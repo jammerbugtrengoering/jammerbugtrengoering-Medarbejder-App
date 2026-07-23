@@ -61,9 +61,77 @@ const DAYS = [
 ];
 
 // ── Login screen ──────────────────────────────────────────────────────────────
-function LoginScreen() {2  const [email, setEmail] = useState("");3  const [password, setPassword] = useState("");4  const [loading, setLoading] = useState(false);5  const [error, setError] = useState("");6 7  async function login() {8    if (!email.trim() || !password.trim()) return;9 10    setLoading(true);11    setError("");12 13    const { error } = await supabase.auth.signInWithPassword({14      email: email.trim(),15      password,16    });17 18    setLoading(false);19 20    if (error) {21      setError(error.message);22    }23  }24 25  return (26    <div style={s.loginWrap}>27      <div style={s.loginCard}>28        <div style={s.brand}>29          <div style={s.brandMark}>RP</div>30          <div>31            <div style={s.brandTitle}>Rengøringsplan</div>32            <div style={s.brandSub}>Medarbejder-app</div>33          </div>34        </div>35 36        <div style={s.loginLabel}>E-mailadresse</div>37        <input38          type="email"39          style={s.loginInput}40          value={email}41          onChange={(e) => setEmail(e.target.value)}42          placeholder="din@email.dk"43        />44 45        <div style={s.loginLabel}>Password</div>46        <input47          type="password"48          style={s.loginInput}49          value={password}50          onChange={(e) => setPassword(e.target.value)}51          placeholder="Password"52          onKeyDown={(e) => {53            if (e.key === "Enter") login();54          }}55        />56 57        {error && (58          <div style={s.errorMsg}>59            {error}60          </div>61        )}62 63        <button64          style={s.loginBtn}65          disabled={loading}66          onClick={login}67        >68          {loading ? "Logger ind..." : "Log ind"}69        </button>70      </div>71    </div>72  );73}Vis færre
-Opret en bruger med password i Supabase
-Gå til:
+
+function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function login() {
+    if (!email || !password) return;
+
+    setLoading(true);
+    setError("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+    }
+  }
+
+  return (
+    <div style={s.loginWrap}>
+      <div style={s.loginCard}>
+        <div style={s.brand}>
+          <div style={s.brandMark}>RP</div>
+          <div>
+            <div style={s.brandTitle}>Rengøringsplan</div>
+            <div style={s.brandSub}>Medarbejder-app</div>
+          </div>
+        </div>
+
+        <div style={s.loginLabel}>E-mail</div>
+        <input
+          type="email"
+          style={s.loginInput}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="jonn.tholstrup@gmail.com"
+        />
+
+        <div style={s.loginLabel}>Password</div>
+        <input
+          type="password"
+          style={s.loginInput}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") login();
+          }}
+        />
+
+        {error && <div style={s.errorMsg}>{error}</div>}
+
+        <button
+          style={s.loginBtn}
+          onClick={login}
+          disabled={loading}
+        >
+          {loading ? "Logger ind..." : "Log ind"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main app ──────────────────────────────────────────────────────────────────
 export default function MedarbejderApp() {
   const [session, setSession] = useState(null);
