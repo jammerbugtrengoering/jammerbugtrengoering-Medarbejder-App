@@ -103,7 +103,7 @@ function LoginScreen() {
           style={s.loginInput}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="jonn.tholstrup@gmail.com"
+          placeholder="din@mail.dk"
         />
 
         <div style={s.loginLabel}>Password</div>
