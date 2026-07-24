@@ -99,23 +99,51 @@ const T = {
 };
 
 // ── Translation helper ───────────────────────────────────────────────────────
-// Bruger MyMemory API — gratis, ingen API-nøgle, understøtter CORS
 const translateCache = {};
 
 async function translateText(text, targetLang) {
   if (!text || targetLang === "da") return text;
   const cacheKey = `${targetLang}:${text}`;
   if (translateCache[cacheKey]) return translateCache[cacheKey];
+
+  console.log("[translate] Translating:", text, "→", targetLang);
+
+  // Prøv MyMemory API
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=da|${targetLang}`;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=da|${targetLang}&de=app@worklist.dk`;
     const res = await fetch(url);
-    const data = await res.json();
-    const translated = data?.responseData?.translatedText || text;
-    translateCache[cacheKey] = translated;
-    return translated;
-  } catch {
-    return text;
+    if (res.ok) {
+      const data = await res.json();
+      const translated = data?.responseData?.translatedText;
+      if (translated && translated !== text) {
+        console.log("[translate] Success:", translated);
+        translateCache[cacheKey] = translated;
+        return translated;
+      }
+    }
+  } catch (e) {
+    console.warn("[translate] MyMemory failed:", e.message);
   }
+
+  // Fallback: Lingva API (open source Google Translate frontend)
+  try {
+    const url = `https://lingva.ml/api/v1/da/${targetLang}/${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      const translated = data?.translation;
+      if (translated) {
+        console.log("[translate] Lingva success:", translated);
+        translateCache[cacheKey] = translated;
+        return translated;
+      }
+    }
+  } catch (e) {
+    console.warn("[translate] Lingva failed:", e.message);
+  }
+
+  console.warn("[translate] All APIs failed, returning original");
+  return text;
 }
 
 async function translateTask(task, targetLang) {
