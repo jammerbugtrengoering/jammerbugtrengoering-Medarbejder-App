@@ -236,16 +236,22 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
         <button style={s.sheetClose} onClick={onClose}><X size={18} /></button>
         <div style={s.sheetScroll}>
 
-          {/* Status + title */}
+          {/* Status + contractType + title */}
           <div style={s.sheetStatusRow}>
             <span style={{ ...s.statusBadge, background: done ? "#ECFDF5" : "#FFF6FA", color: done ? "#16A34A" : "#9C1B5D" }}>
               {done ? "✓ " + tr.status["udført"] : t.status === "i_gang" ? "⚡ " + tr.status["i_gang"] : "⏳ " + tr.status["planlagt"]}
             </span>
+            {t.contractType === "nexus" && (
+              <span style={{ ...s.statusBadge, background: "#EEF2FF", color: "#4F46E5" }}>🏢 Nexus</span>
+            )}
+            {t.contractType === "privat" && (
+              <span style={{ ...s.statusBadge, background: "#FFF6FA", color: "#9C1B5D" }}>🏠 Privat</span>
+            )}
           </div>
           <div style={s.sheetTitle}>{t.title}</div>
           <div style={s.sheetMeta}>{fmtMin(t.duration)}{clProg.total > 0 ? ` · ${clProg.done}/${clProg.total} ${tr.tasks.toLowerCase()}` : ""}</div>
 
-          {/* Customer + address + navigation */}
+          {/* Customer + address + navigation + Nexus link */}
           {(t.customerName || t.address) && (
             <div style={s.sheetSection}>
               <div style={s.sheetSectionTitle}><Building2 size={14} /> {tr.customer}</div>
@@ -259,6 +265,24 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               {mapsUrl && (
                 <a href={mapsUrl} target="_blank" rel="noreferrer" style={s.navBtnLarge}>
                   <Navigation size={16} /> {tr.navigate} — Google Maps
+                </a>
+              )}
+              {t.contractType === "nexus" && (
+                <a
+                  href="kmd-nexus://"
+                  style={{ ...s.navBtnLarge, background: "#4F46E5", marginTop: 8 }}
+                  onClick={(e) => {
+                    // Fallback: hvis app ikke er installeret, åbn App Store / Google Play
+                    setTimeout(() => {
+                      const ua = navigator.userAgent;
+                      if (/android/i.test(ua)) {
+                        window.location.href = "https://play.google.com/store/apps/details?id=dk.kmd.nexusmobile2";
+                      } else if (/iphone|ipad|ipod/i.test(ua)) {
+                        window.location.href = "https://apps.apple.com/dk/app/kmd-nexus-mobile-2/id1234567890";
+                      }
+                    }, 1500);
+                  }}>
+                  🏢 Åbn KMD Nexus Mobile 2
                 </a>
               )}
             </div>
@@ -405,6 +429,7 @@ export default function MedarbejderApp() {
             customerName: i.customer_name || cust?.name || "",
             address: i.address_text || cust?.address || "",
             accessInstructions: i.access_instructions || cust?.access_instructions || "",
+            contractType: i.contract_type || i.contractType || "privat",
           };
         });
 
@@ -568,6 +593,8 @@ export default function MedarbejderApp() {
                   <div style={s.taskCustomer}>
                     <Building2 size={12} color="#9C1B5D" />
                     <span>{t.customerName}</span>
+                    {t.contractType === "nexus" && <span style={{ fontSize: 10, fontWeight: 700, color: "#4F46E5", background: "#EEF2FF", borderRadius: 6, padding: "1px 6px", marginLeft: 4 }}>Nexus</span>}
+                    {t.contractType === "privat" && <span style={{ fontSize: 10, fontWeight: 700, color: "#9C1B5D", background: "#FFF6FA", borderRadius: 6, padding: "1px 6px", marginLeft: 4 }}>Privat</span>}
                   </div>
                 )}
                 <div style={s.taskMeta}>
