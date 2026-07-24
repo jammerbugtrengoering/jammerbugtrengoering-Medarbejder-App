@@ -385,6 +385,14 @@ export default function MedarbejderApp() {
 
   useEffect(() => { localStorage.setItem("wl_lang", lang); }, [lang]);
 
+  // Persist lang change to employee row in DB
+  async function changeLang(newLang) {
+    setLang(newLang);
+    if (employee) {
+      await supabase.from("employees").update({ default_lang: newLang }).eq("id", employee.id);
+    }
+  }
+
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [employee, setEmployee] = useState(null);
@@ -394,6 +402,19 @@ export default function MedarbejderApp() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [day, setDay] = useState(todayKey());
   const [openTask, setOpenTask] = useState(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  async function sendPasswordReset() {
+    if (!session?.user?.email) return;
+    setResetLoading(true);
+    await supabase.auth.resetPasswordForEmail(session.user.email, {
+      redirectTo: window.location.origin,
+    });
+    setResetLoading(false);
+    setResetSent(true);
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setAuthLoading(false); });
@@ -408,6 +429,12 @@ export default function MedarbejderApp() {
       const { data: empData } = await supabase.from("employees").select("*").eq("auth_user_id", session.user.id).single();
       if (!empData) { setDataLoading(false); return; }
       setEmployee(empData);
+
+      // Apply saved language preference
+      if (empData.default_lang && empData.default_lang !== lang) {
+        setLang(empData.default_lang);
+        localStorage.setItem("wl_lang", empData.default_lang);
+      }
 
       const currentWeek = isoWeekNumber(new Date());
       const targetWeek = currentWeek + weekOffset;
@@ -515,11 +542,70 @@ export default function MedarbejderApp() {
           </div>
         </div>
         <div style={s.headerRight}>
-          <LangToggle lang={lang} setLang={setLang} />
-          <span style={s.empName}>{employee.name}</span>
-          <button style={s.signOutBtn} onClick={signOut} title={tr.signOut}><LogOut size={16} /></button>
+          <LangToggle lang={lang} setLang={changeLang} />
+          <button
+            style={{ ...s.signOutBtn, display:"flex", alignItems:"center", gap:6, color:"#E2E8F0", fontSize:13, fontWeight:600 }}
+            onClick={() => setShowProfile((v) => !v)}>
+            <span style={{ width:28, height:28, borderRadius:"50%", background:"#D6247A", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>
+              {employee.name.split(" ").map((n) => n[0]).join("").slice(0,2).toUpperCase()}
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* Profile panel */}
+      {showProfile && (
+        <div style={s.profilePanel}>
+          <div style={s.profileHeader}>
+            <div style={{ width:44, height:44, borderRadius:"50%", background:"#D6247A", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:700, color:"#fff" }}>
+              {employee.name.split(" ").map((n) => n[0]).join("").slice(0,2).toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight:700, fontSize:16, color:"#111111" }}>{employee.name}</div>
+              <div style={{ fontSize:13, color:"#64748B" }}>{session?.user?.email}</div>
+            </div>
+          </div>
+
+          {/* Language */}
+          <div style={s.profileSection}>
+            <div style={s.profileLabel}>🌐 {lang === "da" ? "Sprog / Language" : "Language / Sprog"}</div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button
+                style={{ flex:1, padding:"10px 0", borderRadius:10, border: lang==="da" ? "2px solid #D6247A" : "1.5px solid #E2E8F0", background: lang==="da" ? "#FCE4EF" : "#fff", color: lang==="da" ? "#D6247A" : "#475569", fontWeight:700, fontSize:14, cursor:"pointer" }}
+                onClick={() => changeLang("da")}>🇩🇰 Dansk</button>
+              <button
+                style={{ flex:1, padding:"10px 0", borderRadius:10, border: lang==="en" ? "2px solid #D6247A" : "1.5px solid #E2E8F0", background: lang==="en" ? "#FCE4EF" : "#fff", color: lang==="en" ? "#D6247A" : "#475569", fontWeight:700, fontSize:14, cursor:"pointer" }}
+                onClick={() => changeLang("en")}>🇬🇧 English</button>
+            </div>
+            <div style={{ fontSize:11, color:"#94A3B8", marginTop:4 }}>
+              {lang === "da" ? "Dit sprogvalg gemmes til næste gang" : "Your language preference is saved"}
+            </div>
+          </div>
+
+          {/* Password reset */}
+          <div style={s.profileSection}>
+            <div style={s.profileLabel}>🔑 {lang === "da" ? "Adgangskode" : "Password"}</div>
+            {resetSent ? (
+              <div style={{ fontSize:13, color:"#16A34A", background:"#ECFDF5", padding:"10px 12px", borderRadius:10 }}>
+                ✓ {lang === "da" ? "Link til nulstilling sendt til" : "Reset link sent to"} {session?.user?.email}
+              </div>
+            ) : (
+              <button
+                style={{ width:"100%", padding:"11px 0", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:600, fontSize:14, cursor:"pointer" }}
+                onClick={sendPasswordReset} disabled={resetLoading}>
+                {resetLoading ? "Sender…" : (lang === "da" ? "Send nulstillingslink til min mail" : "Send password reset to my email")}
+              </button>
+            )}
+          </div>
+
+          {/* Sign out */}
+          <button
+            style={{ width:"100%", padding:"13px 0", borderRadius:12, border:"none", background:"#FEF2F2", color:"#DC2626", fontWeight:700, fontSize:15, cursor:"pointer" }}
+            onClick={signOut}>
+            {tr.signOut}
+          </button>
+        </div>
+      )}
 
       {/* Week navigation */}
       <div style={s.weekBar}>
@@ -658,6 +744,11 @@ const s = {
   headerSub: { fontSize:11, color:"#94A3B8" },
   empName: { fontSize:13, fontWeight:600, color:"#E2E8F0" },
   signOutBtn: { border:"none", background:"transparent", color:"#64748B", cursor:"pointer", padding:4, display:"flex", alignItems:"center" },
+
+  profilePanel: { background:"#fff", borderBottom:"1px solid #F1F5F9", padding:"20px 16px 16px", display:"flex", flexDirection:"column", gap:16, boxShadow:"0 4px 16px rgba(0,0,0,0.08)" },
+  profileHeader: { display:"flex", alignItems:"center", gap:12 },
+  profileSection: { display:"flex", flexDirection:"column", gap:8 },
+  profileLabel: { fontSize:12, fontWeight:700, color:"#475569", textTransform:"uppercase", letterSpacing:"0.05em" },
 
   weekBar: { display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"10px 16px", background:"#fff", borderBottom:"1px solid #F1F5F9" },
   weekBtn: { border:"none", background:"#F1F5F9", borderRadius:8, padding:"6px 8px", cursor:"pointer", display:"flex", color:"#475569" },
