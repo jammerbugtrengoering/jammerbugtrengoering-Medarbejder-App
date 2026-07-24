@@ -98,7 +98,33 @@ const T = {
   },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Translation helper ───────────────────────────────────────────────────────
+// Bruger Google Translate's gratis web-API til at oversætte tekst
+async function translateText(text, targetLang) {
+  if (!text || targetLang === "da") return text;
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=da&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    return data[0].map((s) => s[0]).join("") || text;
+  } catch {
+    return text;
+  }
+}
+
+async function translateTask(task, targetLang) {
+  if (targetLang === "da") return task;
+  const [title, accessInstructions, checklist] = await Promise.all([
+    translateText(task.title, targetLang),
+    translateText(task.accessInstructions, targetLang),
+    Promise.all((task.checklist || []).map(async (item) => ({
+      ...item,
+      text: await translateText(item.text, targetLang),
+      description: await translateText(item.description, targetLang),
+    }))),
+  ]);
+  return { ...task, title, accessInstructions, checklist };
+}
 function fmtMin(min) {
   if (!min || min <= 0) return "0m";
   const h = Math.floor(min / 60), m = Math.round(min % 60);
@@ -220,15 +246,28 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const tr = T[lang];
   const [minutes, setMinutes] = useState("");
   const [saving, setSaving] = useState(false);
-  if (!task) return null;
+  const [translatedTask, setTranslatedTask] = useState(null);
+  const [translating, setTranslating] = useState(false);
 
-  const t = task;
-  const myLogged = (t.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
-  const totalLogged = (t.timeLog || []).reduce((s, l) => s + (l.minutes || 0), 0);
-  const done = t.status === "udført";
-  const clProg = { done: (t.checklist || []).filter((i) => i.done).length, total: (t.checklist || []).length };
-  const mapsUrl = t.address
-    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.address)}`
+  useEffect(() => {
+    if (!task) return;
+    if (lang === "da") { setTranslatedTask(null); return; }
+    setTranslating(true);
+    translateTask(task, lang).then((tt) => {
+      setTranslatedTask(tt);
+      setTranslating(false);
+    });
+  }, [task?.id, lang]);
+
+  if (!task) return null;
+  // Brug oversat version hvis tilgængeligt, ellers original
+  const t = translatedTask || task;
+  const myLogged = (task.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
+  const totalLogged = (task.timeLog || []).reduce((s, l) => s + (l.minutes || 0), 0);
+  const done = task.status === "udført";
+  const clProg = { done: (task.checklist || []).filter((i) => i.done).length, total: (task.checklist || []).length };
+  const mapsUrl = task.address
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(task.address)}`
     : null;
 
   async function handleLog() {
@@ -250,13 +289,16 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           {/* Status + contractType + title */}
           <div style={s.sheetStatusRow}>
             <span style={{ ...s.statusBadge, background: done ? "#ECFDF5" : "#FFF6FA", color: done ? "#16A34A" : "#9C1B5D" }}>
-              {done ? "✓ " + tr.status["udført"] : t.status === "i_gang" ? "⚡ " + tr.status["i_gang"] : "⏳ " + tr.status["planlagt"]}
+              {done ? "✓ " + tr.status["udført"] : task.status === "i_gang" ? "⚡ " + tr.status["i_gang"] : "⏳ " + tr.status["planlagt"]}
             </span>
-            {t.contractType === "nexus" && (
+            {task.contractType === "nexus" && (
               <span style={{ ...s.statusBadge, background: "#EEF2FF", color: "#4F46E5" }}>🏢 Nexus</span>
             )}
-            {t.contractType === "privat" && (
+            {task.contractType === "privat" && (
               <span style={{ ...s.statusBadge, background: "#FFF6FA", color: "#9C1B5D" }}>🏠 Privat</span>
+            )}
+            {translating && (
+              <span style={{ ...s.statusBadge, background: "#F0FDF4", color: "#16A34A" }}>🌐 Oversætter…</span>
             )}
           </div>
           <div style={s.sheetTitle}>{t.title}</div>
@@ -389,7 +431,58 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   );
 }
 
-// ── Main app ──────────────────────────────────────────────────────────────────
+// ── Hook: oversæt opgavetitel i listen ───────────────────────────────────────
+function useTranslatedTitle(title, lang) {
+  const [translated, setTranslated] = useState(title);
+  useEffect(() => {
+    if (lang === "da") { setTranslated(title); return; }
+    translateText(title, lang).then(setTranslated);
+  }, [title, lang]);
+  return translated;
+}
+function useTranslatedTitle(title, lang) {
+  const [translated, setTranslated] = useState(title);
+  useEffect(() => {
+    if (lang === "da") { setTranslated(title); return; }
+    translateText(title, lang).then(setTranslated);
+  }, [title, lang]);
+  return translated;
+}
+
+function TaskCard({ seg, employee, lang, onClick }) {
+  const t = seg.task;
+  const done = t.status === "udført";
+  const inProgress = t.status === "i_gang";
+  const myLogged = (t.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
+  const clProg = { done: (t.checklist || []).filter((i) => i.done).length, total: (t.checklist || []).length };
+  const translatedTitle = useTranslatedTitle(t.title, lang);
+  return (
+    <div style={{ ...s.taskCard, opacity: done ? 0.7 : 1 }} onClick={onClick}>
+      <div style={{ ...s.taskAccent, background: done ? "#22C55E" : inProgress ? "#F59E0B" : "#D6247A" }} />
+      <div style={s.taskBody}>
+        <div style={s.taskTime}>{fmtClock(seg.start)}</div>
+        <div style={s.taskTitle}>{translatedTitle}</div>
+        {t.customerName && (
+          <div style={s.taskCustomer}>
+            <Building2 size={12} color="#9C1B5D" />
+            <span>{t.customerName}</span>
+            {t.contractType === "nexus" && <span style={{ fontSize:10, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Nexus</span>}
+            {t.contractType === "privat" && <span style={{ fontSize:10, fontWeight:700, color:"#9C1B5D", background:"#FFF6FA", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Privat</span>}
+          </div>
+        )}
+        <div style={s.taskMeta}>
+          <span style={s.taskDuration}>{fmtMin(t.duration)}</span>
+          {clProg.total > 0 && <span style={s.taskChecklist}><ListChecks size={11} /> {clProg.done}/{clProg.total}</span>}
+          {myLogged > 0 && <span style={s.taskLogged}><Clock size={11} /> {fmtMin(myLogged)}</span>}
+        </div>
+      </div>
+      <div style={s.taskRight}>
+        {done ? <CheckCircle2 size={24} color="#22C55E" /> : <ChevronRight size={20} color="#CBD5E1" />}
+      </div>
+    </div>
+  );
+}
+
 export default function MedarbejderApp() {
   const [lang, setLang] = useState(() => localStorage.getItem("wl_lang") || "en");
   const tr = T[lang];
@@ -610,6 +703,12 @@ export default function MedarbejderApp() {
           </div>
 
           {/* Sign out */}
+          <a
+            href={`https://translate.google.com/translate?sl=da&tl=en&u=${encodeURIComponent(window.location.href)}`}
+            target="_blank" rel="noreferrer"
+            style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", padding:"11px 0", borderRadius:12, border:"1.5px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:600, fontSize:14, textDecoration:"none" }}>
+            🌐 {lang === "da" ? "Oversæt siden til engelsk" : "Translate page to Danish"}
+          </a>
           <button
             style={{ width:"100%", padding:"13px 0", borderRadius:12, border:"none", background:"#FEF2F2", color:"#DC2626", fontWeight:700, fontSize:15, cursor:"pointer" }}
             onClick={signOut}>
@@ -675,39 +774,8 @@ export default function MedarbejderApp() {
           }
 
           const t = seg.task;
-          const done = t.status === "udført";
-          const inProgress = t.status === "i_gang";
-          const myLogged = (t.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
-          const clProg = { done: (t.checklist || []).filter((i) => i.done).length, total: (t.checklist || []).length };
-
           return (
-            <div key={t.id} style={{ ...s.taskCard, opacity: done ? 0.7 : 1 }} onClick={() => setOpenTask(t)}>
-              <div style={{ ...s.taskAccent, background: done ? "#22C55E" : inProgress ? "#F59E0B" : "#D6247A" }} />
-              <div style={s.taskBody}>
-                <div style={s.taskTime}>{fmtClock(seg.start)}</div>
-                <div style={s.taskTitle}>{t.title}</div>
-                {t.customerName && (
-                  <div style={s.taskCustomer}>
-                    <Building2 size={12} color="#9C1B5D" />
-                    <span>{t.customerName}</span>
-                    {t.contractType === "nexus" && <span style={{ fontSize: 10, fontWeight: 700, color: "#4F46E5", background: "#EEF2FF", borderRadius: 6, padding: "1px 6px", marginLeft: 4 }}>Nexus</span>}
-                    {t.contractType === "privat" && <span style={{ fontSize: 10, fontWeight: 700, color: "#9C1B5D", background: "#FFF6FA", borderRadius: 6, padding: "1px 6px", marginLeft: 4 }}>Privat</span>}
-                  </div>
-                )}
-                <div style={s.taskMeta}>
-                  <span style={s.taskDuration}>{fmtMin(t.duration)}</span>
-                  {clProg.total > 0 && (
-                    <span style={s.taskChecklist}><ListChecks size={11} /> {clProg.done}/{clProg.total}</span>
-                  )}
-                  {myLogged > 0 && (
-                    <span style={s.taskLogged}><Clock size={11} /> {fmtMin(myLogged)}</span>
-                  )}
-                </div>
-              </div>
-              <div style={s.taskRight}>
-                {done ? <CheckCircle2 size={24} color="#22C55E" /> : <ChevronRight size={20} color="#CBD5E1" />}
-              </div>
-            </div>
+            <TaskCard key={t.id} seg={seg} employee={employee} lang={lang} onClick={() => setOpenTask(t)} />
           );
         })}
       </div>
