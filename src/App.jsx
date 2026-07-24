@@ -99,14 +99,20 @@ const T = {
 };
 
 // ── Translation helper ───────────────────────────────────────────────────────
-// Bruger Google Translate's gratis web-API til at oversætte tekst
+// Bruger MyMemory API — gratis, ingen API-nøgle, understøtter CORS
+const translateCache = {};
+
 async function translateText(text, targetLang) {
   if (!text || targetLang === "da") return text;
+  const cacheKey = `${targetLang}:${text}`;
+  if (translateCache[cacheKey]) return translateCache[cacheKey];
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=da&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=da|${targetLang}`;
     const res = await fetch(url);
     const data = await res.json();
-    return data[0].map((s) => s[0]).join("") || text;
+    const translated = data?.responseData?.translatedText || text;
+    translateCache[cacheKey] = translated;
+    return translated;
   } catch {
     return text;
   }
