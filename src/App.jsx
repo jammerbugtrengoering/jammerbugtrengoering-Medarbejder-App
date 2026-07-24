@@ -529,6 +529,7 @@ export default function MedarbejderApp() {
   const [showProfile, setShowProfile] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [showWeekend, setShowWeekend] = useState(false);
 
   async function sendPasswordReset() {
     if (!session?.user?.email) return;
@@ -651,7 +652,6 @@ export default function MedarbejderApp() {
   const currentWeek = isoWeekNumber(new Date()) + weekOffset;
   const ALL_DAYS = tr.days;
   const hasWeekendTasks = instances.some((t) => t.day === "Sat" || t.day === "Sun");
-  const [showWeekend, setShowWeekend] = useState(false);
   const DAYS = (showWeekend || hasWeekendTasks) ? ALL_DAYS : ALL_DAYS.filter((d) => !d.weekend);
   const myTasks = instances.filter((t) => t.day === day);
   const schedule = computeDaySchedule(myTasks, travelSettings);
