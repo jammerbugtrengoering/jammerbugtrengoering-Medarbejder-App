@@ -117,9 +117,20 @@ function isoWeekNumber(date) {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 function todayKey() {
+  // Brug lokal dato — ikke UTC — så dansk tidszone er korrekt
+  const now = new Date();
   const keys = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const k = keys[new Date().getDay()];
+  const k = keys[now.getDay()];
   return ["Mon","Tue","Wed","Thu","Fri"].includes(k) ? k : "Mon";
+}
+
+function isoWeekNumber(date) {
+  // Brug lokal dato for at undgå UTC-offset forskydning
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayNum = (d.getDay() + 6) % 7; // Man=0, Tir=1 ... Søn=6
+  d.setDate(d.getDate() - dayNum + 3); // Nærmeste torsdag
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 function travelKey(a, b) { return [a, b].sort().join(" || "); }
 function getTravelMinutes(addrA, addrB, settings) {
