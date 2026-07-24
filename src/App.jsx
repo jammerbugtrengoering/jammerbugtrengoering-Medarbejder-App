@@ -30,6 +30,8 @@ const T = {
       { key: "Wed", label: "Onsdag", short: "Ons" },
       { key: "Thu", label: "Torsdag", short: "Tor" },
       { key: "Fri", label: "Fredag", short: "Fre" },
+      { key: "Sat", label: "Lørdag", short: "Lør", weekend: true },
+      { key: "Sun", label: "Søndag", short: "Søn", weekend: true },
     ],
     noTasks: (day) => `Ingen opgaver ${day}`,
     freeDayNote: "Fri dag eller ingen tildelte opgaver",
@@ -74,6 +76,8 @@ const T = {
       { key: "Wed", label: "Wednesday", short: "Wed" },
       { key: "Thu", label: "Thursday", short: "Thu" },
       { key: "Fri", label: "Friday", short: "Fri" },
+      { key: "Sat", label: "Saturday", short: "Sat", weekend: true },
+      { key: "Sun", label: "Sunday", short: "Sun", weekend: true },
     ],
     noTasks: (day) => `No tasks ${day}`,
     freeDayNote: "Day off or no assigned tasks",
@@ -645,7 +649,10 @@ export default function MedarbejderApp() {
   );
 
   const currentWeek = isoWeekNumber(new Date()) + weekOffset;
-  const DAYS = tr.days;
+  const ALL_DAYS = tr.days;
+  const hasWeekendTasks = instances.some((t) => t.day === "Sat" || t.day === "Sun");
+  const [showWeekend, setShowWeekend] = useState(false);
+  const DAYS = (showWeekend || hasWeekendTasks) ? ALL_DAYS : ALL_DAYS.filter((d) => !d.weekend);
   const myTasks = instances.filter((t) => t.day === day);
   const schedule = computeDaySchedule(myTasks, travelSettings);
 
@@ -744,14 +751,26 @@ export default function MedarbejderApp() {
         {weekOffset !== 0 && (
           <button style={s.todayBtn} onClick={() => setWeekOffset(0)}>{tr.today}</button>
         )}
+        <button
+          style={{ ...s.todayBtn, background: showWeekend ? "#D6247A" : "#F1F5F9", color: showWeekend ? "#fff" : "#475569", marginLeft: 4 }}
+          onClick={() => setShowWeekend((v) => !v)}
+          title="Vis/skjul weekend">
+          {showWeekend ? "Man–Søn" : "+ Weekend"}
+        </button>
       </div>
 
       {/* Day tabs */}
       <div style={s.dayBar}>
         {DAYS.map((d) => {
           const count = instances.filter((t) => t.day === d.key).length;
+          const isWeekend = d.weekend;
           return (
-            <button key={d.key} style={d.key === day ? s.dayTabActive : s.dayTab} onClick={() => setDay(d.key)}>
+            <button key={d.key}
+              style={d.key === day
+                ? { ...s.dayTabActive, ...(isWeekend ? { color: "#B45309", borderBottomColor: "#B45309" } : {}) }
+                : { ...s.dayTab, ...(isWeekend ? { color: "#CBD5E1" } : {}) }
+              }
+              onClick={() => setDay(d.key)}>
               <span>{d.short}</span>
               {count > 0 && <span style={d.key === day ? s.dayCountActive : s.dayCount}>{count}</span>}
             </button>
