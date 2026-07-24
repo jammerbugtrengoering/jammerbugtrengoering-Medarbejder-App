@@ -178,6 +178,10 @@ function isoWeekNumber(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 function todayKey() {
+  const keys = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const k = keys[new Date().getDay()];
+  return ["Mon","Tue","Wed","Thu","Fri"].includes(k) ? k : "Mon";
+}
 function travelKey(a, b) { return [a, b].sort().join(" || "); }
 function getTravelMinutes(addrA, addrB, settings) {
   if (!addrA || !addrB || addrA === addrB) return 0;
