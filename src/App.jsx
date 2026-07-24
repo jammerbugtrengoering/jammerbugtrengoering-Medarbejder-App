@@ -61,29 +61,21 @@ const DAYS = [
 ];
 
 // ── Login screen ──────────────────────────────────────────────────────────────
-
 function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  async function login() {
-    if (!email || !password) return;
-
-    setLoading(true);
-    setError("");
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
+  async function signIn() {
+    if (!email.trim() || !password) return;
+    setLoading(true); setError("");
+    const { error: err } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
       password,
     });
-
     setLoading(false);
-
-    if (error) {
-      setError(error.message);
-    }
+    if (err) setError("Forkert e-mail eller adgangskode");
   }
 
   return (
@@ -96,36 +88,23 @@ function LoginScreen() {
             <div style={s.brandSub}>Medarbejder-app</div>
           </div>
         </div>
-
-        <div style={s.loginLabel}>E-mail</div>
+        <div style={s.loginLabel}>E-mailadresse</div>
         <input
-          type="email"
-          style={s.loginInput}
-          value={email}
+          type="email" style={s.loginInput} value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="din@mail.dk"
+          onKeyDown={(e) => { if (e.key === "Enter") signIn(); }}
+          placeholder="din@email.dk" autoFocus
         />
-
-        <div style={s.loginLabel}>Password</div>
+        <div style={s.loginLabel}>Adgangskode</div>
         <input
-          type="password"
-          style={s.loginInput}
-          value={password}
+          type="password" style={s.loginInput} value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") login();
-          }}
+          onKeyDown={(e) => { if (e.key === "Enter") signIn(); }}
+          placeholder="••••••••"
         />
-
-        {error && <div style={s.errorMsg}>{error}</div>}
-
-        <button
-          style={s.loginBtn}
-          onClick={login}
-          disabled={loading}
-        >
-          {loading ? "Logger ind..." : "Log ind"}
+        {error && <div style={{ ...s.errorMsg, padding:"8px 10px", background:"#FEF2F2", borderRadius:8 }}>{error}</div>}
+        <button style={s.loginBtn} disabled={loading || !email.trim() || !password} onClick={signIn}>
+          {loading ? "Logger ind…" : "Log ind"}
         </button>
       </div>
     </div>
@@ -165,28 +144,47 @@ export default function MedarbejderApp() {
     if (!session) return;
     async function load() {
       setDataLoading(true);
+
       // Find employee row
       const { data: empData } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("auth_user_id", session.user.id)
-        .single();
+        .from("employees").select("*")
+        .eq("auth_user_id", session.user.id).single();
 
       if (!empData) { setDataLoading(false); return; }
       setEmployee(empData);
 
-      // Load instances assigned to this employee
       const currentWeek = isoWeekNumber(new Date());
       const targetWeek = currentWeek + weekOffset;
-      const { data: instData } = await supabase
-        .from("instances")
-        .select("*")
-        .contains("assignees", JSON.stringify([empData.id]))
-        .eq("week", targetWeek);
 
-      setInstances((instData || []).map((i) => ({
-        ...i, timeLog: i.time_log ?? [], requiredSkills: i.required_skills ?? [],
-      })));
+      // Hent alle instanser for ugen, filtrer client-side på assignees
+      // (Supabase JSONB contains på arrays kræver @> operator via rpc eller filter)
+      const { data: instData } = await supabase
+        .from("instances").select("*").eq("week", targetWeek);
+
+      // Hent customers til at berige instanser med navn/adresse
+      const { data: customersData } = await supabase.from("customers").select("*");
+      const custMap = Object.fromEntries((customersData || []).map((c) => [c.id, c]));
+
+      const myInstances = (instData || [])
+        .filter((i) => {
+          const arr = i.assignees;
+          if (!arr) return false;
+          const parsed = typeof arr === "string" ? JSON.parse(arr) : arr;
+          return parsed.includes(empData.id);
+        })
+        .map((i) => {
+          const cust = custMap[i.customer_id];
+          return {
+            ...i,
+            timeLog: i.time_log ?? [],
+            requiredSkills: i.required_skills ?? [],
+            customerName: i.customer_name || cust?.name || "",
+            address: i.address_text || cust?.address || "",
+            accessInstructions: i.access_instructions || cust?.access_instructions || "",
+          };
+        });
+
+      setInstances(myInstances);
 
       // Travel settings
       const { data: travel } = await supabase.from("travel_settings").select("*").eq("id", "default").single();
@@ -204,12 +202,18 @@ export default function MedarbejderApp() {
   }, [session, weekOffset]);
 
   async function logMinutes(taskId, minutes) {
-    if (!employee || minutes <= 0) return;
+    if (!employee || !minutes || Number(minutes) <= 0) return;
+    const mins = Number(minutes);
     const task = instances.find((t) => t.id === taskId);
     if (!task) return;
-    const newLog = [...(task.time_log ?? task.timeLog ?? []), { minutes, empId: employee.id }];
-    await supabase.from("instances").update({ time_log: newLog }).eq("id", taskId);
-    setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, timeLog: newLog, time_log: newLog } : t));
+    const existing = task.time_log ?? task.timeLog ?? [];
+    const newLog = [...existing, { minutes: mins, empId: employee.id, ts: Date.now() }];
+    const { error } = await supabase.from("instances").update({ time_log: newLog }).eq("id", taskId);
+    if (!error) {
+      setInstances((prev) => prev.map((t) =>
+        t.id === taskId ? { ...t, timeLog: newLog, time_log: newLog } : t
+      ));
+    }
     setMinuteInputs((prev) => ({ ...prev, [taskId]: "" }));
   }
 
@@ -309,17 +313,22 @@ export default function MedarbejderApp() {
 
           return (
             <div key={t.id} style={{ ...s.card, opacity: done ? 0.65 : 1 }}>
-              {/* Card header */}
+              {/* Card header — altid klikbar */}
               <div style={s.cardTop} onClick={() => setOpenTaskId(open ? null : t.id)}>
                 <div style={s.cardTopLeft}>
                   <div style={s.cardTime}>{fmtClock(seg.start)}</div>
                   <div style={s.cardTitle}>{t.title}</div>
-                  <div style={s.cardMeta}>{fmtMin(t.duration)}{clProg.total > 0 ? ` · ${clProg.done}/${clProg.total} tasks` : ""}</div>
+                  <div style={s.cardMeta}>
+                    {fmtMin(t.duration)}
+                    {clProg.total > 0 ? ` · ${clProg.done}/${clProg.total} tasks` : ""}
+                    {" · "}
+                    <span style={{ color: open ? "#D6247A" : "#94A3B8" }}>{open ? "▲ Luk" : "▼ Detaljer"}</span>
+                  </div>
                 </div>
-                {done && <CheckCircle2 size={22} color="#111111" />}
+                {done && <CheckCircle2 size={22} color="#22C55E" />}
               </div>
 
-              {/* Address */}
+              {/* Adresse + navigation — vises ALTID når data er til stede */}
               {(t.customerName || t.address) && (
                 <div style={s.addressRow}>
                   <Building2 size={13} color="#9C1B5D" style={{ flexShrink: 0, marginTop: 2 }} />
@@ -328,8 +337,10 @@ export default function MedarbejderApp() {
                     {t.address && <div style={s.cardMeta}>{t.address}</div>}
                   </div>
                   {t.address && (
-                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.address)}`}
-                      target="_blank" rel="noreferrer" style={s.navBtn}>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.address)}`}
+                      target="_blank" rel="noreferrer" style={s.navBtn}
+                      onClick={(e) => e.stopPropagation()}>
                       <Navigation size={12} /> Naviger
                     </a>
                   )}
@@ -379,22 +390,32 @@ export default function MedarbejderApp() {
 
               {/* Footer: time log + done */}
               <div style={s.cardFooter}>
-                <div style={s.timeLogged}><Clock size={12} /> {fmtMin(myLogged)} / {fmtMin(t.duration)}</div>
+                <div style={s.timeLogged}>
+                  <Clock size={12} />
+                  <span>{fmtMin(myLogged)} registreret</span>
+                  <span style={{ color: "#CBD5E1" }}>/</span>
+                  <span>{fmtMin(t.duration)} planlagt</span>
+                </div>
                 <div style={s.footerRight}>
                   <input
                     type="number" min={1} step={5} placeholder="min"
                     style={s.minInput}
                     value={inputVal}
                     onChange={(e) => setMinuteInputs((prev) => ({ ...prev, [t.id]: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === "Enter" && Number(inputVal) > 0) logMinutes(t.id, Number(inputVal)); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        logMinutes(t.id, inputVal);
+                      }
+                    }}
                   />
-                  <button style={s.logBtn} disabled={!inputVal || Number(inputVal) <= 0}
-                    onClick={() => logMinutes(t.id, Number(inputVal))}>
-                    <Clock size={12} /> Gem
+                  <button
+                    style={{ ...s.logBtn, opacity: (!inputVal || Number(inputVal) <= 0) ? 0.4 : 1 }}
+                    onClick={() => logMinutes(t.id, inputVal)}>
+                    <Clock size={12} /> Gem tid
                   </button>
                   <button style={done ? s.doneBtnActive : s.doneBtn}
                     onClick={() => setStatus(t.id, done ? "planlagt" : "udført")}>
-                    <CheckCircle2 size={12} /> {done ? "Udført ✓" : "Marker udført"}
+                    <CheckCircle2 size={12} /> {done ? "Udført ✓" : "Udført"}
                   </button>
                 </div>
               </div>
