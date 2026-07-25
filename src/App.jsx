@@ -758,6 +758,7 @@ export default function MedarbejderApp() {
   const [day, setDay] = useState(todayWorkdayKey());
   const [openTask, setOpenTask] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showShop, setShowShop] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [showWeekend, setShowWeekend] = useState(false);
@@ -901,6 +902,12 @@ export default function MedarbejderApp() {
         </div>
         <div style={s.headerRight}>
           <LangToggle lang={lang} setLang={changeLang} />
+          <button
+            style={{ border:"none", background:"#FCE4EF", color:"#D6247A", borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:700, cursor:"pointer" }}
+            onClick={() => setShowShop(true)}
+            title={lang === "da" ? "Bestil medarbejderprodukter" : "Order staff products"}>
+            👕
+          </button>
           <button
             style={{ ...s.signOutBtn, display:"flex", alignItems:"center", gap:6, color:"#E2E8F0", fontSize:13, fontWeight:600 }}
             onClick={() => setShowProfile((v) => !v)}>
@@ -1063,6 +1070,15 @@ export default function MedarbejderApp() {
         })}
       </div>
 
+      {showShop && (
+        <ShopPage
+          employee={employee}
+          lang={lang}
+          supabaseClient={supabase}
+          onClose={() => setShowShop(false)}
+        />
+      )}
+
       {/* Task modal */}
       {openTask && (
         <TaskModal
@@ -1184,3 +1200,149 @@ const s = {
   doneLarge: { width:"100%", padding:"16px 0", borderRadius:14, border:"2px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:700, fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
   doneActiveLarge: { width:"100%", padding:"16px 0", borderRadius:14, border:"2px solid #22C55E", background:"#ECFDF5", color:"#16A34A", fontWeight:700, fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
 };
+
+// ── Employee shop page ────────────────────────────────────────────────────────
+function ShopPage({ employee, lang, supabaseClient, onClose }) {
+  const [items, setItems] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [view, setView] = useState("shop");
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      const { data: cats } = await supabaseClient.from("inventory_categories").select("id").eq("type", "medarbejder");
+      if (cats?.length) {
+        const { data: products } = await supabaseClient
+          .from("inventory_items")
+          .select("*, inventory_categories(name, icon)")
+          .in("category_id", cats.map((c) => c.id))
+          .order("name");
+        setItems(products || []);
+      }
+      const { data: txns } = await supabaseClient
+        .from("inventory_transactions")
+        .select("*, inventory_items(name, unit)")
+        .eq("employee_id", employee.id)
+        .eq("type", "out")
+        .order("id", { ascending: false })
+        .limit(30);
+      setHistory(txns || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  async function submitOrder() {
+    const entries = Object.entries(selected).filter(([, q]) => Number(q) > 0);
+    if (!entries.length) return;
+    setSaving(true);
+    for (const [itemId, qty] of entries) {
+      const amount = Number(qty);
+      const item = items.find((i) => i.id === itemId);
+      if (!item) continue;
+      await supabaseClient.from("inventory_transactions").insert({
+        item_id: itemId, quantity: -amount, type: "out",
+        reason: lang === "da" ? `Bestilt af ${employee.name}` : `Ordered by ${employee.name}`,
+        employee_id: employee.id,
+      });
+      await supabaseClient.from("inventory_items").update({ stock: Math.max(0, item.stock - amount) }).eq("id", itemId);
+    }
+    const { data: txns } = await supabaseClient
+      .from("inventory_transactions")
+      .select("*, inventory_items(name, unit)")
+      .eq("employee_id", employee.id).eq("type", "out")
+      .order("id", { ascending: false }).limit(30);
+    setHistory(txns || []);
+    setSelected({});
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  const orderCount = Object.values(selected).filter((q) => Number(q) > 0).length;
+
+  return (
+    <div style={s.overlay} onClick={onClose}>
+      <div style={{ ...s.sheet, maxHeight: "92svh" }} onClick={(e) => e.stopPropagation()}>
+        <div style={s.dragHandle} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px 0" }}>
+          <div style={{ fontWeight: 800, fontSize: 18, color: "#111111" }}>
+            {"\uD83D\uDC55"} {lang === "da" ? "Medarbejderprodukter" : "Staff products"}
+          </div>
+          <button style={s.sheetClose} onClick={onClose}><X size={18} /></button>
+        </div>
+        <div style={{ display: "flex", padding: "10px 20px 0", gap: 8, borderBottom: "1px solid #F1F5F9" }}>
+          {[["shop", lang === "da" ? "Bestil" : "Order"], ["history", lang === "da" ? "Historik" : "History"]].map(([k, l]) => (
+            <button key={k} onClick={() => setView(k)}
+              style={{ padding: "8px 16px", border: "none", background: "transparent", fontWeight: view === k ? 700 : 500, color: view === k ? "#D6247A" : "#94A3B8", borderBottom: view === k ? "2.5px solid #D6247A" : "2.5px solid transparent", cursor: "pointer", fontSize: 14 }}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px" }}>
+          {loading ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Indlæser…</div>
+          ) : view === "shop" ? (
+            items.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#94A3B8", fontSize: 14 }}>
+                {lang === "da" ? "Ingen medarbejderprodukter" : "No staff products"}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {items.map((item) => {
+                  const qty = selected[item.id] || "";
+                  const hasQty = Number(qty) > 0;
+                  return (
+                    <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #F1F5F9", background: hasQty ? "#FFF6FA" : "transparent", borderRadius: hasQty ? 10 : 0, paddingLeft: hasQty ? 10 : 0 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: hasQty ? 700 : 500, color: "#111111" }}>{item.inventory_categories?.icon} {item.name}</div>
+                        <div style={{ fontSize: 12, color: "#94A3B8" }}>{lang === "da" ? "Lager" : "Stock"}: {item.stock} {item.unit}</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <button style={{ width:32,height:32,borderRadius:"50%",border:"1.5px solid #E2E8F0",background:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#475569" }}
+                          onClick={() => setSelected((prev) => ({ ...prev, [item.id]: Math.max(0,(Number(prev[item.id])||0)-1)||"" }))}>-</button>
+                        <input type="number" min={0} max={item.stock} step={1}
+                          style={{ width:52,padding:"7px 4px",borderRadius:8,border:hasQty?"2px solid #D6247A":"1.5px solid #E2E8F0",fontSize:15,textAlign:"center",color:"#111111",background:"#fff",fontWeight:hasQty?700:400 }}
+                          value={qty} onChange={(e) => setSelected((prev) => ({ ...prev, [item.id]: e.target.value }))} />
+                        <button style={{ width:32,height:32,borderRadius:"50%",border:"1.5px solid #D6247A",background:"#FCE4EF",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#D6247A" }}
+                          onClick={() => setSelected((prev) => ({ ...prev, [item.id]: (Number(prev[item.id])||0)+1 }))}>+</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            history.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#94A3B8", fontSize: 14 }}>
+                {lang === "da" ? "Ingen bestillinger endnu" : "No orders yet"}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {history.map((tx) => (
+                  <div key={tx.id} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F1F5F9" }}>
+                    <div style={{ fontSize:14,color:"#111111" }}>{tx.inventory_items?.name}</div>
+                    <div style={{ fontSize:14,fontWeight:700,color:"#111111" }}>{Math.abs(tx.quantity)} {tx.inventory_items?.unit}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+        {view === "shop" && (
+          <div style={{ padding:"12px 20px 32px",borderTop:"1px solid #F1F5F9" }}>
+            <button
+              style={{ ...s.doneLarge,background:saved?"#ECFDF5":orderCount>0?"#D6247A":"#fff",color:saved?"#16A34A":orderCount>0?"#fff":"#475569",borderColor:saved?"#22C55E":orderCount>0?"#D6247A":"#E2E8F0",fontWeight:700 }}
+              onClick={submitOrder} disabled={saving||orderCount===0}>
+              {saved?("\u2713 "+(lang==="da"?"Bestilling sendt":"Order sent")):saving?"...":(orderCount>0?(lang==="da"?"Bestil ":"Order ")+orderCount+" "+(lang==="da"?"produkter":"products"):(lang==="da"?"Vaelg produkter":"Select products"))}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
