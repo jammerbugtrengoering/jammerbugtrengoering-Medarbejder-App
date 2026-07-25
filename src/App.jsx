@@ -269,6 +269,171 @@ function LoginScreen({ lang, setLang }) {
   );
 }
 
+// ── Product usage page ────────────────────────────────────────────────────────
+function ProductPage({ task, employee, lang, onClose, onSave, supabaseClient }) {
+  const tr = T[lang];
+  const [items, setItems] = useState([]);
+  const [selected, setSelected] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      // Hent kun kundeprodukter
+      const { data: cats } = await supabaseClient.from("inventory_categories").select("id").eq("type", "kunde");
+      const catIds = (cats || []).map((c) => c.id);
+      if (!catIds.length) { setLoading(false); return; }
+      const { data } = await supabaseClient
+        .from("inventory_items")
+        .select("*, inventory_categories(name,icon)")
+        .in("category_id", catIds)
+        .order("name");
+      setItems(data || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  async function save() {
+    const entries = Object.entries(selected).filter(([, qty]) => Number(qty) > 0);
+    if (!entries.length) { onClose(); return; }
+    setSaving(true);
+    for (const [itemId, qty] of entries) {
+      const amount = Number(qty);
+      const item = items.find((i) => i.id === itemId);
+      if (!item) continue;
+      await supabaseClient.from("inventory_transactions").insert({
+        item_id: itemId, quantity: -amount, type: "out",
+        reason: `Brugt på: ${task.title}`,
+        instance_id: task.id, employee_id: employee.id,
+      });
+      await supabaseClient.from("inventory_items").update({ stock: Math.max(0, item.stock - amount) }).eq("id", itemId);
+    }
+    setSaving(false);
+    onSave(entries.map(([id, qty]) => ({ id, qty: Number(qty), name: items.find((i) => i.id === id)?.name })));
+  }
+
+  const usedCount = Object.values(selected).filter((v) => Number(v) > 0).length;
+
+  return (
+    <div style={s.overlay} onClick={onClose}>
+      <div style={{ ...s.sheet, maxHeight: "95svh" }} onClick={(e) => e.stopPropagation()}>
+        <div style={s.dragHandle} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px 0" }}>
+          <div style={{ fontWeight: 800, fontSize: 18, color: "#111111" }}>
+            📦 {lang === "da" ? "Produkter brugt" : "Products used"}
+          </div>
+          <button style={s.sheetClose} onClick={onClose}><X size={18} /></button>
+        </div>
+        <div style={{ fontSize: 13, color: "#64748B", padding: "4px 20px 12px" }}>{task.title}</div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 20px" }}>
+          {loading ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Indlæser produkter…</div>
+          ) : items.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>
+              {lang === "da" ? "Ingen kundeprodukter på lager" : "No customer products in inventory"}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {items.map((item) => {
+                const qty = selected[item.id] || "";
+                const hasQty = Number(qty) > 0;
+                return (
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #F1F5F9", background: hasQty ? "#FFF6FA" : "transparent", borderRadius: hasQty ? 10 : 0, paddingLeft: hasQty ? 10 : 0, transition: "all 0.15s" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: hasQty ? 700 : 500, color: "#111111" }}>
+                        {item.inventory_categories?.icon} {item.name}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
+                        {lang === "da" ? "Lager" : "Stock"}: {item.stock} {item.unit}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button
+                        style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid #E2E8F0", background: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}
+                        onClick={() => setSelected((prev) => ({ ...prev, [item.id]: Math.max(0, (Number(prev[item.id]) || 0) - 1) || "" }))}>−</button>
+                      <input
+                        type="number" min={0} max={item.stock} step={1}
+                        style={{ width: 52, padding: "7px 4px", borderRadius: 8, border: hasQty ? "2px solid #D6247A" : "1.5px solid #E2E8F0", fontSize: 15, textAlign: "center", color: "#111111", background: "#fff", fontWeight: hasQty ? 700 : 400 }}
+                        value={qty}
+                        onChange={(e) => setSelected((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                      />
+                      <button
+                        style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid #D6247A", background: "#FCE4EF", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#D6247A" }}
+                        onClick={() => setSelected((prev) => ({ ...prev, [item.id]: (Number(prev[item.id]) || 0) + 1 }))}>+</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "12px 20px 32px", borderTop: "1px solid #F1F5F9" }}>
+          <button
+            style={{ ...s.doneLarge, background: usedCount > 0 ? "#D6247A" : "#fff", color: usedCount > 0 ? "#fff" : "#475569", borderColor: usedCount > 0 ? "#D6247A" : "#E2E8F0", fontWeight: 700 }}
+            onClick={save} disabled={saving}>
+            {saving ? "Gemmer…" : usedCount > 0 ? `${lang === "da" ? "Gem" : "Save"} ${usedCount} ${lang === "da" ? "produkter" : "products"}` : lang === "da" ? "Ingen produkter valgt — luk" : "No products — close"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Completion confirmation ───────────────────────────────────────────────────
+function CompletionConfirm({ task, employee, usedProducts, minutes, lang, onConfirm, onCancel }) {
+  const myLogged = (task.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
+  const totalMin = myLogged + (Number(minutes) || 0);
+  return (
+    <div style={s.overlay} onClick={onCancel}>
+      <div style={{ ...s.sheet, maxHeight: "80svh" }} onClick={(e) => e.stopPropagation()}>
+        <div style={s.dragHandle} />
+        <div style={{ padding: "16px 20px 0", fontWeight: 800, fontSize: 18, color: "#111111" }}>
+          ✓ {lang === "da" ? "Bekræft afslutning" : "Confirm completion"}
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px 20px" }}>
+          <div style={{ background: "#F8FAFC", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#111111", marginBottom: 8 }}>{task.title}</div>
+            <div style={{ fontSize: 13, color: "#64748B" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F1F5F9" }}>
+                <span>⏱ {lang === "da" ? "Registreret tid" : "Logged time"}</span>
+                <strong>{fmtMin(totalMin)}</strong>
+              </div>
+              {(task.checklist || []).length > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F1F5F9" }}>
+                  <span>✓ Tasks</span>
+                  <strong>{(task.checklist || []).filter((i) => i.done).length}/{(task.checklist || []).length}</strong>
+                </div>
+              )}
+              {usedProducts.length > 0 && (
+                <div style={{ padding: "6px 0" }}>
+                  <div style={{ marginBottom: 4 }}>📦 {lang === "da" ? "Produkter brugt" : "Products used"}</div>
+                  {usedProducts.map((p) => (
+                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#111111", padding: "2px 0" }}>
+                      <span>{p.name}</span><strong>{p.qty} stk</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "12px 20px 32px", display: "flex", gap: 10 }}>
+          <button style={{ ...s.doneLarge, flex: 1, fontSize: 14 }} onClick={onCancel}>
+            {lang === "da" ? "Tilbage" : "Back"}
+          </button>
+          <button style={{ ...s.doneActiveLarge, flex: 1, fontSize: 14 }} onClick={onConfirm}>
+            {lang === "da" ? "Bekræft & afslut" : "Confirm & complete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Task detail modal ─────────────────────────────────────────────────────────
 function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
   const tr = T[lang];
@@ -276,48 +441,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const [saving, setSaving] = useState(false);
   const [translatedTask, setTranslatedTask] = useState(null);
   const [translating, setTranslating] = useState(false);
-  const [inventoryItems, setInventoryItems] = useState([]);
-  const [selectedItems, setSelectedItems] = useState({});
-  const [inventoryLoading, setInventoryLoading] = useState(false);
-  const [inventorySaved, setInventorySaved] = useState(false);
-
-  useEffect(() => {
-    if (!task) return;
-    // Load inventory items relevant to this task
-    async function loadInventory() {
-      setInventoryLoading(true);
-      const { data } = await supabaseClient
-        .from("inventory_items")
-        .select("*, inventory_categories(name,type,icon)")
-        .eq("inventory_categories.type", "kunde")
-        .order("name");
-      setInventoryItems(data || []);
-      setInventoryLoading(false);
-    }
-    loadInventory();
-  }, [task?.id]);
-
-  async function saveInventoryUsage() {
-    const entries = Object.entries(selectedItems).filter(([, qty]) => Number(qty) > 0);
-    if (!entries.length) return;
-    setSaving(true);
-    for (const [itemId, qty] of entries) {
-      const amount = Number(qty);
-      const item = inventoryItems.find((i) => i.id === itemId);
-      if (!item) continue;
-      const newStock = item.stock - amount;
-      await supabaseClient.from("inventory_transactions").insert({
-        item_id: itemId, quantity: -amount, type: "out",
-        reason: `Brugt på opgave: ${task.title}`,
-        instance_id: task.id, employee_id: employee.id,
-      });
-      await supabaseClient.from("inventory_items").update({ stock: newStock }).eq("id", itemId);
-    }
-    setSelectedItems({});
-    setInventorySaved(true);
-    setTimeout(() => setInventorySaved(false), 3000);
-    setSaving(false);
-  }
+  const [showProducts, setShowProducts] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [usedProducts, setUsedProducts] = useState([]);
 
   useEffect(() => {
     if (!task) return;
@@ -460,36 +586,21 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
             </div>
           )}
 
-          {/* Produkter brugt på opgaven */}
+          {/* Produkter brugt */}
           <div style={s.sheetSection}>
-            <div style={s.sheetSectionTitle}>📦 {lang === "da" ? "Produkter brugt" : "Products used"}</div>
-            {inventoryLoading ? (
-              <div style={{ fontSize: 13, color: "#94A3B8" }}>Indlæser…</div>
-            ) : inventoryItems.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#94A3B8" }}>{lang === "da" ? "Ingen kundeprodukter" : "No customer products"}</div>
-            ) : (
-              <>
-                {inventoryItems.map((item) => (
-                  <div key={item.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #F1F5F9" }}>
-                    <div>
-                      <div style={{ fontSize:14, fontWeight:600, color:"#111111" }}>{item.inventory_categories?.icon} {item.name}</div>
-                      <div style={{ fontSize:12, color:"#94A3B8" }}>{lang === "da" ? "Lager" : "Stock"}: {item.stock} {item.unit}</div>
-                    </div>
-                    <input type="number" min={0} max={item.stock} step={1} placeholder="0"
-                      style={{ width:64, padding:"7px 8px", borderRadius:8, border:"1.5px solid #E2E8F0", fontSize:14, textAlign:"center", color:"#111111", background:"#fff" }}
-                      value={selectedItems[item.id] || ""}
-                      onChange={(e) => setSelectedItems((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                    />
+            <div style={s.sheetSectionTitle}>📦 {lang === "da" ? "Produkter" : "Products"}</div>
+            {usedProducts.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                {usedProducts.map((p) => (
+                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "#111111" }}>
+                    <span>{p.name}</span><strong>{p.qty} stk</strong>
                   </div>
                 ))}
-                {Object.values(selectedItems).some((v) => Number(v) > 0) && (
-                  <button style={{ ...s.doneLarge, marginTop:10, background: inventorySaved ? "#ECFDF5" : "#fff", color: inventorySaved ? "#16A34A" : "#475569", borderColor: inventorySaved ? "#22C55E" : "#E2E8F0" }}
-                    onClick={saveInventoryUsage} disabled={saving}>
-                    {inventorySaved ? "✓ Gemt" : saving ? "Gemmer…" : (lang === "da" ? "Registrér forbrug" : "Register usage")}
-                  </button>
-                )}
-              </>
+              </div>
             )}
+            <button style={{ ...s.doneLarge, fontSize: 14 }} onClick={() => setShowProducts(true)}>
+              📦 {usedProducts.length > 0 ? (lang === "da" ? "Ret produkter" : "Edit products") : (lang === "da" ? "Vælg produkter brugt" : "Select products used")}
+            </button>
           </div>
 
           {/* Time tracking */}
@@ -519,16 +630,42 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
             </div>
           </div>
 
-          {/* Done button */}
+          {/* Done button → confirmation */}
           <div style={{ padding: "0 0 32px" }}>
-            <button style={done ? s.doneActiveLarge : s.doneLarge}
-              onClick={() => onSetStatus(t.id, done ? "planlagt" : "udført")}>
-              <CheckCircle2 size={18} />
-              {done ? tr.markNotDone : tr.markDone}
-            </button>
+            {done ? (
+              <button style={s.doneActiveLarge} onClick={() => onSetStatus(task.id, "planlagt")}>
+                <CheckCircle2 size={18} /> {tr.markNotDone}
+              </button>
+            ) : (
+              <button style={s.doneLarge} onClick={() => setShowConfirm(true)}>
+                <CheckCircle2 size={18} /> {tr.markDone}
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {showProducts && (
+        <ProductPage
+          task={task} employee={employee} lang={lang}
+          supabaseClient={supabaseClient}
+          onClose={() => setShowProducts(false)}
+          onSave={(products) => { setUsedProducts(products); setShowProducts(false); }}
+        />
+      )}
+      {showConfirm && (
+        <CompletionConfirm
+          task={task} employee={employee} lang={lang}
+          usedProducts={usedProducts} minutes={minutes}
+          onCancel={() => setShowConfirm(false)}
+          onConfirm={async () => {
+            if (Number(minutes) > 0) await onLogMinutes(task.id, Number(minutes));
+            await onSetStatus(task.id, "udført");
+            setShowConfirm(false);
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -575,6 +712,19 @@ function TaskCard({ seg, employee, lang, onClick }) {
       </div>
     </div>
   );
+}
+
+function weekMeta(weekNo) {
+  const now = new Date();
+  const jan4 = new Date(now.getFullYear(), 0, 4);
+  const jan4Day = (jan4.getDay() + 6) % 7;
+  const weekOneMonday = new Date(jan4);
+  weekOneMonday.setDate(jan4.getDate() - jan4Day);
+  const monday = new Date(weekOneMonday);
+  monday.setDate(weekOneMonday.getDate() + (weekNo - 1) * 7);
+  const friday = new Date(monday); friday.setDate(monday.getDate() + 4);
+  const fmt = (d) => d.toLocaleDateString("da-DK", { day: "numeric", month: "short" });
+  return `${fmt(monday)} – ${fmt(friday)}`;
 }
 
 export default function MedarbejderApp() {
@@ -817,9 +967,12 @@ export default function MedarbejderApp() {
       {/* Week navigation */}
       <div style={s.weekBar}>
         <button style={s.weekBtn} onClick={() => setWeekOffset((w) => w - 1)}><ChevronLeft size={20} /></button>
-        <div style={s.weekLabel}>
-          {tr.week} {currentWeek}
-          {weekOffset === 0 && <span style={s.thisWeekTag}>{tr.thisWeek}</span>}
+        <div style={{ ...s.weekLabel, flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span>{tr.week} {currentWeek}</span>
+            {weekOffset === 0 && <span style={s.thisWeekTag}>{tr.thisWeek}</span>}
+          </div>
+          <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 400 }}>{weekMeta(currentWeek)}</div>
         </div>
         <button style={s.weekBtn} onClick={() => setWeekOffset((w) => w + 1)}><ChevronRight size={20} /></button>
         {weekOffset !== 0 && (
