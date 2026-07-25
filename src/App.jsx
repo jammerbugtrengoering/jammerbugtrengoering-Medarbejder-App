@@ -270,12 +270,54 @@ function LoginScreen({ lang, setLang }) {
 }
 
 // ── Task detail modal ─────────────────────────────────────────────────────────
-function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, onToggleChecklist }) {
+function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
   const tr = T[lang];
   const [minutes, setMinutes] = useState("");
   const [saving, setSaving] = useState(false);
   const [translatedTask, setTranslatedTask] = useState(null);
   const [translating, setTranslating] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState({});
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventorySaved, setInventorySaved] = useState(false);
+
+  useEffect(() => {
+    if (!task) return;
+    // Load inventory items relevant to this task
+    async function loadInventory() {
+      setInventoryLoading(true);
+      const { data } = await supabaseClient
+        .from("inventory_items")
+        .select("*, inventory_categories(name,type,icon)")
+        .eq("inventory_categories.type", "kunde")
+        .order("name");
+      setInventoryItems(data || []);
+      setInventoryLoading(false);
+    }
+    loadInventory();
+  }, [task?.id]);
+
+  async function saveInventoryUsage() {
+    const entries = Object.entries(selectedItems).filter(([, qty]) => Number(qty) > 0);
+    if (!entries.length) return;
+    setSaving(true);
+    for (const [itemId, qty] of entries) {
+      const amount = Number(qty);
+      const item = inventoryItems.find((i) => i.id === itemId);
+      if (!item) continue;
+      const newStock = item.stock - amount;
+      await supabaseClient.from("inventory_transactions").insert({
+        item_id: itemId, quantity: -amount, type: "out",
+        reason: `Brugt på opgave: ${task.title}`,
+        instance_id: task.id, employee_id: employee.id,
+      });
+      await supabaseClient.from("inventory_items").update({ stock: newStock }).eq("id", itemId);
+    }
+    setSelectedItems({});
+    setInventorySaved(true);
+    setTimeout(() => setInventorySaved(false), 3000);
+    setSaving(false);
+  }
 
   useEffect(() => {
     if (!task) return;
@@ -417,6 +459,38 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               </div>
             </div>
           )}
+
+          {/* Produkter brugt på opgaven */}
+          <div style={s.sheetSection}>
+            <div style={s.sheetSectionTitle}>📦 {lang === "da" ? "Produkter brugt" : "Products used"}</div>
+            {inventoryLoading ? (
+              <div style={{ fontSize: 13, color: "#94A3B8" }}>Indlæser…</div>
+            ) : inventoryItems.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#94A3B8" }}>{lang === "da" ? "Ingen kundeprodukter" : "No customer products"}</div>
+            ) : (
+              <>
+                {inventoryItems.map((item) => (
+                  <div key={item.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #F1F5F9" }}>
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:600, color:"#111111" }}>{item.inventory_categories?.icon} {item.name}</div>
+                      <div style={{ fontSize:12, color:"#94A3B8" }}>{lang === "da" ? "Lager" : "Stock"}: {item.stock} {item.unit}</div>
+                    </div>
+                    <input type="number" min={0} max={item.stock} step={1} placeholder="0"
+                      style={{ width:64, padding:"7px 8px", borderRadius:8, border:"1.5px solid #E2E8F0", fontSize:14, textAlign:"center", color:"#111111", background:"#fff" }}
+                      value={selectedItems[item.id] || ""}
+                      onChange={(e) => setSelectedItems((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+                {Object.values(selectedItems).some((v) => Number(v) > 0) && (
+                  <button style={{ ...s.doneLarge, marginTop:10, background: inventorySaved ? "#ECFDF5" : "#fff", color: inventorySaved ? "#16A34A" : "#475569", borderColor: inventorySaved ? "#22C55E" : "#E2E8F0" }}
+                    onClick={saveInventoryUsage} disabled={saving}>
+                    {inventorySaved ? "✓ Gemt" : saving ? "Gemmer…" : (lang === "da" ? "Registrér forbrug" : "Register usage")}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Time tracking */}
           <div style={s.sheetSection}>
@@ -825,6 +899,7 @@ export default function MedarbejderApp() {
           onLogMinutes={logMinutes}
           onSetStatus={setStatus}
           onToggleChecklist={toggleChecklistItem}
+          supabaseClient={supabase}
         />
       )}
     </div>
