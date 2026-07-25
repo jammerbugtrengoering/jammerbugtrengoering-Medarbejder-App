@@ -183,8 +183,15 @@ function isoWeekNumber(date) {
 }
 function todayKey() {
   const keys = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return keys[new Date().getDay()];
+}
+function todayWorkdayKey() {
+  // Returner nærmeste hverdag (til default dag-valg)
+  const keys = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const k = keys[new Date().getDay()];
-  return ["Mon","Tue","Wed","Thu","Fri"].includes(k) ? k : "Mon";
+  if (k === "Sat") return "Fri";
+  if (k === "Sun") return "Mon";
+  return k;
 }
 function travelKey(a, b) { return [a, b].sort().join(" || "); }
 function getTravelMinutes(addrA, addrB, settings) {
@@ -491,7 +498,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               <span style={{ ...s.statusBadge, background: "#EEF2FF", color: "#4F46E5" }}>🏢 Nexus</span>
             )}
             {task.contractType === "privat" && (
-              <span style={{ ...s.statusBadge, background: "#FFF6FA", color: "#9C1B5D" }}>🏠 Privat</span>
+              <span style={{ ...s.statusBadge, background: "#FFF6FA", color: "#9C1B5D" }}>🏠 {lang === "da" ? "Privat" : "Private"}</span>
             )}
             {translating && (
               <span style={{ ...s.statusBadge, background: "#F0FDF4", color: "#16A34A" }}>🌐 Oversætter…</span>
@@ -698,7 +705,7 @@ function TaskCard({ seg, employee, lang, onClick }) {
             <Building2 size={12} color="#9C1B5D" />
             <span>{t.customerName}</span>
             {t.contractType === "nexus" && <span style={{ fontSize:10, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Nexus</span>}
-            {t.contractType === "privat" && <span style={{ fontSize:10, fontWeight:700, color:"#9C1B5D", background:"#FFF6FA", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Privat</span>}
+            {t.contractType === "privat" && <span style={{ fontSize:10, fontWeight:700, color:"#9C1B5D", background:"#FFF6FA", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>{lang === "da" ? "Privat" : "Private"}</span>}
           </div>
         )}
         <div style={s.taskMeta}>
@@ -748,7 +755,7 @@ export default function MedarbejderApp() {
   const [travelSettings, setTravelSettings] = useState({ defaultMinutes: 20, dayStart: "07:00", overrides: {} });
   const [dataLoading, setDataLoading] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
-  const [day, setDay] = useState(todayKey());
+  const [day, setDay] = useState(todayWorkdayKey());
   const [openTask, setOpenTask] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [resetSent, setResetSent] = useState(false);
@@ -991,6 +998,19 @@ export default function MedarbejderApp() {
         {DAYS.map((d) => {
           const count = instances.filter((t) => t.day === d.key).length;
           const isWeekend = d.weekend;
+          const isToday = d.key === todayKey();
+          // Beregn dato for denne dag i den aktuelle uge
+          const dayIndex = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(d.key);
+          const jan4 = new Date(new Date().getFullYear(), 0, 4);
+          const jan4Day = (jan4.getDay() + 6) % 7;
+          const weekOneMonday = new Date(jan4);
+          weekOneMonday.setDate(jan4.getDate() - jan4Day);
+          const monday = new Date(weekOneMonday);
+          monday.setDate(weekOneMonday.getDate() + (currentWeek - 1) * 7);
+          const dayDate = new Date(monday);
+          dayDate.setDate(monday.getDate() + dayIndex);
+          const dateNum = dayDate.getDate();
+
           return (
             <button key={d.key}
               style={d.key === day
@@ -998,7 +1018,8 @@ export default function MedarbejderApp() {
                 : { ...s.dayTab, ...(isWeekend ? { color: "#CBD5E1" } : {}) }
               }
               onClick={() => setDay(d.key)}>
-              <span>{d.short}</span>
+              <span>{d.short} <span style={{ fontWeight: isToday ? 800 : "inherit" }}>{dateNum}</span></span>
+              {isToday && d.key !== day && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#D6247A", display: "block", margin: "0 auto" }} />}
               {count > 0 && <span style={d.key === day ? s.dayCountActive : s.dayCount}>{count}</span>}
             </button>
           );
