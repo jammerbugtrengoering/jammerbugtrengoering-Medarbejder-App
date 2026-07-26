@@ -500,6 +500,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
             {task.contractType === "privat" && (
               <span style={{ ...s.statusBadge, background: "#FFF6FA", color: "#9C1B5D" }}>🏠 {lang === "da" ? "Privat" : "Private"}</span>
             )}
+            {task.contractType === "aeldrelov" && (
+              <span style={{ ...s.statusBadge, background: "#FFF7ED", color: "#C2410C" }}>👴 Ældrelov</span>
+            )}
             {translating && (
               <span style={{ ...s.statusBadge, background: "#F0FDF4", color: "#16A34A" }}>🌐 Oversætter…</span>
             )}
@@ -706,6 +709,7 @@ function TaskCard({ seg, employee, lang, onClick }) {
             <span>{t.customerName}</span>
             {t.contractType === "nexus" && <span style={{ fontSize:10, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Nexus</span>}
             {t.contractType === "privat" && <span style={{ fontSize:10, fontWeight:700, color:"#9C1B5D", background:"#FFF6FA", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>{lang === "da" ? "Privat" : "Private"}</span>}
+            {t.contractType === "aeldrelov" && <span style={{ fontSize:10, fontWeight:700, color:"#C2410C", background:"#FFF7ED", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Ældrelov</span>}
           </div>
         )}
         <div style={s.taskMeta}>
@@ -1225,12 +1229,13 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
       }
       const { data: txns } = await supabaseClient
         .from("inventory_transactions")
-        .select("*, inventory_items(name, unit)")
+        .select("*, inventory_items(name, unit, category_id, inventory_categories(type))")
         .eq("employee_id", employee.id)
         .eq("type", "out")
         .order("id", { ascending: false })
         .limit(30);
-      setHistory(txns || []);
+      // Filtrer kun medarbejderprodukter
+      setHistory((txns || []).filter((tx) => tx.inventory_items?.inventory_categories?.type === "medarbejder"));
       setLoading(false);
     }
     load();
@@ -1253,10 +1258,10 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
     }
     const { data: txns } = await supabaseClient
       .from("inventory_transactions")
-      .select("*, inventory_items(name, unit)")
+      .select("*, inventory_items(name, unit, inventory_categories(type))")
       .eq("employee_id", employee.id).eq("type", "out")
       .order("id", { ascending: false }).limit(30);
-    setHistory(txns || []);
+    setHistory((txns || []).filter((tx) => tx.inventory_items?.inventory_categories?.type === "medarbejder"));
     setSelected({});
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -1323,9 +1328,10 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
             ) : (
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {history.map((tx) => (
-                  <div key={tx.id} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F1F5F9" }}>
-                    <div style={{ fontSize:14,color:"#111111" }}>{tx.inventory_items?.name}</div>
+                  <div key={tx.id} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F1F5F9", gap: 8 }}>
+                    <div style={{ flex: 1, fontSize:14,color:"#111111" }}>{tx.inventory_items?.name}</div>
                     <div style={{ fontSize:14,fontWeight:700,color:"#111111" }}>{Math.abs(tx.quantity)} {tx.inventory_items?.unit}</div>
+                    {tx.created_at && <div style={{ fontSize: 11, color: "#94A3B8", flexShrink: 0 }}>{new Date(tx.created_at).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}</div>}
                   </div>
                 ))}
               </div>
