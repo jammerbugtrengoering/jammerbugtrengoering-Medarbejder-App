@@ -362,10 +362,10 @@ function ProductPage({ task, employee, lang, onClose, onSave, supabaseClient }) 
                         style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid #E2E8F0", background: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}
                         onClick={() => setSelected((prev) => ({ ...prev, [item.id]: Math.max(0, (Number(prev[item.id]) || 0) - 1) || "" }))}>−</button>
                       <input
-                        type="number" min={0} max={item.stock} step={1}
+                        type="number" min={0} max={item.stock} step={1} inputMode="numeric" pattern="[0-9]*"
                         style={{ width: 52, padding: "7px 4px", borderRadius: 8, border: hasQty ? "2px solid #D6247A" : "1.5px solid #E2E8F0", fontSize: 15, textAlign: "center", color: "#111111", background: "#fff", fontWeight: hasQty ? 700 : 400 }}
                         value={qty}
-                        onChange={(e) => setSelected((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                        onChange={(e) => setSelected((prev) => ({ ...prev, [item.id]: e.target.value.replace(/[^0-9]/g, "") }))}
                       />
                       <button
                         style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid #D6247A", background: "#FCE4EF", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#D6247A" }}
@@ -629,9 +629,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               )}
             </div>
             <div style={s.timeInputRow}>
-              <input type="number" min={1} step={5} placeholder={tr.minutesPlaceholder}
+              <input type="number" min={1} step={5} inputMode="numeric" pattern="[0-9]*" placeholder={tr.minutesPlaceholder}
                 style={s.timeInput} value={minutes}
-                onChange={(e) => setMinutes(e.target.value)}
+                onChange={(e) => setMinutes(e.target.value.replace(/[^0-9]/g, ""))}
                 onKeyDown={(e) => { if (e.key === "Enter") handleLog(); }} />
               <button style={{ ...s.timeLogBtn, opacity: (!minutes || Number(minutes) <= 0 || saving) ? 0.4 : 1 }}
                 onClick={handleLog} disabled={saving}>
@@ -1316,9 +1316,9 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <button style={{ width:32,height:32,borderRadius:"50%",border:"1.5px solid #E2E8F0",background:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#475569" }}
                           onClick={() => setSelected((prev) => ({ ...prev, [item.id]: Math.max(0,(Number(prev[item.id])||0)-1)||"" }))}>-</button>
-                        <input type="number" min={0} max={item.stock} step={1}
+                        <input type="number" min={0} max={item.stock} step={1} inputMode="numeric" pattern="[0-9]*"
                           style={{ width:52,padding:"7px 4px",borderRadius:8,border:hasQty?"2px solid #D6247A":"1.5px solid #E2E8F0",fontSize:15,textAlign:"center",color:"#111111",background:"#fff",fontWeight:hasQty?700:400 }}
-                          value={qty} onChange={(e) => setSelected((prev) => ({ ...prev, [item.id]: e.target.value }))} />
+                          value={qty} onChange={(e) => setSelected((prev) => ({ ...prev, [item.id]: e.target.value.replace(/[^0-9]/g, "") }))} />
                         <button style={{ width:32,height:32,borderRadius:"50%",border:"1.5px solid #D6247A",background:"#FCE4EF",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#D6247A" }}
                           onClick={() => setSelected((prev) => ({ ...prev, [item.id]: (Number(prev[item.id])||0)+1 }))}>+</button>
                       </div>
