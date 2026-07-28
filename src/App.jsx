@@ -712,6 +712,12 @@ function TaskCard({ seg, employee, lang, onClick }) {
             {t.contractType === "aeldrelov" && <span style={{ fontSize:10, fontWeight:700, color:"#C2410C", background:"#FFF7ED", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Ældrelov</span>}
           </div>
         )}
+        {t.address && (
+          <div style={s.taskAddress}>
+            <MapPin size={11} color="#94A3B8" />
+            <span>{t.address}</span>
+          </div>
+        )}
         <div style={s.taskMeta}>
           <span style={s.taskDuration}>{fmtMin(t.duration)}</span>
           {clProg.total > 0 && <span style={s.taskChecklist}><ListChecks size={11} /> {clProg.done}/{clProg.total}</span>}
@@ -1161,6 +1167,7 @@ const s = {
   taskTime: { fontSize:11.5, fontWeight:700, color:"#D6247A", marginBottom:3 },
   taskTitle: { fontWeight:700, fontSize:15.5, color:"#111111", lineHeight:1.25, marginBottom:5 },
   taskCustomer: { display:"flex", alignItems:"center", gap:5, fontSize:13, color:"#475569", fontWeight:500, marginBottom:6 },
+  taskAddress: { display:"flex", alignItems:"center", gap:5, fontSize:11.5, color:"#94A3B8", fontWeight:500, marginBottom:6, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
   taskMeta: { display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" },
   taskDuration: { fontSize:12, color:"#64748B", fontWeight:500 },
   taskChecklist: { display:"flex", alignItems:"center", gap:3, fontSize:12, color:"#64748B" },
