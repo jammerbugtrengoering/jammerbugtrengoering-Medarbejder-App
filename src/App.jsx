@@ -47,6 +47,7 @@ const T = {
     allTeam: "Alle:",
     inTotal: "i alt",
     minutesPlaceholder: "Antal minutter",
+    openNexus: "Åbn KMD Nexus Mobile",
     overrunTitle: "Registreret tid overskrider planlagt tid",
     overrunBody: (reg, plan) => `Med denne registrering bliver der brugt ${reg} på opgaven, men der er kun planlagt ${plan}. Angiv en begrundelse for overskridelsen.`,
     overrunPlaceholder: "Begrundelse for overskridelsen…",
@@ -98,6 +99,7 @@ const T = {
     allTeam: "Team total:",
     inTotal: "in total",
     minutesPlaceholder: "Number of minutes",
+    openNexus: "Open KMD Nexus Mobile",
     overrunTitle: "Registered time exceeds planned time",
     overrunBody: (reg, plan) => `With this entry, ${reg} will have been spent on the task, but only ${plan} is planned. Please state a reason for the overrun.`,
     overrunPlaceholder: "Reason for the overrun…",
@@ -204,6 +206,65 @@ function weekInfoWithOffset(offset) {
   d.setDate(d.getDate() + offset * 7);
   return isoWeekInfo(d);
 }
+// ---- KMD Nexus Mobile: åbn appen hvis den er installeret, ellers hent den ----
+// Identifikatorer verificeret mod de officielle butikssider (udgiver KMD A/S):
+//   iOS      https://apps.apple.com/dk/app/kmd-nexus-mobile/id6449771475
+//   Android  https://play.google.com/store/apps/details?id=dk.kmd.homecare
+// Bemærk: "KMD Nexus Mobile II" er en ANDEN, ældre app (id1189227406 /
+// kmd.mobile.nexus_ii). Den tidligere kode pegede på et opdigtet ID og virkede derfor aldrig.
+const NEXUS_IOS_APP_ID = "6449771475";
+const NEXUS_ANDROID_PACKAGE = "dk.kmd.homecare";
+const NEXUS_APP_STORE_URL = `https://apps.apple.com/dk/app/kmd-nexus-mobile/id${NEXUS_IOS_APP_ID}`;
+const NEXUS_PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${NEXUS_ANDROID_PACKAGE}`;
+// KMD offentliggør ikke deres iOS URL-scheme. Bliver det bekræftet hos KMD,
+// rettes det ét sted her, og iOS åbner appen direkte i stedet for via App Store.
+const NEXUS_IOS_SCHEME = "kmdnexus://";
+
+function openNexusApp() {
+  const ua = navigator.userAgent || "";
+  const isAndroid = /android/i.test(ua);
+  const isIOS = /iphone|ipad|ipod/i.test(ua) ||
+    (/Macintosh/.test(ua) && typeof document !== "undefined" && "ontouchend" in document);
+
+  if (isAndroid) {
+    // Android klarer det i ét hop: intent:// starter appen ud fra pakkenavnet hvis
+    // den er installeret, og sender ellers browseren til Play Store. Der skal ikke
+    // gættes et URL-scheme, så det virker uanset hvad KMD har valgt internt.
+    window.location.href =
+      `intent://open#Intent;scheme=https;package=${NEXUS_ANDROID_PACKAGE};` +
+      `S.browser_fallback_url=${encodeURIComponent(NEXUS_PLAY_STORE_URL)};end`;
+    return;
+  }
+
+  if (!isIOS) {
+    window.open(NEXUS_APP_STORE_URL, "_blank", "noopener");
+    return;
+  }
+
+  // iOS: forsøg at åbne appen, og gå kun til App Store hvis der ikke skete noget.
+  // Timeren annulleres så snart siden mister fokus (= appen kom i forgrunden).
+  // Uden det blev brugeren sendt i App Store SELVOM appen åbnede korrekt — det
+  // var fejlen i den tidligere version.
+  let fallbackTimer = window.setTimeout(() => {
+    cleanup();
+    window.location.href = NEXUS_APP_STORE_URL;
+  }, 1200);
+
+  function cleanup() {
+    if (fallbackTimer) { window.clearTimeout(fallbackTimer); fallbackTimer = null; }
+    document.removeEventListener("visibilitychange", onLeave);
+    window.removeEventListener("pagehide", onLeave);
+    window.removeEventListener("blur", onLeave);
+  }
+  function onLeave() { cleanup(); }
+
+  document.addEventListener("visibilitychange", onLeave);
+  window.addEventListener("pagehide", onLeave);
+  window.addEventListener("blur", onLeave);
+
+  window.location.href = NEXUS_IOS_SCHEME;
+}
+
 function todayKey() {
   const keys = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return keys[new Date().getDay()];
@@ -568,22 +629,13 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                 </a>
               )}
               {t.contractType === "nexus" && (
-                <a
-                  href="kmd-nexus://"
-                  style={{ ...s.navBtnLarge, background: "#4F46E5", marginTop: 8 }}
-                  onClick={(e) => {
-                    // Fallback: hvis app ikke er installeret, åbn App Store / Google Play
-                    setTimeout(() => {
-                      const ua = navigator.userAgent;
-                      if (/android/i.test(ua)) {
-                        window.location.href = "https://play.google.com/store/apps/details?id=dk.kmd.nexusmobile2";
-                      } else if (/iphone|ipad|ipod/i.test(ua)) {
-                        window.location.href = "https://apps.apple.com/dk/app/kmd-nexus-mobile-2/id1234567890";
-                      }
-                    }, 1500);
-                  }}>
-                  🏢 Åbn KMD Nexus Mobile 2
-                </a>
+                <button
+                  type="button"
+                  style={{ ...s.navBtnLarge, background: "#4F46E5", marginTop: 8,
+                           border: "none", width: "100%", font: "inherit", cursor: "pointer" }}
+                  onClick={openNexusApp}>
+                  🏢 {tr.openNexus}
+                </button>
               )}
             </div>
           )}
