@@ -613,7 +613,11 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           <div style={s.sheetMeta}>{fmtMin(t.duration)}{clProg.total > 0 ? ` · ${clProg.done}/${clProg.total} ${tr.tasks.toLowerCase()}` : ""}</div>
 
           {/* Customer + address + navigation + Nexus link */}
-          {(t.customerName || t.address) && (
+          {/* Nexus-knappen skal ogsaa vises paa opgaver UDEN kunde og adresse.
+              Tidligere laa hele sektionen bag (kunde || adresse), hvilket skjulte
+              Nexus-linket helt paa 90 ud af 723 Nexus-opgaver (fx "Soehotellet"
+              og "Soeparken gennemgang", hvis skabeloner ikke har kundeoplysninger). */}
+          {(t.customerName || t.address || t.contractType === "nexus") && (
             <div style={s.sheetSection}>
               <div style={s.sheetSectionTitle}><Building2 size={14} /> {tr.customer}</div>
               {t.customerName && <div style={s.sheetCustomer}>{t.customerName}</div>}
