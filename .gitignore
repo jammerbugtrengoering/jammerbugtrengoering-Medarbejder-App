@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Miljøvariabler - må ikke i git
+.env
+.env.*
+!.env.example

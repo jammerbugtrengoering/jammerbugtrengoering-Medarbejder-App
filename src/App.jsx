@@ -173,13 +173,26 @@ function fmtClock(minutesFromMidnight) {
   const m = Math.round(minutesFromMidnight % 60);
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
-function isoWeekNumber(date) {
-  // Brug lokal dato for at undgå UTC-offset forskydning
+// Beregner både ISO-ugenummer OG det år ugen hører til. Omkring årsskiftet kan
+// de to afvige (30. dec. kan høre til uge 1 i det nye år), og da planlæggeren
+// gemmer både week og year på hver opgave, SKAL vi matche på begge — ellers
+// blandes fx uge 30 i 2026 sammen med uge 30 i 2027.
+function isoWeekInfo(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const dayNum = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - dayNum + 3);
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  d.setDate(d.getDate() - dayNum + 3); // Nærmeste torsdag afgør ISO-uge-året
+  const isoYear = d.getFullYear();
+  const yearStart = new Date(isoYear, 0, 1);
+  const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  return { week, year: isoYear };
+}
+// Finder (uge, år) et antal uger fra i dag. Regner i rigtige 7-dages spring over
+// kalenderen, så navigation forbi uge 52/53 ruller korrekt over til det nye år
+// i stedet for at give ugyldige ugenumre som 53, 54, 55...
+function weekInfoWithOffset(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset * 7);
+  return isoWeekInfo(d);
 }
 function todayKey() {
   const keys = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -310,12 +323,17 @@ function ProductPage({ task, employee, lang, onClose, onSave, supabaseClient }) 
       const amount = Number(qty);
       const item = items.find((i) => i.id === itemId);
       if (!item) continue;
-      await supabaseClient.from("inventory_transactions").insert({
+      const { error: txErr } = await supabaseClient.from("inventory_transactions").insert({
         item_id: itemId, quantity: -amount, type: "out",
         reason: `Brugt på: ${task.title}`,
         instance_id: task.id, employee_id: employee.id,
       });
-      await supabaseClient.from("inventory_items").update({ stock: Math.max(0, item.stock - amount) }).eq("id", itemId);
+      if (txErr) { console.error("inventory_transactions insert:", txErr.message); alert(`Kunne ikke registrere forbrug af "${item.name}" — prøv igen.`); setSaving(false); return; }
+      // Atomart fradrag i databasen. Tidligere blev lagertallet læst i browseren,
+      // trukket fra og skrevet tilbage — hvis to medarbejdere udtog varer samtidig,
+      // overskrev den ene den andens opdatering, og lageret blev forkert.
+      const { error: stockErr } = await supabaseClient.rpc("consume_stock", { p_item_id: itemId, p_amount: amount });
+      if (stockErr) { console.error("consume_stock:", stockErr.message); alert(`Kunne ikke opdatere lageret for "${item.name}" — prøv igen.`); setSaving(false); return; }
     }
     setSaving(false);
     onSave(entries.map(([id, qty]) => ({ id, qty: Number(qty), name: items.find((i) => i.id === id)?.name })));
@@ -731,9 +749,8 @@ function TaskCard({ seg, employee, lang, onClick }) {
   );
 }
 
-function weekMeta(weekNo) {
-  const now = new Date();
-  const jan4 = new Date(now.getFullYear(), 0, 4);
+function weekMeta(weekNo, year) {
+  const jan4 = new Date(year ?? new Date().getFullYear(), 0, 4);
   const jan4Day = (jan4.getDay() + 6) % 7;
   const weekOneMonday = new Date(jan4);
   weekOneMonday.setDate(jan4.getDate() - jan4Day);
@@ -803,9 +820,10 @@ export default function MedarbejderApp() {
         localStorage.setItem("wl_lang", empData.default_lang);
       }
 
-      const currentWeek = isoWeekNumber(new Date());
-      const targetWeek = currentWeek + weekOffset;
-      const { data: instData } = await supabase.from("instances").select("*").eq("week", targetWeek);
+      const { week: targetWeek, year: targetYear } = weekInfoWithOffset(weekOffset);
+      const { data: instData, error: instErr } = await supabase
+        .from("instances").select("*").eq("week", targetWeek).eq("year", targetYear);
+      if (instErr) console.error("load instances error:", instErr.message);
       const { data: customersData } = await supabase.from("customers").select("*");
       const custMap = Object.fromEntries((customersData || []).map((c) => [c.id, c]));
 
@@ -855,10 +873,18 @@ export default function MedarbejderApp() {
     if (!employee || !m || m <= 0) return;
     const task = instances.find((t) => t.id === taskId);
     if (!task) return;
-    const existing = task.time_log ?? task.timeLog ?? [];
-    const newLog = [...existing, { minutes: m, empId: employee.id, ts: Date.now() }];
-    const { error } = await supabase.from("instances").update({ time_log: newLog }).eq("id", taskId);
-    if (!error) setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, timeLog: newLog, time_log: newLog } : t));
+    // Atomar tilføjelse i databasen. Tidligere blev hele time_log-arrayet læst,
+    // udvidet og skrevet tilbage — loggede to medarbejdere tid på samme opgave
+    // samtidig, forsvandt den enes registrering sporløst.
+    const { data: newLog, error } = await supabase.rpc("append_time_log", {
+      p_instance_id: taskId, p_minutes: m, p_emp_id: employee.id,
+    });
+    if (error) {
+      console.error("append_time_log:", error.message);
+      alert("Kunne ikke gemme tiden — prøv igen.");
+      return;
+    }
+    setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, timeLog: newLog, time_log: newLog } : t));
   }
 
   async function setStatus(taskId, status) {
@@ -891,7 +917,7 @@ export default function MedarbejderApp() {
     </div>
   );
 
-  const currentWeek = isoWeekNumber(new Date()) + weekOffset;
+  const { week: currentWeek, year: currentWeekYear } = weekInfoWithOffset(weekOffset);
   const ALL_DAYS = tr.days;
   const hasWeekendTasks = instances.some((t) => t.day === "Sat" || t.day === "Sun");
   const DAYS = (showWeekend || hasWeekendTasks) ? ALL_DAYS : ALL_DAYS.filter((d) => !d.weekend);
@@ -996,7 +1022,7 @@ export default function MedarbejderApp() {
             <span>{tr.week} {currentWeek}</span>
             {weekOffset === 0 && <span style={s.thisWeekTag}>{tr.thisWeek}</span>}
           </div>
-          <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 400 }}>{weekMeta(currentWeek)}</div>
+          <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 400 }}>{weekMeta(currentWeek, currentWeekYear)}</div>
         </div>
         <button style={s.weekBtn} onClick={() => setWeekOffset((w) => w + 1)}><ChevronRight size={20} /></button>
         {weekOffset !== 0 && (
@@ -1261,7 +1287,8 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
         reason: lang === "da" ? `Bestilt af ${employee.name}` : `Ordered by ${employee.name}`,
         employee_id: employee.id,
       });
-      await supabaseClient.from("inventory_items").update({ stock: Math.max(0, item.stock - amount) }).eq("id", itemId);
+      const { error: stockErr2 } = await supabaseClient.rpc("consume_stock", { p_item_id: itemId, p_amount: amount });
+      if (stockErr2) { console.error("consume_stock:", stockErr2.message); alert(`Kunne ikke opdatere lageret for "${item.name}" — prøv igen.`); setSaving(false); return; }
     }
     const { data: txns } = await supabaseClient
       .from("inventory_transactions")
