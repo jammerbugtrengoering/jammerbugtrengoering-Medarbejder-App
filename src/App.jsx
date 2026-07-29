@@ -47,6 +47,11 @@ const T = {
     allTeam: "Alle:",
     inTotal: "i alt",
     minutesPlaceholder: "Antal minutter",
+    overrunTitle: "Registreret tid overskrider planlagt tid",
+    overrunBody: (reg, plan) => `Med denne registrering bliver der brugt ${reg} på opgaven, men der er kun planlagt ${plan}. Angiv en begrundelse for overskridelsen.`,
+    overrunPlaceholder: "Begrundelse for overskridelsen…",
+    overrunRequired: "Du skal angive en begrundelse for at registrere tiden.",
+    overrunNoteLabel: "Begrundelse",
     logTime: "Registrér tid",
     saving: "Gemmer…",
     markDone: "Marker som udført",
@@ -93,6 +98,11 @@ const T = {
     allTeam: "Team total:",
     inTotal: "in total",
     minutesPlaceholder: "Number of minutes",
+    overrunTitle: "Registered time exceeds planned time",
+    overrunBody: (reg, plan) => `With this entry, ${reg} will have been spent on the task, but only ${plan} is planned. Please state a reason for the overrun.`,
+    overrunPlaceholder: "Reason for the overrun…",
+    overrunRequired: "You must state a reason to register the time.",
+    overrunNoteLabel: "Reason",
     logTime: "Log time",
     saving: "Saving…",
     markDone: "Mark as completed",
@@ -469,6 +479,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const [showProducts, setShowProducts] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [usedProducts, setUsedProducts] = useState([]);
+  // Begrundelse ved overskridelse af planlagt tid
+  const [overrunNote, setOverrunNote] = useState("");
+  const [overrunError, setOverrunError] = useState(false);
 
   useEffect(() => {
     if (!task) return;
@@ -491,12 +504,22 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(task.address)}`
     : null;
 
+  // Overskrider den SAMLEDE registrerede tid (alle medarbejdere) det planlagte,
+  // naar denne registrering laegges til? Summen bruges bevidst, fordi opgavens
+  // varighed er planlagt for hele opgaven - ikke pr. medarbejder.
+  const pendingMinutes = Number(minutes) || 0;
+  const projectedTotal = totalLogged + pendingMinutes;
+  const willExceed = pendingMinutes > 0 && projectedTotal > t.duration;
+
   async function handleLog() {
     const m = Number(minutes);
     if (!m || m <= 0) return;
+    if (willExceed && !overrunNote.trim()) { setOverrunError(true); return; }
     setSaving(true);
-    await onLogMinutes(t.id, m);
+    await onLogMinutes(t.id, m, willExceed ? overrunNote.trim() : null);
     setMinutes("");
+    setOverrunNote("");
+    setOverrunError(false);
     setSaving(false);
   }
 
@@ -646,6 +669,19 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                 <div style={s.timeMeta2}>{tr.allTeam} {fmtMin(totalLogged)} {tr.inTotal}</div>
               )}
             </div>
+            {willExceed && (
+              <div style={s.overrunBox}>
+                <div style={s.overrunTitle}>⚠️ {tr.overrunTitle}</div>
+                <div style={s.overrunBody}>{tr.overrunBody(fmtMin(projectedTotal), fmtMin(t.duration))}</div>
+                <textarea
+                  style={{ ...s.overrunInput, borderColor: overrunError ? "#DC2626" : "#F59E0B" }}
+                  placeholder={tr.overrunPlaceholder}
+                  value={overrunNote}
+                  onChange={(e) => { setOverrunNote(e.target.value); if (e.target.value.trim()) setOverrunError(false); }}
+                  rows={2} />
+                {overrunError && <div style={s.overrunError}>{tr.overrunRequired}</div>}
+              </div>
+            )}
             <div style={s.timeInputRow}>
               <input type="number" min={1} step={5} inputMode="numeric" pattern="[0-9]*" placeholder={tr.minutesPlaceholder}
                 style={s.timeInput} value={minutes}
@@ -687,7 +723,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           usedProducts={usedProducts} minutes={minutes}
           onCancel={() => setShowConfirm(false)}
           onConfirm={async () => {
-            if (Number(minutes) > 0) await onLogMinutes(task.id, Number(minutes));
+            if (Number(minutes) > 0) await onLogMinutes(task.id, Number(minutes), willExceed ? overrunNote.trim() : null);
             await onSetStatus(task.id, "udført");
             setShowConfirm(false);
             onClose();
@@ -868,7 +904,7 @@ export default function MedarbejderApp() {
     }
   }, [instances]);
 
-  async function logMinutes(taskId, minutes) {
+  async function logMinutes(taskId, minutes, note = null) {
     const m = Number(minutes);
     if (!employee || !m || m <= 0) return;
     const task = instances.find((t) => t.id === taskId);
@@ -877,7 +913,7 @@ export default function MedarbejderApp() {
     // udvidet og skrevet tilbage — loggede to medarbejdere tid på samme opgave
     // samtidig, forsvandt den enes registrering sporløst.
     const { data: newLog, error } = await supabase.rpc("append_time_log", {
-      p_instance_id: taskId, p_minutes: m, p_emp_id: employee.id,
+      p_instance_id: taskId, p_minutes: m, p_emp_id: employee.id, p_note: note,
     });
     if (error) {
       console.error("append_time_log:", error.message);
@@ -1232,6 +1268,13 @@ const s = {
   timeMeta: { display:"flex", gap:6, fontSize:13, fontWeight:600, color:"#111111" },
   timeMeta2: { fontSize:12, color:"#94A3B8", marginTop:2 },
   timeInputRow: { display:"flex", gap:8 },
+  // Advarsel + begrundelsesfelt naar registreret tid overskrider planlagt tid
+  overrunBox: { background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:10, padding:"12px 14px", marginBottom:10 },
+  overrunTitle: { fontSize:14, fontWeight:700, color:"#92400E", marginBottom:4 },
+  overrunBody: { fontSize:13, color:"#92400E", lineHeight:1.45, marginBottom:10 },
+  overrunInput: { width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:8, border:"1px solid #F59E0B",
+    fontSize:15, fontFamily:"inherit", resize:"vertical", outline:"none", background:"#fff", color:"#111111" },
+  overrunError: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:6 },
   timeInput: { flex:1, padding:"13px 14px", borderRadius:10, border:"1.5px solid #E2E8F0", fontSize:15, color:"#111111", background:"#fff" },
   timeLogBtn: { padding:"13px 18px", borderRadius:10, border:"none", background:"#111111", color:"#fff", fontWeight:700, fontSize:14, cursor:"pointer", whiteSpace:"nowrap" },
   doneLarge: { width:"100%", padding:"16px 0", borderRadius:14, border:"2px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:700, fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
