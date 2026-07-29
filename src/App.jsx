@@ -980,8 +980,25 @@ export default function MedarbejderApp() {
   }
 
   async function setStatus(taskId, status) {
-    await supabase.from("instances").update({ status }).eq("id", taskId);
-    setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, status } : t));
+    // Registrér HVEM der afsluttede opgaven og hvornår, så planlæggeren kan se
+    // forskel på en opgave medarbejderen selv har afsluttet i marken og en der
+    // er sat manuelt af planlæggeren. Felterne ryddes igen hvis opgaven
+    // genåbnes, så de altid afspejler den aktuelle status.
+    const done = status === "udført";
+    const patch = {
+      status,
+      completed_by: done ? employee.id : null,
+      completed_at: done ? new Date().toISOString() : null,
+    };
+    const { error } = await supabase.from("instances").update(patch).eq("id", taskId);
+    if (error) {
+      console.error("setStatus:", error.message);
+      alert("Kunne ikke opdatere status — prøv igen.");
+      return;
+    }
+    setInstances((prev) => prev.map((t) => t.id === taskId
+      ? { ...t, status, completed_by: patch.completed_by, completed_at: patch.completed_at }
+      : t));
   }
 
   async function toggleChecklistItem(taskId, itemId) {
