@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# Miljøvariabler - må ikke i git
-.env
-.env.*
-!.env.example
+# Miljøvariabler
+# BEMÆRK: .env er bevidst committet indtil variablerne er sat i Netlify UI.
+.env.local
+.env.*.local
