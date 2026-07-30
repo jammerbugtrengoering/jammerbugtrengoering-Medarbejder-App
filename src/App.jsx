@@ -991,6 +991,8 @@ export default function MedarbejderApp() {
   const [resetLoading, setResetLoading] = useState(false);
   const [showWeekend, setShowWeekend] = useState(false);
 
+  const [recoveryToken, setRecoveryToken] = useState(null);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
   async function sendPasswordReset() {
     if (!session?.user?.email) return;
     setResetLoading(true);
@@ -1010,16 +1012,21 @@ export default function MedarbejderApp() {
 useEffect(() => {
     if (window.location.hash.includes("type=recovery")) { setPasswordRecovery(true); return; }
     const params = new URLSearchParams(window.location.search);
-    const tokenHash = params.get("token_hash");
-    const type = params.get("type");
-    if (tokenHash && type === "recovery") {
-          supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" }).then(({ error }) => {
-                  window.history.replaceState(null, "", window.location.pathname);
-                  if (error) setRecoveryError("Nulstillingslinket er udløbet eller allerede brugt. Bed om et nyt.");
-                  else setPasswordRecovery(true);
-          });
-    }
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+      if (tokenHash && type === "recovery") { setRecoveryToken(tokenHash); }
 }, []);
+
+    async function confirmRecovery() {
+          if (!recoveryToken) return;
+          setRecoveryLoading(true);
+          const { error } = await supabase.auth.verifyOtp({ token_hash: recoveryToken, type: "recovery" });
+          setRecoveryLoading(false);
+          window.history.replaceState(null, "", window.location.pathname);
+          setRecoveryToken(null);
+          if (error) setRecoveryError("Nulstillingslinket er udløbet eller allerede brugt. Bed om et nyt.");
+          else setPasswordRecovery(true);
+    }
 
   useEffect(() => {
     if (!session) return;
@@ -1138,7 +1145,8 @@ useEffect(() => {
   }
 
   if (authLoading) return <div style={s.loading}>{T[lang].loading}</div>;
-if (passwordRecovery) return <SetNewPasswordScreen lang={lang} setLang={setLang} onDone={() => { setPasswordRecovery(false); window.history.replaceState(null, "", window.location.pathname); }} />;
+if (recoveryToken) return React.createElement("div", { style: { display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#FFF0F5",fontFamily:"system-ui" } }, React.createElement("div", { style: { background:"#fff",borderRadius:16,padding:28,width:320,textAlign:"center",boxShadow:"0 4px 24px rgba(0,0,0,0.08)" } }, React.createElement("div", { style: { fontWeight:700,fontSize:16,marginBottom:8 } }, "Nulstil adgangskode"), React.createElement("div", { style: { fontSize:13,color:"#666",marginBottom:16 } }, "Klik for at fortsætte."), React.createElement("button", { onClick: confirmRecovery, disabled: recoveryLoading, style: { width:"100%",padding:"12px 0",borderRadius:10,border:"none",background:"#D6247A",color:"#fff",fontWeight:700 } }, recoveryLoading ? "Bekræfter…" : "Fortsæt")));
+  if (passwordRecovery) return <SetNewPasswordScreen lang={lang} setLang={setLang} onDone={() => { setPasswordRecovery(false); window.history.replaceState(null, "", window.location.pathname); }} />;
         if (!session) return <LoginScreen lang={lang} setLang={setLang} initialError={recoveryError} />;
   if (dataLoading) return <div style={s.loading}>{T[lang].fetchingTasks}</div>;
   if (!employee) return (
