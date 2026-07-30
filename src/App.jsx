@@ -17,6 +17,20 @@ const T = {
     loginBtn: "Log ind",
     loggingIn: "Logger ind…",
     loginError: "Forkert e-mail eller adgangskode",
+    forgotPassword: "Glemt adgangskode?",
+    forgotPasswordEmailRequired: "Indtast din e-mail for at nulstille adgangskoden",
+    resetSentMsg: (email) => `Der er sendt et link til nulstilling af adgangskode til ${email}, hvis e-mailen findes i systemet.`,
+    resetError: "Kunne ikke sende nulstillingslink — prøv igen.",
+    newPasswordTitle: "Nulstil adgangskode",
+    newPasswordLabel: "Ny adgangskode",
+    repeatPasswordLabel: "Gentag adgangskode",
+    passwordTooShort: "Adgangskoden skal være mindst 6 tegn",
+    passwordMismatch: "Adgangskoderne er ikke ens",
+    saveNewPassword: "Gem ny adgangskode",
+    savingPassword: "Gemmer…",
+    passwordUpdated: "Din adgangskode er opdateret.",
+    continueBtn: "Fortsæt",
+    passwordUpdateError: "Kunne ikke opdatere adgangskode — prøv igen.",
     loading: "Indlæser…",
     fetchingTasks: "Henter opgaver…",
     noProfileError: "Din bruger er ikke koblet til en medarbejder-profil. Kontakt din planlægger.",
@@ -69,6 +83,20 @@ const T = {
     loginBtn: "Log in",
     loggingIn: "Logging in…",
     loginError: "Incorrect email or password",
+    forgotPassword: "Forgot password?",
+    forgotPasswordEmailRequired: "Enter your email to reset your password",
+    resetSentMsg: (email) => `A password reset link has been sent to ${email}, if the email exists in the system.`,
+    resetError: "Could not send reset link — please try again.",
+    newPasswordTitle: "Reset password",
+    newPasswordLabel: "New password",
+    repeatPasswordLabel: "Repeat password",
+    passwordTooShort: "Password must be at least 6 characters",
+    passwordMismatch: "Passwords do not match",
+    saveNewPassword: "Save new password",
+    savingPassword: "Saving…",
+    passwordUpdated: "Your password has been updated.",
+    continueBtn: "Continue",
+    passwordUpdateError: "Could not update password — please try again.",
     loading: "Loading…",
     fetchingTasks: "Fetching tasks…",
     noProfileError: "Your user is not linked to an employee profile. Contact your planner.",
@@ -320,6 +348,18 @@ function LoginScreen({ lang, setLang }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  async function requestPasswordReset() {
+    if (!email.trim()) { setError(t.forgotPasswordEmailRequired); return; }
+    setLoading(true); setError(""); setResetSent(false);
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    });
+    setLoading(false);
+    if (err) setError(t.resetError);
+    else setResetSent(true);
+  }
 
   async function signIn() {
     if (!email.trim() || !password) return;
@@ -355,6 +395,72 @@ function LoginScreen({ lang, setLang }) {
           disabled={loading || !email.trim() || !password} onClick={signIn}>
           {loading ? t.loggingIn : t.loginBtn}
         </button>
+          <button
+            type="button"
+            onClick={requestPasswordReset}
+            disabled={loading || !email.trim()}
+            style={{ width:"100%",padding:"10px 0",marginTop:10,border:"none",background:"transparent",color:"#D6247A",fontWeight:600,fontSize:13,cursor:"pointer",textAlign:"center" }}>
+            {t.forgotPassword}
+          </button>
+          {resetSent && <div style={{ fontSize:13,color:"#16A34A",marginTop:8,padding:"10px 12px",background:"#ECFDF5",borderRadius:10 }}>{t.resetSentMsg(email.trim())}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Set new password (after clicking reset link) ─────────────────────────────
+function SetNewPasswordScreen({ lang, setLang, onDone }) {
+  const t = T[lang];
+  const [pw1, setPw1] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function save() {
+    if (pw1.length < 6) { setError(t.passwordTooShort); return; }
+    if (pw1 !== pw2) { setError(t.passwordMismatch); return; }
+    setLoading(true); setError("");
+    const { error: err } = await supabase.auth.updateUser({ password: pw1 });
+    setLoading(false);
+    if (err) setError(t.passwordUpdateError);
+    else setDone(true);
+  }
+
+  return (
+    <div style={s.loginWrap}>
+      <LangToggle lang={lang} setLang={setLang} />
+      <div style={s.loginCard}>
+        <div style={s.brand}>
+          <img src="/app-icon.png" alt="Worklist" style={s.brandIcon} />
+          <div>
+            <div style={s.brandTitle}>{t.appName}</div>
+            <div style={s.brandSub}>{t.newPasswordTitle}</div>
+          </div>
+        </div>
+        {done ? (
+          <>
+            <div style={{ fontSize:13,color:"#16A34A",marginBottom:16,padding:"10px 12px",background:"#ECFDF5",borderRadius:10 }}>{t.passwordUpdated}</div>
+            <button style={s.loginBtn} onClick={onDone}>{t.continueBtn}</button>
+          </>
+        ) : (
+          <>
+            <div style={s.loginLabel}>{t.newPasswordLabel}</div>
+            <input type="password" style={s.loginInput} value={pw1}
+              onChange={(e) => setPw1(e.target.value)}
+              placeholder="••••••••" autoFocus />
+            <div style={s.loginLabel}>{t.repeatPasswordLabel}</div>
+            <input type="password" style={s.loginInput} value={pw2}
+              onChange={(e) => setPw2(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+              placeholder="••••••••" />
+            {error && <div style={s.errorBox}>{error}</div>}
+            <button style={{ ...s.loginBtn, opacity: (!pw1 || !pw2 || loading) ? 0.5 : 1 }}
+              disabled={loading || !pw1 || !pw2} onClick={save}>
+              {loading ? t.savingPassword : t.saveNewPassword}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -879,6 +985,7 @@ export default function MedarbejderApp() {
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [showWeekend, setShowWeekend] = useState(false);
 
@@ -896,6 +1003,10 @@ export default function MedarbejderApp() {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setAuthLoading(false); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => { setSession(session); setAuthLoading(false); });
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (window.location.hash.includes("type=recovery")) setPasswordRecovery(true);
   }, []);
 
   useEffect(() => {
@@ -1015,7 +1126,8 @@ export default function MedarbejderApp() {
   }
 
   if (authLoading) return <div style={s.loading}>{T[lang].loading}</div>;
-  if (!session) return <LoginScreen lang={lang} setLang={setLang} />;
+if (passwordRecovery) return <SetNewPasswordScreen lang={lang} setLang={setLang} onDone={() => { setPasswordRecovery(false); window.history.replaceState(null, "", window.location.pathname); }} />;
+    if (!session) return <LoginScreen lang={lang} setLang={setLang} />;
   if (dataLoading) return <div style={s.loading}>{T[lang].fetchingTasks}</div>;
   if (!employee) return (
     <div style={s.loginWrap}>
