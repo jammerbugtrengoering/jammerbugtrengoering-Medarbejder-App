@@ -342,19 +342,20 @@ function LangToggle({ lang, setLang }) {
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
-function LoginScreen({ lang, setLang }) {
+function LoginScreen({ lang, setLang, initialError }) {
   const t = T[lang];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+    useEffect(() => { if (initialError) setError(initialError); }, [initialError]);
 
   async function requestPasswordReset() {
     if (!email.trim()) { setError(t.forgotPasswordEmailRequired); return; }
     setLoading(true); setError(""); setResetSent(false);
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.origin,
+      redirectTo: window.location.origin + "/",
     });
     setLoading(false);
     if (err) setError(t.resetError);
@@ -986,6 +987,7 @@ export default function MedarbejderApp() {
   const [showShop, setShowShop] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+    const [recoveryError, setRecoveryError] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [showWeekend, setShowWeekend] = useState(false);
 
@@ -993,7 +995,7 @@ export default function MedarbejderApp() {
     if (!session?.user?.email) return;
     setResetLoading(true);
     await supabase.auth.resetPasswordForEmail(session.user.email, {
-      redirectTo: window.location.origin,
+      redirectTo: window.location.origin + "/",
     });
     setResetLoading(false);
     setResetSent(true);
@@ -1005,9 +1007,19 @@ export default function MedarbejderApp() {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (window.location.hash.includes("type=recovery")) setPasswordRecovery(true);
-  }, []);
+useEffect(() => {
+    if (window.location.hash.includes("type=recovery")) { setPasswordRecovery(true); return; }
+    const params = new URLSearchParams(window.location.search);
+    const tokenHash = params.get("token_hash");
+    const type = params.get("type");
+    if (tokenHash && type === "recovery") {
+          supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" }).then(({ error }) => {
+                  window.history.replaceState(null, "", window.location.pathname);
+                  if (error) setRecoveryError("Nulstillingslinket er udløbet eller allerede brugt. Bed om et nyt.");
+                  else setPasswordRecovery(true);
+          });
+    }
+}, []);
 
   useEffect(() => {
     if (!session) return;
@@ -1127,7 +1139,7 @@ export default function MedarbejderApp() {
 
   if (authLoading) return <div style={s.loading}>{T[lang].loading}</div>;
 if (passwordRecovery) return <SetNewPasswordScreen lang={lang} setLang={setLang} onDone={() => { setPasswordRecovery(false); window.history.replaceState(null, "", window.location.pathname); }} />;
-    if (!session) return <LoginScreen lang={lang} setLang={setLang} />;
+        if (!session) return <LoginScreen lang={lang} setLang={setLang} initialError={recoveryError} />;
   if (dataLoading) return <div style={s.loading}>{T[lang].fetchingTasks}</div>;
   if (!employee) return (
     <div style={s.loginWrap}>
