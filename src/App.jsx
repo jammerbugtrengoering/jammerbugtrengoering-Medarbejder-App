@@ -985,6 +985,7 @@ export default function MedarbejderApp() {
   const [openTask, setOpenTask] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
+  const [showKm, setShowKm] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
     const [recoveryError, setRecoveryError] = useState("");
@@ -1186,6 +1187,12 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             👕
           </button>
           <button
+            style={{ border:"none", background:"#EEF2FF", color:"#4F46E5", borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:700, cursor:"pointer" }}
+            onClick={() => setShowKm(true)}
+            title={lang === "da" ? "Min kørsel" : "My driving"}>
+            🚗
+          </button>
+          <button
             style={{ ...s.signOutBtn, display:"flex", alignItems:"center", gap:6, color:"#E2E8F0", fontSize:13, fontWeight:600 }}
             onClick={() => setShowProfile((v) => !v)}>
             <span style={{ width:28, height:28, borderRadius:"50%", background:"#D6247A", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>
@@ -1353,6 +1360,15 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           lang={lang}
           supabaseClient={supabase}
           onClose={() => setShowShop(false)}
+        />
+      )}
+
+      {showKm && (
+        <KmPage
+          employee={employee}
+          lang={lang}
+          supabaseClient={supabase}
+          onClose={() => setShowKm(false)}
         />
       )}
 
@@ -1634,3 +1650,69 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
   );
 }
 
+
+function KmPage({ employee, lang, supabaseClient, onClose }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const { data } = await supabaseClient
+        .from("km_log")
+        .select("work_date, leg_order, from_address, to_address, km, minutes")
+        .eq("employee_id", employee.id)
+        .order("work_date", { ascending: false })
+        .order("leg_order", { ascending: true })
+        .limit(200);
+      if (cancelled) return;
+      setRows(data || []);
+      setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [employee.id]);
+
+  const byDate = {};
+  rows.forEach((r) => {
+    if (!byDate[r.work_date]) byDate[r.work_date] = [];
+    byDate[r.work_date].push(r);
+  });
+  const dates = Object.keys(byDate).sort((a, b) => (a < b ? 1 : -1));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 50, overflowY: "auto" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #F1F5F9", position: "sticky", top: 0, background: "#fff" }}>
+        <div style={{ fontWeight: 700, fontSize: 17 }}>{lang === "da" ? "Min kørsel" : "My driving"}</div>
+        <button onClick={onClose} style={{ border: "none", background: "#F1F5F9", borderRadius: 8, width: 32, height: 32, fontSize: 16, cursor: "pointer" }}>✕</button>
+      </div>
+      <div style={{ padding: 16 }}>
+        {loading && <div style={{ color: "#64748B" }}>{lang === "da" ? "Indlæser..." : "Loading..."}</div>}
+        {!loading && dates.length === 0 && (
+          <div style={{ color: "#64748B", padding: 20, textAlign: "center" }}>
+            {lang === "da" ? "Ingen kørsel registreret endnu." : "No driving registered yet."}
+          </div>
+        )}
+        {!loading && dates.map((d) => {
+          const legs = byDate[d];
+          const total = legs.reduce((s, r) => s + (Number(r.km) || 0), 0);
+          return (
+            <div key={d} style={{ marginBottom: 18, border: "1px solid #F1F5F9", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", background: "#F8FAFC" }}>
+                <span style={{ fontWeight: 700, fontSize: 13 }}>{d}</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: "#4F46E5" }}>{total.toFixed(1)} km</span>
+              </div>
+              {legs.map((r, i) => (
+                <div key={i} style={{ padding: "10px 14px", borderTop: i > 0 ? "1px solid #F1F5F9" : "none", fontSize: 13 }}>
+                  <div style={{ color: "#111111" }}>{r.from_address} → {r.to_address}</div>
+                  <div style={{ color: "#94A3B8", fontSize: 12, marginTop: 2 }}>{r.km != null ? Number(r.km).toFixed(1) + " km" : "—"} {r.minutes != null ? "· " + r.minutes + " min" : ""}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
