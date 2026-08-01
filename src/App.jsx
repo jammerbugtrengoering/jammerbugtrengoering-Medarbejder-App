@@ -1456,8 +1456,8 @@ const s = {
   taskChecklist: { display:"flex", alignItems:"center", gap:3, fontSize:12, color:"#64748B" },
   taskLogged: { display:"flex", alignItems:"center", gap:3, fontSize:12, color:"#9C1B5D", fontWeight:600 },
 
-  overlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems:"flex-end" },
-  sheet: { width:"100%", maxHeight:"92svh", background:"#fff", borderRadius:"20px 20px 0 0", display:"flex", flexDirection:"column", position:"relative" },
+  overlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems:"stretch" },
+  sheet: { width:"100%", height:"100%", maxHeight:"100%", background:"#fff", borderRadius:0, display:"flex", flexDirection:"column", position:"relative" },
   dragHandle: { width:36, height:4, background:"#E2E8F0", borderRadius:99, margin:"12px auto 0" },
   sheetClose: { position:"absolute", top:12, right:14, border:"none", background:"#F1F5F9", borderRadius:99, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"#475569" },
   sheetScroll: { flex:1, overflowY:"auto", padding:"8px 20px 20px" },
