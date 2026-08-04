@@ -640,7 +640,8 @@ function CompletionConfirm({ task, employee, usedProducts, minutes, lang, onConf
 // ── Task detail modal ─────────────────────────────────────────────────────────
 function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
   const tr = T[lang];
-  const [minutes, setMinutes] = useState("");
+  const [hours, setHours] = useState("0");
+  const [mins, setMins] = useState("00");
   const [saving, setSaving] = useState(false);
   const [translatedTask, setTranslatedTask] = useState(null);
   const [translating, setTranslating] = useState(false);
@@ -675,7 +676,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   // Overskrider den SAMLEDE registrerede tid (alle medarbejdere) det planlagte,
   // naar denne registrering laegges til? Summen bruges bevidst, fordi opgavens
   // varighed er planlagt for hele opgaven - ikke pr. medarbejder.
-  const pendingMinutes = Number(minutes) || 0;
+  const pendingMinutes = Number(hours) * 60 + Number(mins) || 0;
   const projectedTotal = totalLogged + pendingMinutes;
   const willExceed = pendingMinutes > 0 && projectedTotal > t.duration;
 
@@ -846,11 +847,13 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               </div>
             )}
             <div style={s.timeInputRow}>
-              <input type="number" min={1} step={5} inputMode="numeric" pattern="[0-9]*" placeholder={tr.minutesPlaceholder}
-                style={s.timeInput} value={minutes}
-                onChange={(e) => setMinutes(e.target.value.replace(/[^0-9]/g, ""))}
-                onKeyDown={(e) => { if (e.key === "Enter") handleLog(); }} />
-              <button style={{ ...s.timeLogBtn, opacity: (!minutes || Number(minutes) <= 0 || saving) ? 0.4 : 1 }}
+              <select style={{ ...s.timeInput, flex: 0.3 }} value={hours} onChange={(e) => setHours(e.target.value)}>
+                {Array.from({length: 13}, (_, i) => i).map(h => <option key={h} value={h}>{h}t</option>)}
+              </select>
+              <select style={{ ...s.timeInput, flex: 0.3 }} value={mins} onChange={(e) => setMins(e.target.value)}>
+                {["00", "15", "30", "45"].map(m => <option key={m} value={m}>{m}m</option>)}
+              </select>
+              <button style={{ ...s.timeLogBtn, opacity: (Number(hours) === 0 && mins === "00") || saving ? 0.4 : 1 }}
                 onClick={handleLog} disabled={saving}>
                 {saving ? tr.saving : tr.logTime}
               </button>
@@ -886,7 +889,8 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           usedProducts={usedProducts} minutes={minutes}
           onCancel={() => setShowConfirm(false)}
           onConfirm={async () => {
-            if (Number(minutes) > 0) await onLogMinutes(task.id, Number(minutes), willExceed ? overrunNote.trim() : null);
+            const totalMinutes = Number(hours) * 60 + Number(mins);
+    if (totalMinutes > 0) await onLogMinutes(task.id, totalMinutes, willExceed ? overrunNote.trim() : null);
             await onSetStatus(task.id, "udført");
             setShowConfirm(false);
             onClose();
@@ -1716,3 +1720,4 @@ function KmPage({ employee, lang, supabaseClient, onClose }) {
     </div>
   );
 }
+
