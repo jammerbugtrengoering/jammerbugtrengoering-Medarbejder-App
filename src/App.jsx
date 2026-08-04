@@ -886,7 +886,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
       {showConfirm && (
         <CompletionConfirm
           task={task} employee={employee} lang={lang}
-          usedProducts={usedProducts} minutes={minutes}
+          usedProducts={usedProducts} minutes={mins}
           onCancel={() => setShowConfirm(false)}
           onConfirm={async () => {
             const totalMinutes = Number(hours) * 60 + Number(mins);
