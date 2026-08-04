@@ -851,7 +851,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                 {Array.from({length: 13}, (_, i) => i).map(h => <option key={h} value={h}>{h}t</option>)}
               </select>
               <select style={{ ...s.timeInput, flex: 0.3 }} value={mins} onChange={(e) => setMins(e.target.value)}>
-                {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => <option key={m} value={m}>{m}m</option>)}
+                {["00", "15", "30", "45"].map(m => <option key={m} value={m}>{m}m</option>)}
               </select>
               <button style={{ ...s.timeLogBtn, opacity: (Number(hours) === 0 && mins === "00") || saving ? 0.4 : 1 }}
                 onClick={handleLog} disabled={saving}>
