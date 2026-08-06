@@ -667,7 +667,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const t = translatedTask || task;
   const myLogged = (task.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
   const totalLogged = (task.timeLog || []).reduce((s, l) => s + (l.minutes || 0), 0);
-  const done = task.status === "udført";
+  const done = !!((task.completed_by_employee || {})[employee.id]);
   const clProg = { done: (task.checklist || []).filter((i) => i.done).length, total: (task.checklist || []).length };
   const mapsUrl = task.address
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(task.address)}`
@@ -863,7 +863,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           {/* Done button → confirmation */}
           <div style={{ padding: "0 0 32px" }}>
             {done ? (
-              <button style={s.doneActiveLarge} onClick={() => onSetStatus(task.id, "planlagt")}>
+              <button style={s.doneActiveLarge} onClick={() => onSetStatus(task.id, false)}>
                 <CheckCircle2 size={18} /> {tr.markNotDone}
               </button>
             ) : (
@@ -891,7 +891,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           onConfirm={async () => {
             const totalMinutes = Number(hours) * 60 + Number(mins);
     if (totalMinutes > 0) await onLogMinutes(task.id, totalMinutes, willExceed ? overrunNote.trim() : null);
-            await onSetStatus(task.id, "udført");
+            await onSetStatus(task.id, true);
             setShowConfirm(false);
             onClose();
           }}
@@ -913,7 +913,7 @@ function useTranslatedTitle(title, lang) {
 
 function TaskCard({ seg, employee, lang, onClick }) {
   const t = seg.task;
-  const done = t.status === "udført";
+  const done = !!((t.completed_by_employee || {})[employee.id]);
   const inProgress = t.status === "i_gang";
   const myLogged = (t.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
   const clProg = { done: (t.checklist || []).filter((i) => i.done).length, total: (t.checklist || []).length };
@@ -1114,25 +1114,32 @@ useEffect(() => {
     setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, timeLog: newLog, time_log: newLog } : t));
   }
 
-  async function setStatus(taskId, status) {
-    // Registrér HVEM der afsluttede opgaven og hvornår, så planlæggeren kan se
-    // forskel på en opgave medarbejderen selv har afsluttet i marken og en der
-    // er sat manuelt af planlæggeren. Felterne ryddes igen hvis opgaven
-    // genåbnes, så de altid afspejler den aktuelle status.
-    const done = status === "udført";
-    const patch = {
-      status,
-      completed_by: done ? employee.id : null,
-      completed_at: done ? new Date().toISOString() : null,
-    };
-    const { error } = await supabase.from("instances").update(patch).eq("id", taskId);
+  async function setStatus(taskId, done) {
+    // Afslutning er nu PR. MEDARBEJDER, ikke fælles for hele opgaven — ellers
+    // ville én medarbejders "udført" lukke opgaven for de andre tilknyttede
+    // medarbejdere, så de ikke længere kunne registrere tid eller afslutte
+    // deres egen del. Databasefunktionen opdaterer atomart kun denne
+    // medarbejders egen post og udleder selv om opgaven som helhed (status)
+    // skal være "udført" — nemlig først når ALLE tilknyttede har afsluttet.
+    const { data, error } = await supabase.rpc("set_employee_task_status", {
+      p_instance_id: taskId, p_emp_id: employee.id, p_done: done,
+    });
     if (error) {
       console.error("setStatus:", error.message);
       alert("Kunne ikke opdatere status — prøv igen.");
       return;
     }
     setInstances((prev) => prev.map((t) => t.id === taskId
-      ? { ...t, status, completed_by: patch.completed_by, completed_at: patch.completed_at }
+      ? {
+          ...t,
+          status: data.status,
+          completed_by: data.completed_by,
+          completed_at: data.completed_at,
+          completedBy: data.completed_by,
+          completedAt: data.completed_at,
+          completed_by_employee: data.completed_by_employee,
+          completedByEmployee: data.completed_by_employee,
+        }
       : t));
   }
 
