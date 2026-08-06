@@ -681,12 +681,14 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const willExceed = pendingMinutes > 0 && projectedTotal > t.duration;
 
   async function handleLog() {
-    const m = Number(minutes);
+    const m = pendingMinutes;
     if (!m || m <= 0) return;
     if (willExceed && !overrunNote.trim()) { setOverrunError(true); return; }
+    if (!window.confirm(lang === "da" ? `Registrér ${fmtMin(m)}?` : `Log ${fmtMin(m)}?`)) return;
     setSaving(true);
     await onLogMinutes(t.id, m, willExceed ? overrunNote.trim() : null);
-    setMinutes("");
+    setHours("0");
+    setMins("00");
     setOverrunNote("");
     setOverrunError(false);
     setSaving(false);
