@@ -1555,18 +1555,45 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
     const entries = Object.entries(selected).filter(([, q]) => Number(q) > 0);
     if (!entries.length) return;
     setSaving(true);
+    // Bestillingen oprettes som "pending" — lageret nedskrives først når
+    // planlæggeren godkender udleveringen (se InventoryView i Rengøringsplan).
+    const orderGroupId = crypto.randomUUID();
     for (const [itemId, qty] of entries) {
       const amount = Number(qty);
       const item = items.find((i) => i.id === itemId);
       if (!item) continue;
-      await supabaseClient.from("inventory_transactions").insert({
-        item_id: itemId, quantity: -amount, type: "out",
+      const { error: insertErr } = await supabaseClient.from("inventory_transactions").insert({
+        item_id: itemId, quantity: -amount, type: "out", status: "pending", order_group_id: orderGroupId,
         reason: lang === "da" ? `Bestilt af ${employee.name}` : `Ordered by ${employee.name}`,
         employee_id: employee.id,
       });
-      const { error: stockErr2 } = await supabaseClient.rpc("consume_stock", { p_item_id: itemId, p_amount: amount });
-      if (stockErr2) { console.error("consume_stock:", stockErr2.message); alert(`Kunne ikke opdatere lageret for "${item.name}" — prøv igen.`); setSaving(false); return; }
+      if (insertErr) { console.error("order insert:", insertErr.message); alert(`Kunne ikke oprette bestillingen for "${item.name}" — prøv igen.`); setSaving(false); return; }
     }
+    // Giv planlæggeren besked om at der venter en bestilling til godkendelse.
+    try {
+      const { data: admins } = await supabaseClient.from("employees").select("app_email, name").eq("is_admin", true);
+      const itemsList = entries.map(([itemId, qty]) => {
+        const item = items.find((i) => i.id === itemId);
+        return `${qty} × ${item ? item.name : itemId}`;
+      }).join(", ");
+      await Promise.all((admins || []).filter((a) => a.app_email).map((admin) =>
+        fetch("https://gteowfoahsfpunzgdxum.supabase.co/functions/v1/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: admin.app_email,
+            name: admin.name,
+            subject: `Ny bestilling af medarbejderprodukter - ${employee.name}`,
+            html: `
+              <h2>Ny bestilling</h2>
+              <p><strong>${employee.name}</strong> har bestilt:</p>
+              <p>${itemsList}</p>
+              <p>Godkend udleveringen i Rengøringsplan under Lager, så lageret opdateres.</p>
+            `,
+          }),
+        }).catch((e) => console.error("notify admin failed", e))
+      ));
+    } catch (e) { console.error("notify admins failed:", e); }
     const { data: txns } = await supabaseClient
       .from("inventory_transactions")
       .select("*, inventory_items(name, unit, inventory_categories(type))")
@@ -1640,7 +1667,11 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {history.map((tx) => (
                   <div key={tx.id} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F1F5F9", gap: 8 }}>
-                    <div style={{ flex: 1, fontSize:14,color:"#111111" }}>{tx.inventory_items?.name}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize:14,color:"#111111" }}>{tx.inventory_items?.name}</div>
+                      {tx.status === "pending" && <div style={{ fontSize: 11, fontWeight: 700, color: "#B45309" }}>{lang === "da" ? "Afventer godkendelse" : "Awaiting approval"}</div>}
+                      {tx.status === "rejected" && <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626" }}>{lang === "da" ? "Afvist" : "Rejected"}</div>}
+                    </div>
                     <div style={{ fontSize:14,fontWeight:700,color:"#111111" }}>{Math.abs(tx.quantity)} {tx.inventory_items?.unit}</div>
                     {tx.created_at && <div style={{ fontSize: 11, color: "#94A3B8", flexShrink: 0 }}>{new Date(tx.created_at).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}</div>}
                   </div>
