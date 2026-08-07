@@ -251,8 +251,6 @@ const NEXUS_IOS_SCHEME = "kmdnexus://";
 function openNexusApp() {
   const ua = navigator.userAgent || "";
   const isAndroid = /android/i.test(ua);
-  const isIOS = /iphone|ipad|ipod/i.test(ua) ||
-    (/Macintosh/.test(ua) && typeof document !== "undefined" && "ontouchend" in document);
 
   if (isAndroid) {
     // Android klarer det i ét hop: intent:// starter appen ud fra pakkenavnet hvis
@@ -264,33 +262,11 @@ function openNexusApp() {
     return;
   }
 
-  if (!isIOS) {
-    window.open(NEXUS_APP_STORE_URL, "_blank", "noopener");
-    return;
-  }
-
-  // iOS: forsøg at åbne appen, og gå kun til App Store hvis der ikke skete noget.
-  // Timeren annulleres så snart siden mister fokus (= appen kom i forgrunden).
-  // Uden det blev brugeren sendt i App Store SELVOM appen åbnede korrekt — det
-  // var fejlen i den tidligere version.
-  let fallbackTimer = window.setTimeout(() => {
-    cleanup();
-    window.location.href = NEXUS_APP_STORE_URL;
-  }, 1200);
-
-  function cleanup() {
-    if (fallbackTimer) { window.clearTimeout(fallbackTimer); fallbackTimer = null; }
-    document.removeEventListener("visibilitychange", onLeave);
-    window.removeEventListener("pagehide", onLeave);
-    window.removeEventListener("blur", onLeave);
-  }
-  function onLeave() { cleanup(); }
-
-  document.addEventListener("visibilitychange", onLeave);
-  window.addEventListener("pagehide", onLeave);
-  window.addEventListener("blur", onLeave);
-
-  window.location.href = NEXUS_IOS_SCHEME;
+  // iOS/desktop: KMD offentliggør ikke deres iOS URL-scheme, så et gættet scheme
+  // (fx "kmdnexus://") giver en "Safari kan ikke åbne siden, fordi adressen er
+  // ugyldig"-fejl i stedet for at åbne appen. Derfor går vi direkte til App Store,
+  // hvor "ÅBEN"-knappen vises automatisk hvis appen allerede er installeret.
+  window.open(NEXUS_APP_STORE_URL, "_blank", "noopener");
 }
 
 function todayKey() {
