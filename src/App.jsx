@@ -390,7 +390,8 @@ function HelpPage({ lang, onClose }) {
         <button onClick={onClose}
           style={{ border:"none", background:"#333", color:"#fff", borderRadius:8, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
       </div>
-      <div style={{ flex:1, overflowY:"auto", padding:"14px 16px 32px", WebkitOverflowScrolling:"touch" }}>
+      <div style={{ flex:1, overflowY:"auto", padding:"14px 16px 32px", WebkitOverflowScrolling:"touch",
+                    textAlign:"left", maxWidth:640, margin:"0 auto", width:"100%", boxSizing:"border-box" }}>
         <div style={{ background:"#FCE4EF", borderRadius:10, padding:"12px 14px", marginBottom:16,
                       fontSize:14.5, lineHeight:1.5, color:"#9C1B5D", fontWeight:700 }}>
           {da ? "Hver dag: åbn appen → tryk på opgaven → sæt flueben → registrér tid → marker som udført."
