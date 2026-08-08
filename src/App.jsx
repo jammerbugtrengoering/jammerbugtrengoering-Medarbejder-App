@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import {
   Clock, CheckCircle2, Video, Lock, ListChecks, Check,
@@ -964,7 +964,19 @@ export default function MedarbejderApp() {
   const [dataLoading, setDataLoading] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
   const [day, setDay] = useState(todayWorkdayKey());
+  // Standarddagen falder tilbage til nærmeste hverdag, så man ikke lander på en tom
+  // lørdag. Men har medarbejderen faktisk opgaver i dag, og det ER weekend, skal vi
+  // åbne på den rigtige dag — ellers viste appen fredag til en der møder om lørdagen.
+  const weekendJumpDone = useRef(false);
   const [openTask, setOpenTask] = useState(null);
+
+  useEffect(() => {
+    if (weekendJumpDone.current || weekOffset !== 0 || !instances.length) return;
+    const tk = todayKey();
+    if (tk !== "Sat" && tk !== "Sun") return;
+    weekendJumpDone.current = true;
+    if (instances.some((t) => t.day === tk)) setDay(tk);
+  }, [instances, weekOffset]);
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showKm, setShowKm] = useState(false);
