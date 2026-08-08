@@ -308,6 +308,116 @@ function computeDaySchedule(dayTasks, settings) {
 }
 
 // ── Language selector ─────────────────────────────────────────────────────────
+
+// ── Hjælpeside ────────────────────────────────────────────────────────────────
+// Samme indhold som den trykte brugervejledning, men bygget til telefon:
+// fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
+const HELP_DA = [
+  { t: "Sådan finder du dine opgaver", p: [
+      "Når du åbner appen, ser du denne uge. Øverst vælger du dag.",
+      "Tallet i den lille boble på dagen viser, hvor mange opgaver du har.",
+      "Pilene skifter uge. «I dag» hopper tilbage til dagens dato.",
+      "«+ Weekend» viser lørdag og søndag, hvis du har vagter der.",
+      "Tryk på opgaven for at åbne den." ] },
+  { t: "Inde i opgaven", p: [
+      "Øverst står kunden og adressen.",
+      "«Naviger — Google Maps» viser vej til adressen.",
+      "«Adgang» viser fx nøgleboks og kode, hvis der er en.",
+      "Under «Tasks» sætter du flueben, når du har gjort en ting. Tælleren viser hvor langt du er." ] },
+  { t: "Registrér din tid", p: [
+      "1. Vælg timer i den første boks og minutter i den anden.",
+      "2. Tryk «Registrér tid».",
+      "3. Tryk «Marker som udført», når du er helt færdig." ], warn:
+      "Husk at registrere din tid samme dag. Registrerer du ikke din tid, bliver din kørsel ikke beregnet — og så får du ikke kørselspenge for turen. Hver dag kl. 18 får du en mail, hvis du mangler noget." },
+  { t: "Produkter du har brugt", p: [
+      "Brugte du fx rengøringsmidler hos kunden, så tryk «Vælg produkter brugt» inde i opgaven og sæt antal.",
+      "Så trækkes det fra lageret, og kunden bliver faktureret rigtigt." ] },
+  { t: "Bestil arbejdstøj", p: [
+      "Tryk på trøje-ikonet 👕 øverst.",
+      "Sæt antal med + og − og tryk «Vælg produkter».",
+      "Din bestilling går til kontoret, som godkender den. Under «Historik» ser du dine tidligere bestillinger." ] },
+  { t: "Din kørsel", p: [
+      "Tryk på bil-ikonet 🚗 øverst for at se din beregnede kørsel.",
+      "Du skal ikke selv taste kilometer — det regnes ud fra dine opgaver, når du har registreret din tid." ] },
+  { t: "Hvis noget driller", p: [
+      "Kan du ikke logge ind? Tjek din e-mail og brug «Glemt adgangskode?».",
+      "Kan du ikke se dine opgaver? Tjek at du står på den rigtige uge og dag.",
+      "Mangler der en opgave? Kontakt kontoret — de kan flytte den.",
+      "Hænger appen? Luk siden og åbn den igen." ] },
+];
+const HELP_EN = [
+  { t: "Finding your jobs", p: [
+      "When you open the app you see this week. Pick a day at the top.",
+      "The small bubble shows how many jobs you have that day.",
+      "The arrows change week. \"Today\" jumps back to today.",
+      "\"+ Weekend\" shows Saturday and Sunday if you have shifts.",
+      "Tap a job to open it." ] },
+  { t: "Inside the job", p: [
+      "The customer and address are at the top.",
+      "\"Navigate — Google Maps\" shows the way there.",
+      "\"Access\" shows key box and code if there is one.",
+      "Under \"Tasks\" you tick off each thing as you finish it." ] },
+  { t: "Register your time", p: [
+      "1. Pick hours in the first box and minutes in the second.",
+      "2. Tap \"Register time\".",
+      "3. Tap \"Mark as done\" when you have finished." ], warn:
+      "Register your time the same day. If you do not, your mileage is not calculated — and you will not be paid for the drive. Every day at 18:00 you get an email if something is missing." },
+  { t: "Products you used", p: [
+      "If you used products at the customer, tap \"Select products used\" inside the job and set the amount.",
+      "It is then deducted from stock and billed to the customer." ] },
+  { t: "Order workwear", p: [
+      "Tap the shirt icon 👕 at the top.",
+      "Set the amount with + and − and tap \"Select products\".",
+      "Your order goes to the office for approval. \"History\" shows earlier orders." ] },
+  { t: "Your mileage", p: [
+      "Tap the car icon 🚗 at the top to see your calculated mileage.",
+      "You do not enter kilometres yourself — it is calculated from your jobs once you register your time." ] },
+  { t: "If something goes wrong", p: [
+      "Cannot log in? Check your email and use \"Forgot password?\".",
+      "Cannot see your jobs? Check you are on the right week and day.",
+      "A job is missing? Contact the office — they can move it.",
+      "App stuck? Close the page and open it again." ] },
+];
+
+function HelpPage({ lang, onClose }) {
+  const da = lang === "da";
+  const sections = da ? HELP_DA : HELP_EN;
+  return (
+    <div style={{ position:"fixed", inset:0, background:"#fff", zIndex:120, display:"flex", flexDirection:"column" }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                    padding:"14px 16px", borderBottom:"1px solid #E2E8F0", background:"#111", color:"#fff" }}>
+        <div style={{ fontWeight:800, fontSize:16 }}>{da ? "Sådan bruger du appen" : "How to use the app"}</div>
+        <button onClick={onClose}
+          style={{ border:"none", background:"#333", color:"#fff", borderRadius:8, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
+      </div>
+      <div style={{ flex:1, overflowY:"auto", padding:"14px 16px 32px", WebkitOverflowScrolling:"touch" }}>
+        <div style={{ background:"#FCE4EF", borderRadius:10, padding:"12px 14px", marginBottom:16,
+                      fontSize:14.5, lineHeight:1.5, color:"#9C1B5D", fontWeight:700 }}>
+          {da ? "Hver dag: åbn appen → tryk på opgaven → sæt flueben → registrér tid → marker som udført."
+              : "Every day: open the app → tap the job → tick off tasks → register time → mark as done."}
+        </div>
+        {sections.map((sec, i) => (
+          <div key={i} style={{ marginBottom:20 }}>
+            <div style={{ fontWeight:800, fontSize:16, color:"#111", marginBottom:7 }}>{sec.t}</div>
+            {sec.p.map((line, j) => (
+              <div key={j} style={{ fontSize:15, lineHeight:1.55, color:"#334155", marginBottom:6 }}>{line}</div>
+            ))}
+            {sec.warn && (
+              <div style={{ marginTop:9, background:"#FEF3C7", borderLeft:"4px solid #D97706",
+                            borderRadius:6, padding:"11px 13px", fontSize:14.5, lineHeight:1.5, color:"#111", fontWeight:600 }}>
+                {sec.warn}
+              </div>
+            )}
+          </div>
+        ))}
+        <div style={{ fontSize:13, color:"#94A3B8", borderTop:"1px solid #E2E8F0", paddingTop:12 }}>
+          {da ? "Spørgsmål? Kontakt kontoret." : "Questions? Contact the office."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LangToggle({ lang, setLang }) {
   return (
     <div style={s.langRow}>
@@ -980,6 +1090,7 @@ export default function MedarbejderApp() {
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showKm, setShowKm] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
     const [recoveryError, setRecoveryError] = useState("");
@@ -1194,6 +1305,12 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             🚗
           </button>
           <button
+            style={{ border:"none", background:"#F1F5F9", color:"#334155", borderRadius:8, padding:"6px 11px", fontSize:13, fontWeight:800, cursor:"pointer" }}
+            onClick={() => setShowHelp(true)}
+            title={lang === "da" ? "Hjælp - sådan bruger du appen" : "Help - how to use the app"}>
+            ?
+          </button>
+          <button
             style={{ ...s.signOutBtn, display:"flex", alignItems:"center", gap:6, color:"#E2E8F0", fontSize:13, fontWeight:600 }}
             onClick={() => setShowProfile((v) => !v)}>
             <span style={{ width:28, height:28, borderRadius:"50%", background:"#D6247A", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>
@@ -1363,6 +1480,8 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           onClose={() => setShowShop(false)}
         />
       )}
+
+      {showHelp && <HelpPage lang={lang} onClose={() => setShowHelp(false)} />}
 
       {showKm && (
         <KmPage
