@@ -1151,7 +1151,9 @@ useEffect(() => {
 
       const { week: targetWeek, year: targetYear } = weekInfoWithOffset(weekOffset);
       const { data: instData, error: instErr } = await supabase
-        .from("instances").select("*").eq("week", targetWeek).eq("year", targetYear);
+        // Slettemarkerede opgaver (fra en aftale der er sat som udgaaet) hentes ikke,
+        // saa de forsvinder fra medarbejderens liste med det samme.
+        .from("instances").select("*").eq("week", targetWeek).eq("year", targetYear).is("deleted_at", null);
       if (instErr) console.error("load instances error:", instErr.message);
       const { data: customersData } = await supabase.from("customers").select("*");
       const custMap = Object.fromEntries((customersData || []).map((c) => [c.id, c]));
