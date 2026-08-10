@@ -273,6 +273,18 @@ function todayKey() {
   const keys = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return keys[new Date().getDay()];
 }
+// Medarbejdervaelgeren maa kun findes paa en computer. Ude i marken bruger alle
+// telefonen, og der skal skaermen vise ens egen dag og intet andet. Bemaerk at
+// dette er en bekvemmelighed, ikke en spaerring — den rigtige beskyttelse er at
+// databasen kun lader administratorer laese andres opgaver.
+function isDesktopBrowser() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return false;
+  if (typeof window !== "undefined" && window.matchMedia
+      && window.matchMedia("(display-mode: standalone)").matches) return false;
+  return true;
+}
 function todayWorkdayKey() {
   // Returner nærmeste hverdag (til default dag-valg)
   const keys = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1074,6 +1086,12 @@ export default function MedarbejderApp() {
   const [travelSettings, setTravelSettings] = useState({ defaultMinutes: 20, dayStart: "07:00", overrides: {} });
   const [dataLoading, setDataLoading] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
+  // Planlæggeren kan kigge med i en kollegas uge for at hjælpe over telefonen.
+  // viewEmpId er null når man ser sin egen plan — man starter altid hos sig selv.
+  const [viewEmpId, setViewEmpId] = useState(null);
+  const [allEmployees, setAllEmployees] = useState([]);
+  const viewingOther = !!(viewEmpId && employee && viewEmpId !== employee.id);
+  const viewedEmployee = viewingOther ? allEmployees.find((e) => e.id === viewEmpId) : null;
   const [day, setDay] = useState(todayWorkdayKey());
   // Standarddagen falder tilbage til nærmeste hverdag, så man ikke lander på en tom
   // lørdag. Men har medarbejderen faktisk opgaver i dag, og det ER weekend, skal vi
@@ -1142,6 +1160,16 @@ useEffect(() => {
       const { data: empData } = await supabase.from("employees").select("*").eq("auth_user_id", session.user.id).single();
       if (!empData) { setDataLoading(false); return; }
       setEmployee(empData);
+      // Medarbejderlisten hentes kun til administratorer, og kun paa computer.
+      // Databasen har i forvejen sidste ord: en almindelig medarbejder kan slet
+      // ikke laese andres opgaver, uanset hvad brugerfladen viser.
+      if (empData.is_admin && isDesktopBrowser()) {
+        const { data: emps } = await supabase.from("employees").select("id,name,color").order("name");
+        setAllEmployees(emps || []);
+      } else {
+        setAllEmployees([]);
+        setViewEmpId(null);
+      }
 
       // Apply saved language preference
       if (empData.default_lang && empData.default_lang !== lang) {
@@ -1161,7 +1189,7 @@ useEffect(() => {
       const myInstances = (instData || [])
         .filter((i) => {
           const arr = typeof i.assignees === "string" ? JSON.parse(i.assignees) : (i.assignees || []);
-          return arr.includes(empData.id);
+          return arr.includes(viewEmpId || empData.id);
         })
         .map((i) => {
           const cust = custMap[i.customer_id];
@@ -1190,7 +1218,7 @@ useEffect(() => {
       setDataLoading(false);
     }
     load();
-  }, [session, weekOffset]);
+  }, [session, weekOffset, viewEmpId]);
 
   useEffect(() => {
     if (openTask) {
@@ -1200,6 +1228,7 @@ useEffect(() => {
   }, [instances]);
 
   async function logMinutes(taskId, minutes, note = null) {
+    if (viewingOther) return;
     const m = Number(minutes);
     if (!employee || !m || m <= 0) return;
     const task = instances.find((t) => t.id === taskId);
@@ -1219,6 +1248,7 @@ useEffect(() => {
   }
 
   async function setStatus(taskId, done) {
+    if (viewingOther) return;
     // Afslutning er nu PR. MEDARBEJDER, ikke fælles for hele opgaven — ellers
     // ville én medarbejders "udført" lukke opgaven for de andre tilknyttede
     // medarbejdere, så de ikke længere kunne registrere tid eller afslutte
@@ -1248,6 +1278,7 @@ useEffect(() => {
   }
 
   async function toggleChecklistItem(taskId, itemId) {
+    if (viewingOther) return;
     const task = instances.find((t) => t.id === taskId);
     if (!task) return;
     const newChecklist = (task.checklist || []).map((i) => i.id === itemId ? { ...i, done: !i.done } : i);
@@ -1379,6 +1410,34 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             style={{ width:"100%", padding:"13px 0", borderRadius:12, border:"none", background:"#FEF2F2", color:"#DC2626", fontWeight:700, fontSize:15, cursor:"pointer" }}
             onClick={signOut}>
             {tr.signOut}
+          </button>
+        </div>
+      )}
+
+      {/* Medarbejdervælger — kun for administratorer, og kun på computer.
+          Man starter altid på sin egen plan; det her er noget man aktivt vælger. */}
+      {allEmployees.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "#64748B" }}>Se plan for</span>
+          <select
+            value={viewEmpId || ""}
+            onChange={(e) => setViewEmpId(e.target.value || null)}
+            style={{ padding: "6px 10px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1", background: "#fff" }}>
+            <option value="">Mig selv</option>
+            {allEmployees.filter((e) => !employee || e.id !== employee.id).map((e) => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {viewingOther && (
+        <div style={{ background: "#FFF7ED", borderLeft: "4px solid #C2410C", color: "#9A3412",
+          padding: "10px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span>Du ser <b>{viewedEmployee ? viewedEmployee.name : "en kollegas"}</b> plan. Kun visning — du kan ikke registrere noget her.</span>
+          <button onClick={() => setViewEmpId(null)}
+            style={{ marginLeft: "auto", padding: "5px 12px", borderRadius: 999, border: "1px solid #C2410C",
+              background: "#fff", color: "#9A3412", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            Tilbage til min egen
           </button>
         </div>
       )}
