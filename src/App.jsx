@@ -303,16 +303,34 @@ function parseTimeToMinutes(str) {
   return (h || 0) * 60 + (m || 0);
 }
 function computeDaySchedule(dayTasks, settings) {
+  // Opgaver med et aftalt klokkeslaet ligger foerst og i kronologisk raekkefoelge.
+  // Resten fylder ud efter dem. Foer blev raekkefoelgen bestemt af den vilkaarlige
+  // raekkefoelge opgaverne kom retur fra databasen.
+  const timeOf = (t) => t.scheduled_time || t.scheduledTime || null;
+  const sorted = [...dayTasks].sort((a, b) => {
+    const at = timeOf(a), bt = timeOf(b);
+    if (at && bt) return parseTimeToMinutes(at) - parseTimeToMinutes(bt);
+    if (at) return -1;
+    if (bt) return 1;
+    return 0;
+  });
   let cursor = parseTimeToMinutes(settings.dayStart);
   const segments = [];
-  dayTasks.forEach((t, idx) => {
+  sorted.forEach((t, idx) => {
     if (idx > 0) {
-      const travel = getTravelMinutes(dayTasks[idx - 1].address, t.address, settings);
+      const travel = getTravelMinutes(sorted[idx - 1].address, t.address, settings);
       if (travel > 0) {
-        segments.push({ type: "transport", minutes: travel, start: cursor, key: `${dayTasks[idx-1].id}->${t.id}`, to: t.address });
+        segments.push({ type: "transport", minutes: travel, start: cursor, key: `${sorted[idx-1].id}-${t.id}` });
         cursor += travel;
       }
     }
+    // Et aftalt klokkeslaet er en aftale med kunden og skal staa fast. Tidligere
+    // blev det kun brugt til at bestemme raekkefoelgen, saa en opgave aftalt til
+    // kl. 11 blev vist fra arbejdsdagens start — medarbejderen fik altsaa et
+    // andet tidspunkt end det planlaeggeren og kunden havde aftalt.
+    const fixedRaw = timeOf(t);
+    const fixed = fixedRaw ? parseTimeToMinutes(fixedRaw) : null;
+    if (fixed !== null && fixed > cursor) cursor = fixed;
     segments.push({ type: "task", task: t, start: cursor });
     cursor += t.duration;
   });
