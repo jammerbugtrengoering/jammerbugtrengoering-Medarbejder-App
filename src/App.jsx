@@ -302,7 +302,7 @@ function parseTimeToMinutes(str) {
   const [h, m] = (str || "07:00").split(":").map(Number);
   return (h || 0) * 60 + (m || 0);
 }
-function computeDaySchedule(dayTasks, settings) {
+function computeDaySchedule(dayTasks, settings, employee) {
   // Opgaver med et aftalt klokkeslaet ligger foerst og i kronologisk raekkefoelge.
   // Resten fylder ud efter dem. Foer blev raekkefoelgen bestemt af den vilkaarlige
   // raekkefoelge opgaverne kom retur fra databasen.
@@ -314,7 +314,9 @@ function computeDaySchedule(dayTasks, settings) {
     if (bt) return 1;
     return 0;
   });
-  let cursor = parseTimeToMinutes(settings.dayStart);
+  // Dagen starter ved medarbejderens egen moedetid hvis den er sat — praecis som
+  // planlaeggeren regner. Ellers ved det generelle standardtidspunkt.
+  let cursor = parseTimeToMinutes((employee && (employee.start_time || employee.startTime)) || settings.dayStart);
   const segments = [];
   sorted.forEach((t, idx) => {
     if (idx > 0) {
@@ -1328,7 +1330,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
   const hasWeekendTasks = instances.some((t) => t.day === "Sat" || t.day === "Sun");
   const DAYS = (showWeekend || hasWeekendTasks) ? ALL_DAYS : ALL_DAYS.filter((d) => !d.weekend);
   const myTasks = instances.filter((t) => t.day === day);
-  const schedule = computeDaySchedule(myTasks, travelSettings);
+  const schedule = computeDaySchedule(myTasks, travelSettings, employee);
 
   return (
     <div style={s.app}>
