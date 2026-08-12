@@ -253,11 +253,19 @@ function openNexusApp() {
   const isAndroid = /android/i.test(ua);
 
   if (isAndroid) {
-    // Android klarer det i ét hop: intent:// starter appen ud fra pakkenavnet hvis
-    // den er installeret, og sender ellers browseren til Play Store. Der skal ikke
-    // gættes et URL-scheme, så det virker uanset hvad KMD har valgt internt.
+    // Android: bed om appens startskaerm — praecis som at trykke paa ikonet.
+    //
+    // Tidligere bad vi om at aabne adressen "https://open" inde i appen. Det
+    // forudsatte at KMD havde erklaeret netop den adresse i appen, og det har de
+    // ikke. Android kunne derfor ikke afgoere hvad der skulle aabnes, og resultatet
+    // var uforudsigeligt — nogle telefoner landede et forkert sted.
+    //
+    // MAIN + LAUNCHER er den handling telefonen selv bruger, naar man trykker paa
+    // app-ikonet, og den findes i enhver app. Er appen ikke installeret, sender
+    // browseren i stedet brugeren til Play Store via browser_fallback_url.
     window.location.href =
-      `intent://open#Intent;scheme=https;package=${NEXUS_ANDROID_PACKAGE};` +
+      `intent://#Intent;package=${NEXUS_ANDROID_PACKAGE};` +
+      `action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;` +
       `S.browser_fallback_url=${encodeURIComponent(NEXUS_PLAY_STORE_URL)};end`;
     return;
   }
