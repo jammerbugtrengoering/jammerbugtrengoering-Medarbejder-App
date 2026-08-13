@@ -1497,7 +1497,10 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
         {DAYS.map((d) => {
           const count = instances.filter((t) => t.day === d.key).length;
           const isWeekend = d.weekend;
-          const isToday = d.key === todayKey();
+          // "I dag" gaelder kun i indevaerende uge. Uden weekOffset-tjekket fik samme
+          // ugedag prikken i ALLE uger — bladrede man frem til uge 40, sad prikken
+          // stadig paa torsdagen, selv om den dag ligger flere maaneder ude i fremtiden.
+          const isToday = weekOffset === 0 && d.key === todayKey();
           // Beregn dato for denne dag i den aktuelle uge
           const dayIndex = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(d.key);
           const jan4 = new Date(new Date().getFullYear(), 0, 4);
