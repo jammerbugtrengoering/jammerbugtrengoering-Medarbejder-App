@@ -431,6 +431,24 @@ const HELP_EN = [
       "App stuck? Close the page and open it again." ] },
 ];
 
+// Udskriver vejledningen som den staar i appen. Hjaelpeteksten er kilden — der
+// findes ingen separat PDF der skal huskes opdateret.
+function udskrivVejledning(sections, da) {
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const idag = new Date().toLocaleDateString(da ? "da-DK" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const titel = da ? "Sådan bruger du appen" : "How to use the app";
+  const krop = (sections || []).map((s) => `<h2>${esc(s.t)}</h2>` + (s.p || []).map((l) => `<p>${esc(l)}</p>`).join("")).join("");
+  const w = window.open("", "_blank");
+  if (!w) { alert(da ? "Tillad pop op-vinduer for at kunne udskrive." : "Allow pop-ups to print."); return; }
+  w.document.write(
+    `<!doctype html><html lang="${da ? "da" : "en"}"><head><meta charset="utf-8"><title>${esc(titel)}</title><style>` +
+    `body{font-family:Inter,-apple-system,system-ui,sans-serif;color:#111;line-height:1.55;max-width:700px;margin:0 auto;padding:26px 24px}` +
+    `h1{color:#D6247A;font-size:24px;margin:0 0 4px}.dato{color:#94A3B8;font-size:12px;margin:0 0 24px}` +
+    `h2{font-size:16px;margin:22px 0 6px;page-break-after:avoid}p{font-size:13.5px;margin:4px 0}@page{margin:16mm}` +
+    `</style></head><body><h1>Worklist</h1><p class="dato">${esc(titel)} · ${da ? "udskrevet" : "printed"} ${esc(idag)}</p>${krop}</body></html>`
+  );
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
+}
 function HelpPage({ lang, onClose }) {
   const da = lang === "da";
   const sections = da ? HELP_DA : HELP_EN;
@@ -438,7 +456,13 @@ function HelpPage({ lang, onClose }) {
     <div style={{ position:"fixed", inset:0, background:"#fff", zIndex:120, display:"flex", flexDirection:"column" }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
                     padding:"14px 16px", borderBottom:"1px solid #E2E8F0", background:"#111", color:"#fff" }}>
-        <div style={{ fontWeight:800, fontSize:16 }}>{da ? "Sådan bruger du appen" : "How to use the app"}</div>
+        <div>
+          <div style={{ fontWeight:800, fontSize:16 }}>{da ? "Sådan bruger du appen" : "How to use the app"}</div>
+          <button onClick={() => udskrivVejledning(sections, da)}
+            style={{ marginTop:6, border:"1px solid #555", background:"transparent", color:"#fff", borderRadius:8, padding:"4px 10px", fontSize:11.5, cursor:"pointer" }}>
+            {da ? "Udskriv vejledningen" : "Print the guide"}
+          </button>
+        </div>
         <button onClick={onClose}
           style={{ border:"none", background:"#333", color:"#fff", borderRadius:8, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
       </div>
