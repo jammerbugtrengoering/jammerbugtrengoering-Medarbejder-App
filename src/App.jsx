@@ -353,6 +353,12 @@ function computeDaySchedule(dayTasks, settings, employee) {
 // Samme indhold som den trykte brugervejledning, men bygget til telefon:
 // fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
 const HELP_DA = [
+  { t: "Hvis en opgave skal flyttes", p: [
+    "Aftaler du en ny tid med kunden, skal kontoret flytte opgaven. Du flytter den ikke selv.",
+    "Åbn opgaven og tryk «Foreslå ny tid». Skriv den dato I har aftalt, klokkeslættet hvis I har sat et, og hvorfor den skal flyttes.",
+    "Opgaven bliver stående hos dig, indtil kontoret har flyttet den. Den forsvinder altså ikke, fordi du har sendt ønsket.",
+    "Kontoret får besked med det samme. Godkender de det, flytter opgaven sig i din plan.",
+    "Kan det ikke lade sig gøre, får du en mail med begrundelsen, og så skal du ringe til kunden igen."] },
   { t: "Sådan finder du dine opgaver", p: [
       "Når du åbner appen, ser du denne uge. Øverst vælger du dag.",
       "Tallet i den lille boble på dagen viser, hvor mange opgaver du har.",
@@ -386,6 +392,12 @@ const HELP_DA = [
       "Hænger appen? Luk siden og åbn den igen." ] },
 ];
 const HELP_EN = [
+  { t: "If a task needs to move", p: [
+    "If you agree a new time with the customer, the office moves the task. You do not move it yourself.",
+    "Open the task and tap «Suggest a new time». Enter the agreed date, the time if you set one, and why it needs moving.",
+    "The task stays with you until the office has moved it. Sending the request does not remove it.",
+    "The office is notified straight away. If they approve, the task moves in your plan.",
+    "If it is not possible, you get an email explaining why, and you need to call the customer again."] },
   { t: "Finding your jobs", p: [
       "When you open the app you see this week. Pick a day at the top.",
       "The small bubble shows how many jobs you have that day.",
