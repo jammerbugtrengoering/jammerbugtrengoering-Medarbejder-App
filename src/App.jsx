@@ -766,6 +766,47 @@ function CompletionConfirm({ task, employee, usedProducts, minutes, lang, onConf
 
 // ── Task detail modal ─────────────────────────────────────────────────────────
 function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
+  // Oenske om ny tid. Medarbejderen aftaler selv med kunden, men aendringen skal
+  // planlaegges af backoffice — derfor sendes et oenske, ikke en aendring.
+  const [rsAaben, setRsAaben] = React.useState(false);
+  const [rsDato, setRsDato] = React.useState("");
+  const [rsTid, setRsTid] = React.useState("");
+  const [rsGrund, setRsGrund] = React.useState("");
+  const [rsGemmer, setRsGemmer] = React.useState(false);
+  const [rsSendt, setRsSendt] = React.useState(false);
+  async function sendOnskeOmNyTid() {
+    if (!rsDato || !rsGrund.trim()) return;
+    setRsGemmer(true);
+    try {
+      const id = "rr" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      const { error } = await supabaseClient.from("reschedule_requests").insert({
+        id,
+        instance_id: task.id,
+        employee_id: employee?.id || null,
+        requested_date: rsDato,
+        requested_time: rsTid || null,
+        reason: rsGrund.trim(),
+        old_year: task.year, old_week: task.week, old_day: task.day,
+        old_time: task.scheduled_time || null,
+      });
+      if (error) { alert("Kunne ikke sende ønsket: " + error.message); setRsGemmer(false); return; }
+      // Backoffice skal vide det med det samme — de kigger ikke nødvendigvis i appen.
+      const { data: adm } = await supabaseClient.from("employees").select("name,app_email").eq("is_admin", true).not("app_email", "is", null);
+      const naar = rsDato + (rsTid ? " kl. " + rsTid : "");
+      for (const a of (adm || [])) {
+        await supabaseClient.functions.invoke("send-email", { body: {
+          email: a.app_email, name: a.name,
+          subject: "Ønske om ny tid: " + (task.title || "opgave"),
+          html: `<p><b>${employee?.name || "En medarbejder"}</b> har aftalt en ny tid med kunden og beder om at få opgaven flyttet.</p>` +
+                `<p><b>Opgave:</b> ${task.title || ""}<br/><b>Kunde:</b> ${task.customerName || ""}<br/>` +
+                `<b>Ønsket:</b> ${naar}</p><p><b>Begrundelse:</b><br/>${rsGrund.trim()}</p>` +
+                `<p>Åbn ugeplanen for at godkende eller afvise.</p>`,
+        }});
+      }
+      setRsSendt(true); setRsAaben(false);
+    } catch (e) { alert("Kunne ikke sende ønsket: " + (e?.message || e)); }
+    setRsGemmer(false);
+  }
   const tr = T[lang];
   const [hours, setHours] = useState("0");
   const [mins, setMins] = useState("00");
@@ -988,6 +1029,47 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               </button>
             </div>
           </div>
+
+          {/* Oenske om ny tid — medarbejderen aftaler med kunden, backoffice planlaegger */}
+          {!done && (
+            <div style={{ padding: "0 0 18px" }}>
+              {rsSendt ? (
+                <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46", borderRadius: 12, padding: "12px 14px", fontSize: 14 }}>
+                  Dit ønske er sendt til kontoret. Opgaven bliver stående her, indtil planlæggeren har flyttet den.
+                </div>
+              ) : !rsAaben ? (
+                <button style={{ ...s.doneLarge, background: "#fff", color: "#B45309", border: "1.5px solid #FCD34D" }}
+                  onClick={() => setRsAaben(true)}>
+                  Foreslå ny tid
+                </button>
+              ) : (
+                <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontSize: 13, color: "#92400E", marginBottom: 10 }}>
+                    Har du aftalt et nyt tidspunkt med kunden? Skriv det her, så flytter kontoret opgaven.
+                  </div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Ny dato</label>
+                  <input type="date" value={rsDato} onChange={(e) => setRsDato(e.target.value)}
+                    style={{ width: "100%", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 10px" }} />
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Klokkeslæt (valgfrit)</label>
+                  <input type="time" value={rsTid} onChange={(e) => setRsTid(e.target.value)}
+                    style={{ width: "100%", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 10px" }} />
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Hvorfor skal den flyttes?</label>
+                  <textarea rows={3} value={rsGrund} onChange={(e) => setRsGrund(e.target.value)}
+                    placeholder="F.eks. kunden er til lægen, eller der var håndværkere"
+                    style={{ width: "100%", padding: "10px 12px", fontSize: 15, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 12px", fontFamily: "inherit" }} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", fontSize: 15, cursor: "pointer" }}
+                      onClick={() => setRsAaben(false)}>Fortryd</button>
+                    <button disabled={!rsDato || !rsGrund.trim() || rsGemmer}
+                      style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", fontSize: 15, fontWeight: 700, color: "#fff",
+                        background: (!rsDato || !rsGrund.trim() || rsGemmer) ? "#CBD5E1" : "#B45309",
+                        cursor: (!rsDato || !rsGrund.trim() || rsGemmer) ? "not-allowed" : "pointer" }}
+                      onClick={sendOnskeOmNyTid}>{rsGemmer ? "Sender…" : "Send til kontoret"}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Done button → confirmation */}
           <div style={{ padding: "0 0 32px" }}>
