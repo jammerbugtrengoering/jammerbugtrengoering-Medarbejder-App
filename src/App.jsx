@@ -112,6 +112,22 @@ const T = {
     finishOpen: "Afslut opgave",
     reportProblem: "Der er et problem",
     reportProblemTitle: "Hvad er der sket?",
+    reportProblemHint: "Vælg det der passer. Kontoret får besked med det samme.",
+    reportNewTimeCard: "Du har aftalt et nyt tidspunkt med kunden, og opgaven skal flyttes.",
+    reportNoEntryCard: "Du stod ved døren, men kom ikke ind, og opgaven blev ikke udført.",
+    reportNewTimeQ: "Hvornår skal den flyttes til?",
+    reportNewTimeHint: "Skriv den dato I har aftalt. Kontoret flytter opgaven — du skal ikke selv gøre mere.",
+    reportNewDate: "Ny dato",
+    reportNewClock: "Klokkeslæt (valgfrit)",
+    reportWhyMove: "Hvorfor skal den flyttes?",
+    reportWhyMovePlaceholder: "F.eks. kunden er til lægen, eller der var håndværkere",
+    reportSend: "Send til kontoret",
+    reportSending: "Sender…",
+    reportSentTitle: "Kontoret har fået besked",
+    reportSentNewTime: "Opgaven bliver stående hos dig, indtil planlæggeren har flyttet den. Du får en mail hvis det ikke kan lade sig gøre.",
+    reportBackToTask: "Tilbage til opgaven",
+    reportSentNoEntryShort: "Meldt som forgæves besøg",
+    reportSentNewTimeShort: "Ønske om ny tid er sendt",
     notesSending: "Gemmer…",
     notesPhotoProgress: "Sender billede",
     notesPhotosDeleted: "Billederne er slettet efter 12 måneder.",
@@ -227,6 +243,22 @@ const T = {
     finishOpen: "Complete job",
     reportProblem: "There is a problem",
     reportProblemTitle: "What happened?",
+    reportProblemHint: "Pick whichever fits. The office is notified straight away.",
+    reportNewTimeCard: "You agreed a new time with the customer, and the job needs moving.",
+    reportNoEntryCard: "You were at the door but could not get in, and the job was not done.",
+    reportNewTimeQ: "When should it move to?",
+    reportNewTimeHint: "Enter the date you agreed. The office moves the job — you do not need to do anything else.",
+    reportNewDate: "New date",
+    reportNewClock: "Time (optional)",
+    reportWhyMove: "Why does it need moving?",
+    reportWhyMovePlaceholder: "E.g. the customer is at the doctor, or there were builders in",
+    reportSend: "Send to the office",
+    reportSending: "Sending…",
+    reportSentTitle: "The office has been notified",
+    reportSentNewTime: "The job stays with you until the planner has moved it. You will get an email if it is not possible.",
+    reportBackToTask: "Back to the job",
+    reportSentNoEntryShort: "Reported as a wasted visit",
+    reportSentNewTimeShort: "Request for a new time sent",
     notesSending: "Saving…",
     notesPhotoProgress: "Sending photo",
     notesPhotosDeleted: "Photos were deleted after 12 months.",
@@ -585,18 +617,13 @@ function computeDaySchedule(dayTasks, settings, employee) {
 // Samme indhold som den trykte brugervejledning, men bygget til telefon:
 // fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
 const HELP_DA = [
-  { t: "Hvis en opgave skal flyttes", p: [
-    "Aftaler du en ny tid med kunden, skal kontoret flytte opgaven. Du flytter den ikke selv.",
-    "Åbn opgaven og tryk «Foreslå ny tid». Skriv den dato I har aftalt, klokkeslættet hvis I har sat et, og hvorfor den skal flyttes.",
-    "Opgaven bliver stående hos dig, indtil kontoret har flyttet den. Den forsvinder altså ikke, fordi du har sendt ønsket.",
-    "Kontoret får besked med det samme. Godkender de det, flytter opgaven sig i din plan.",
-    "Kan det ikke lade sig gøre, får du en mail med begrundelsen, og så skal du ringe til kunden igen."] },
-  { t: "Hvis du ikke kan komme ind", p: [
-    "Kunne du ikke komme ind — ingen svarede, nøglen passede ikke, eller døren var låst — så meld det med det samme.",
-    "Åbn opgaven, tryk «Kunne ikke komme ind», skriv hvad der skete, og tag gerne et billede af fx døren eller nøgleboksen.",
-    "Kan du allerede nu se hvornår du kan komme igen, kan du foreslå en ny dato. Det er frivilligt.",
-    "Kontoret får besked med det samme og afgør, om kunden skal betale for turen alligevel. Det er ikke noget du skal tage stilling til.",
-    "Registrér ikke tid på opgaven som om den var udført. Skriv i stedet hvad der skete."] },
+  { t: "Hvis der er et problem", p: [
+    "Nederst på opgaven står «Der er et problem». Tryk på den, så får du en skærm med to muligheder — du skal ikke scrolle efter noget.",
+    "«Foreslå ny tid» bruger du, når du har aftalt et nyt tidspunkt med kunden. Opgaven bliver stående hos dig, indtil kontoret har flyttet den — den forsvinder ikke, fordi du har sendt ønsket. Kan det ikke lade sig gøre, får du en mail med begrundelsen, og så skal du ringe til kunden igen.",
+    "«Kunne ikke komme ind» bruger du, når ingen svarede, nøglen ikke passede, eller døren var låst. Skriv hvad der skete, og tag gerne et billede af døren eller nøgleboksen.",
+    "Ved «kunne ikke komme ind» kan du foreslå en ny dato hvis du allerede ved hvornår du kan komme igen. Det er frivilligt.",
+    "Kontoret får besked med det samme i begge tilfælde og afgør, om kunden skal betale for turen. Det er ikke noget du skal tage stilling til.",
+    "Registrér ikke tid på opgaven som om den var udført. Meld den i stedet."] },
   { t: "Kommentar og billeder", p: [
     "På alle opgaver kan du skrive en kommentar til kontoret og tage billeder. Du finder det inde i opgaven under «Kommentar og billeder».",
     "Brug det når noget skal dokumenteres: der var meget mere beskidt end normalt, noget var i stykker, eller kunden har bedt om noget ekstra.",
@@ -653,18 +680,13 @@ const HELP_DA = [
       "Hænger appen? Luk siden og åbn den igen." ] },
 ];
 const HELP_EN = [
-  { t: "If a task needs to move", p: [
-    "If you agree a new time with the customer, the office moves the task. You do not move it yourself.",
-    "Open the task and tap «Suggest a new time». Enter the agreed date, the time if you set one, and why it needs moving.",
-    "The task stays with you until the office has moved it. Sending the request does not remove it.",
-    "The office is notified straight away. If they approve, the task moves in your plan.",
-    "If it is not possible, you get an email explaining why, and you need to call the customer again."] },
-  { t: "If you cannot get in", p: [
-    "If you could not get in — nobody answered, the key did not fit, or the door was locked — report it straight away.",
-    "Open the task, tap «Could not get in», write what happened, and please take a photo of the door or the key box.",
-    "If you already know when you can come back, you can suggest a new date. That is optional.",
-    "The office is notified immediately and decides whether the customer still pays for the trip. That is not for you to judge.",
-    "Do not log time on the task as if it had been done. Write what happened instead."] },
+  { t: "If there is a problem", p: [
+    "At the bottom of the job you will find «There is a problem». Tap it and you get a screen with two options — nothing to scroll for.",
+    "«Suggest a new time» is for when you have agreed a new time with the customer. The job stays with you until the office has moved it — sending the request does not remove it. If it is not possible, you get an email explaining why, and you need to call the customer again.",
+    "«Could not get in» is for when nobody answered, the key did not fit, or the door was locked. Write what happened, and please take a photo of the door or the key box.",
+    "With «could not get in» you can suggest a new date if you already know when you can come back. That is optional.",
+    "Either way the office is notified straight away and decides whether the customer pays for the trip. That is not for you to judge.",
+    "Do not log time on the job as if it had been done. Report it instead."] },
   { t: "Comments and photos", p: [
     "On every task you can write a comment to the office and take photos. You find it inside the task under «Comments and photos».",
     "Use it when something needs documenting: it was far dirtier than usual, something was broken, or the customer asked for extra work.",
@@ -1039,6 +1061,194 @@ function ProductPage({ task, employee, lang, onClose, onSave, supabaseClient }) 
   );
 }
 
+// ── Meld et problem ──────────────────────────────────────────────────────────
+// Egen fuldskaerm, ikke et felt der klapper ud nederst paa opgaven. Foer laa de to
+// valg under folden, saa man skulle scrolle for at opdage at man havde trykket paa
+// noget — og en melding om at man ikke kan komme ind er ikke noget man skal lede efter.
+function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSendt }) {
+  const [art, setArt] = useState(null);
+  const [dato, setDato] = useState("");
+  const [klokken, setKlokken] = useState("");
+  const [grund, setGrund] = useState("");
+  const [filer, setFiler] = useState([]);
+  const [gemmer, setGemmer] = useState(false);
+  const [fejl, setFejl] = useState("");
+  const [fotoFremdrift, setFotoFremdrift] = useState(null);
+  const [sendt, setSendt] = useState(null);
+
+  const forgaeves = art === "forgaeves";
+  const kanSende = grund.trim() && (forgaeves || dato);
+
+  async function send() {
+    if (!kanSende) return;
+    setGemmer(true);
+    setFejl("");
+    try {
+      // Notatet foerst: det er dét der baerer billederne, og kontoret skal kunne se
+      // dokumentationen ved siden af opgaven — ogsaa efter meldingen er lukket.
+      let notatId = null;
+      let stier = [];
+      if (forgaeves) {
+        notatId = nytId("tn");
+        const { error: insErr } = await supabaseClient.from("task_notes").insert({
+          id: notatId, instance_id: task.id, employee_id: employee?.id || null,
+          kind: "forgaeves", text: grund.trim(), photos: [],
+        });
+        if (insErr) throw new Error(insErr.message);
+        if (filer.length > 0) {
+          stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, filer,
+            (nr, iAlt) => setFotoFremdrift({ nr, iAlt }));
+          const { error: updErr } = await supabaseClient
+            .from("task_notes").update({ photos: stier }).eq("id", notatId);
+          if (updErr) throw new Error(updErr.message);
+        }
+      }
+      const { error } = await supabaseClient.from("reschedule_requests").insert({
+        id: nytId("rr"),
+        instance_id: task.id,
+        employee_id: employee?.id || null,
+        kind: forgaeves ? "forgaeves" : "ny_tid",
+        note_id: notatId,
+        requested_date: dato || null,
+        requested_time: klokken || null,
+        reason: grund.trim(),
+        old_year: task.year, old_week: task.week, old_day: task.day,
+        old_time: task.scheduled_time || null,
+      });
+      if (error) throw new Error(error.message);
+
+      // Backoffice skal vide det med det samme — de kigger ikke nødvendigvis i appen.
+      const { data: adm } = await supabaseClient.from("employees")
+        .select("name,app_email").eq("is_admin", true).not("app_email", "is", null);
+      const naar = dato ? dato + (klokken ? " kl. " + klokken : "") : "";
+      for (const a of (adm || [])) {
+        await supabaseClient.functions.invoke("send-email", { body: {
+          email: a.app_email, name: a.name,
+          subject: forgaeves
+            ? "Forgæves besøg: " + (task.title || "opgave")
+            : "Ønske om ny tid: " + (task.title || "opgave"),
+          html: forgaeves
+            ? `<p><b>${employee?.name || "En medarbejder"}</b> kunne ikke komme ind og fik ikke udført opgaven.</p>` +
+              `<p><b>Opgave:</b> ${task.title || ""}<br/><b>Kunde:</b> ${task.customerName || ""}</p>` +
+              `<p><b>Hvad skete der:</b><br/>${grund.trim()}</p>` +
+              (stier.length > 0 ? `<p>Der er vedhæftet ${stier.length} billede(r) i planlægningsappen.</p>` : "") +
+              (naar ? `<p><b>Foreslået ny tid:</b> ${naar}</p>` : "") +
+              `<p>Åbn ugeplanen og afgør om opgaven skal flyttes, eller sættes til udført så den kan faktureres.</p>`
+            : `<p><b>${employee?.name || "En medarbejder"}</b> har aftalt en ny tid med kunden og beder om at få opgaven flyttet.</p>` +
+              `<p><b>Opgave:</b> ${task.title || ""}<br/><b>Kunde:</b> ${task.customerName || ""}<br/>` +
+              `<b>Ønsket:</b> ${naar}</p><p><b>Begrundelse:</b><br/>${grund.trim()}</p>` +
+              `<p>Åbn ugeplanen for at godkende eller afvise.</p>`,
+        }});
+      }
+      setSendt(forgaeves ? "forgaeves" : "ny_tid");
+      onSendt(forgaeves ? "forgaeves" : "ny_tid", notatId
+        ? { id: notatId, instance_id: task.id, employee_id: employee?.id || null,
+            kind: "forgaeves", text: grund.trim(), photos: stier,
+            created_at: new Date().toISOString() }
+        : null);
+    } catch (e) {
+      setFejl(e?.message || String(e));
+    }
+    setFotoFremdrift(null);
+    setGemmer(false);
+  }
+
+  if (sendt) {
+    return (
+      <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+        <div style={s.sheet}>
+          <div style={s.afslutTop}>{task.customerName || task.title}</div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "28px 20px", textAlign: "center" }}>
+            <div style={s.kvitteringCirkel}><Check size={34} color="#16A34A" strokeWidth={3} /></div>
+            <div style={s.kvitteringTitel}>{tr.reportSentTitle}</div>
+            <div style={{ ...s.trinHjaelp, marginTop: 10 }}>
+              {sendt === "forgaeves" ? tr.reportSentNoEntry : tr.reportSentNewTime}
+            </div>
+          </div>
+          <div style={s.afslutBund}>
+            <button style={s.primaerStor} onClick={onAfbryd}>{tr.reportBackToTask}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+      <div style={s.sheet}>
+        <div style={s.afslutTop}>
+          <button style={s.afslutTilbage} onClick={() => (art ? setArt(null) : onAfbryd())}>
+            <ChevronLeft size={16} /> {tr.back}
+          </button>
+          <span>{task.customerName || ""}</span>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "18px 16px 20px" }}>
+          {!art ? (
+            <>
+              <div style={s.trinSpoergsmaal}>{tr.reportProblemTitle}</div>
+              <div style={s.trinHjaelp}>{tr.reportProblemHint}</div>
+              {/* Store kort med forklaring under, ikke to knapper med tre ord.
+                  Valget mellem "flyt den" og "jeg kom ikke ind" skal vaere til at
+                  traeffe uden at gaette hvad kontoret gør med det bagefter. */}
+              <button style={s.valgKortGul} onClick={() => { setArt("ny_tid"); setGrund(""); }}>
+                <div style={s.valgKortTitel}>🕑 {tr.reportNewTime}</div>
+                <div style={s.valgKortTekst}>{tr.reportNewTimeCard}</div>
+              </button>
+              <button style={s.valgKortRoed} onClick={() => { setArt("forgaeves"); setGrund(""); setDato(""); setKlokken(""); }}>
+                <div style={s.valgKortTitel}>🚫 {tr.reportNoEntry}</div>
+                <div style={s.valgKortTekst}>{tr.reportNoEntryCard}</div>
+              </button>
+            </>
+          ) : forgaeves ? (
+            <>
+              <div style={s.trinSpoergsmaal}>{tr.reportNoEntryWhy}</div>
+              <div style={s.trinHjaelp}>{tr.reportNoEntryHint}</div>
+              <textarea rows={4} value={grund} onChange={(e) => setGrund(e.target.value)}
+                placeholder={tr.reportNoEntryPlaceholder}
+                style={{ ...s.notatInput, marginTop: 12 }} />
+              <div style={{ marginTop: 12 }}>
+                <FotoVaelger filer={filer} setFiler={setFiler} farve="#991B1B" tr={tr} />
+              </div>
+              <div style={{ ...s.stepperLabel, marginTop: 16 }}>{tr.reportNewDateOptional}</div>
+              <input type="date" value={dato} onChange={(e) => setDato(e.target.value)}
+                style={s.datoFelt} />
+            </>
+          ) : (
+            <>
+              <div style={s.trinSpoergsmaal}>{tr.reportNewTimeQ}</div>
+              <div style={s.trinHjaelp}>{tr.reportNewTimeHint}</div>
+              <div style={{ ...s.stepperLabel, marginTop: 14 }}>{tr.reportNewDate}</div>
+              <input type="date" value={dato} onChange={(e) => setDato(e.target.value)} style={s.datoFelt} />
+              <div style={{ ...s.stepperLabel, marginTop: 12 }}>{tr.reportNewClock}</div>
+              <input type="time" value={klokken} onChange={(e) => setKlokken(e.target.value)} style={s.datoFelt} />
+              <div style={{ ...s.stepperLabel, marginTop: 12 }}>{tr.reportWhyMove}</div>
+              <textarea rows={3} value={grund} onChange={(e) => setGrund(e.target.value)}
+                placeholder={tr.reportWhyMovePlaceholder} style={s.notatInput} />
+            </>
+          )}
+          {fejl && <div style={s.notatFejl}>{fejl}</div>}
+        </div>
+
+        {art && (
+          <div style={s.afslutBund}>
+            <button
+              disabled={!kanSende || gemmer}
+              style={{ ...s.primaerStor,
+                background: forgaeves ? "#B91C1C" : "#B45309",
+                opacity: (!kanSende || gemmer) ? 0.45 : 1 }}
+              onClick={send}>
+              {gemmer
+                ? (fotoFremdrift ? `${tr.notesPhotoProgress} ${fotoFremdrift.nr}/${fotoFremdrift.iAlt}` : tr.reportSending)
+                : tr.reportSend}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Afslut opgave ────────────────────────────────────────────────────────────
 // Alt der skal registreres, samlet ét sted og ét spoergsmaal ad gangen. Foer laa
 // tidsregistrering, produkter og kommentarfelt paa selve opgaveskaermen, hvor de
@@ -1376,100 +1586,15 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
 
 // ── Task detail modal ─────────────────────────────────────────────────────────
 function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
-  // Oenske om ny tid. Medarbejderen aftaler selv med kunden, men aendringen skal
-  // planlaegges af backoffice — derfor sendes et oenske, ikke en aendring.
-  // rsArt afgoer hvad medarbejderen melder: en aftalt ny tid, eller at hun ikke kunne
-  // komme ind. Begge dele gaar gennem samme flow, fordi kontoret skal traeffe
-  // beslutningen ét sted — ogsaa beslutningen om kunden skal betale alligevel.
-  const [rsArt, setRsArt] = React.useState(null);
-  const [rsDato, setRsDato] = React.useState("");
-  const [rsTid, setRsTid] = React.useState("");
-  const [rsGrund, setRsGrund] = React.useState("");
-  const [rsFiler, setRsFiler] = React.useState([]);
-  const [rsGemmer, setRsGemmer] = React.useState(false);
-  const [rsSendt, setRsSendt] = React.useState(null);
-
-  async function sendOnskeOmNyTid() {
-    const forgaeves = rsArt === "forgaeves";
-    // Ved forgaeves besoeg er en ny dato frivillig — man ved ikke altid hvornaar
-    // man kan komme til igen, og meldingen maa ikke braende inde af den grund.
-    if (!rsGrund.trim() || (!forgaeves && !rsDato)) return;
-    setRsGemmer(true);
-    try {
-      // Notatet foerst: det er dét der baerer billederne, og kontoret skal kunne se
-      // dokumentationen ved siden af opgaven — ogsaa efter oensket er lukket.
-      let notatId = null;
-      let notatStier = [];
-      if (forgaeves) {
-        const gemt = await gemNotat("forgaeves", rsGrund, rsFiler);
-        notatId = gemt.notatId;
-        notatStier = gemt.stier;
-      }
-      const id = nytId("rr");
-      const { error } = await supabaseClient.from("reschedule_requests").insert({
-        id,
-        instance_id: task.id,
-        employee_id: employee?.id || null,
-        kind: forgaeves ? "forgaeves" : "ny_tid",
-        note_id: notatId,
-        requested_date: rsDato || null,
-        requested_time: rsTid || null,
-        reason: rsGrund.trim(),
-        old_year: task.year, old_week: task.week, old_day: task.day,
-        old_time: task.scheduled_time || null,
-      });
-      if (error) { alert("Kunne ikke sende beskeden: " + error.message); setRsGemmer(false); return; }
-      // Backoffice skal vide det med det samme — de kigger ikke nødvendigvis i appen.
-      const { data: adm } = await supabaseClient.from("employees").select("name,app_email").eq("is_admin", true).not("app_email", "is", null);
-      const naar = rsDato ? rsDato + (rsTid ? " kl. " + rsTid : "") : "";
-      for (const a of (adm || [])) {
-        await supabaseClient.functions.invoke("send-email", { body: {
-          email: a.app_email, name: a.name,
-          subject: forgaeves
-            ? "Forgæves besøg: " + (task.title || "opgave")
-            : "Ønske om ny tid: " + (task.title || "opgave"),
-          html: forgaeves
-            ? `<p><b>${employee?.name || "En medarbejder"}</b> kunne ikke komme ind og fik ikke udført opgaven.</p>` +
-              `<p><b>Opgave:</b> ${task.title || ""}<br/><b>Kunde:</b> ${task.customerName || ""}</p>` +
-              `<p><b>Hvad skete der:</b><br/>${rsGrund.trim()}</p>` +
-              (rsFiler.length > 0 ? `<p>Der er vedhæftet ${rsFiler.length} billede(r) i planlægningsappen.</p>` : "") +
-              (naar ? `<p><b>Foreslået ny tid:</b> ${naar}</p>` : "") +
-              `<p>Åbn ugeplanen og afgør om opgaven skal flyttes, eller sættes til udført så den kan faktureres.</p>`
-            : `<p><b>${employee?.name || "En medarbejder"}</b> har aftalt en ny tid med kunden og beder om at få opgaven flyttet.</p>` +
-              `<p><b>Opgave:</b> ${task.title || ""}<br/><b>Kunde:</b> ${task.customerName || ""}<br/>` +
-              `<b>Ønsket:</b> ${naar}</p><p><b>Begrundelse:</b><br/>${rsGrund.trim()}</p>` +
-              `<p>Åbn ugeplanen for at godkende eller afvise.</p>`,
-        }});
-      }
-      if (forgaeves) {
-        // Notatet vises med det samme i listen ovenfor, saa medarbejderen kan se at
-        // billederne rent faktisk kom med.
-        setNoter((prev) => [{
-          id: notatId, instance_id: task.id, employee_id: employee?.id || null,
-          kind: "forgaeves", text: rsGrund.trim(), photos: notatStier,
-          created_at: new Date().toISOString(),
-        }, ...prev]);
-        if (notatStier.length > 0) {
-          const urls = await signeredeFotoUrls(supabaseClient, notatStier);
-          setFotoUrls((prev) => {
-            const kort = { ...prev };
-            notatStier.forEach((sti, i) => { if (urls[i]) kort[sti] = urls[i]; });
-            return kort;
-          });
-        }
-      }
-      setRsSendt(forgaeves ? "forgaeves" : "ny_tid");
-      setRsArt(null);
-      setRsFiler([]);
-    } catch (e) { alert("Kunne ikke sende beskeden: " + (e?.message || e)); }
-    setRsGemmer(false);
-  }
   const tr = T[lang];
   const [translatedTask, setTranslatedTask] = useState(null);
   const [translating, setTranslating] = useState(false);
   // De to veje ud af denne skaerm: afslut opgaven, eller meld et problem.
   const [visAfslut, setVisAfslut] = useState(false);
   const [visProblem, setVisProblem] = useState(false);
+  // Huskes efter meldingen er sendt, saa knappen erstattes af en kvittering. Ellers
+  // ville hun ikke kunne se at kontoret allerede har faaet beskeden.
+  const [problemSendt, setProblemSendt] = useState(null);
   // Gemte kommentarer og billeder vises her, men skrives i afslutningsflowet.
   const [noter, setNoter] = useState([]);
   const [fotoUrls, setFotoUrls] = useState({});
@@ -1712,93 +1837,6 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           </div>
           )}
 
-          {/* Meld til kontoret. Ligger bag "Der er et problem" nederst, saa den ikke
-              konkurrerer med den almindelige vej gennem opgaven. */}
-          {(visProblem || rsSendt) && !done && (
-            <div style={s.sheetSection}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={s.sheetSectionTitle}>🚩 {tr.reportProblemTitle}</div>
-                {!rsSendt && (
-                  <button style={s.notatRyd} onClick={() => { setVisProblem(false); setRsArt(null); setRsFiler([]); }}>
-                    {tr.back}
-                  </button>
-                )}
-              </div>
-              {rsSendt ? (
-                <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46", borderRadius: 12, padding: "12px 14px", fontSize: 14 }}>
-                  {rsSendt === "forgaeves"
-                    ? tr.reportSentNoEntry
-                    : "Dit ønske er sendt til kontoret. Opgaven bliver stående her, indtil planlæggeren har flyttet den."}
-                </div>
-              ) : !rsArt ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <button style={{ ...s.doneLarge, background: "#fff", color: "#B45309", border: "1.5px solid #FCD34D" }}
-                    onClick={() => { setRsArt("ny_tid"); setRsGrund(""); }}>
-                    {tr.reportNewTime}
-                  </button>
-                  {/* Roed frem for gul: det er ikke et oenske, det er en melding om at
-                      arbejdet ikke blev udfoert, og den skal skille sig ud. */}
-                  <button style={{ ...s.doneLarge, background: "#fff", color: "#B91C1C", border: "1.5px solid #FCA5A5" }}
-                    onClick={() => { setRsArt("forgaeves"); setRsGrund(""); setRsDato(""); setRsTid(""); }}>
-                    🚫 {tr.reportNoEntry}
-                  </button>
-                </div>
-              ) : rsArt === "forgaeves" ? (
-                <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: 14 }}>
-                  <div style={{ fontSize: 13, color: "#991B1B", marginBottom: 10 }}>{tr.reportNoEntryHint}</div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#991B1B" }}>{tr.reportNoEntryWhy}</label>
-                  <textarea rows={3} value={rsGrund} onChange={(e) => setRsGrund(e.target.value)}
-                    placeholder={tr.reportNoEntryPlaceholder}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 15, borderRadius: 10, border: "1px solid #FCA5A5", margin: "4px 0 10px", fontFamily: "inherit" }} />
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#991B1B" }}>{tr.reportNewDateOptional}</label>
-                  <input type="date" value={rsDato} onChange={(e) => setRsDato(e.target.value)}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCA5A5", margin: "4px 0 10px" }} />
-                  <div style={{ marginBottom: 10 }}>
-                    <FotoVaelger filer={rsFiler} setFiler={setRsFiler} farve="#991B1B" tr={tr} />
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", fontSize: 15, cursor: "pointer" }}
-                      onClick={() => { setRsArt(null); setRsFiler([]); }}>Fortryd</button>
-                    <button disabled={!rsGrund.trim() || rsGemmer}
-                      style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", fontSize: 15, fontWeight: 700, color: "#fff",
-                        background: (!rsGrund.trim() || rsGemmer) ? "#CBD5E1" : "#B91C1C",
-                        cursor: (!rsGrund.trim() || rsGemmer) ? "not-allowed" : "pointer" }}
-                      onClick={sendOnskeOmNyTid}>
-                      {rsGemmer
-                        ? (fotoFremdrift ? `${tr.notesPhotoProgress} ${fotoFremdrift.nr}/${fotoFremdrift.iAlt}` : "Sender…")
-                        : "Send til kontoret"}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: 14 }}>
-                  <div style={{ fontSize: 13, color: "#92400E", marginBottom: 10 }}>
-                    Har du aftalt et nyt tidspunkt med kunden? Skriv det her, så flytter kontoret opgaven.
-                  </div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Ny dato</label>
-                  <input type="date" value={rsDato} onChange={(e) => setRsDato(e.target.value)}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 10px" }} />
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Klokkeslæt (valgfrit)</label>
-                  <input type="time" value={rsTid} onChange={(e) => setRsTid(e.target.value)}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 10px" }} />
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Hvorfor skal den flyttes?</label>
-                  <textarea rows={3} value={rsGrund} onChange={(e) => setRsGrund(e.target.value)}
-                    placeholder="F.eks. kunden er til lægen, eller der var håndværkere"
-                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 15, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 12px", fontFamily: "inherit" }} />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", fontSize: 15, cursor: "pointer" }}
-                      onClick={() => setRsArt(null)}>Fortryd</button>
-                    <button disabled={!rsDato || !rsGrund.trim() || rsGemmer}
-                      style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", fontSize: 15, fontWeight: 700, color: "#fff",
-                        background: (!rsDato || !rsGrund.trim() || rsGemmer) ? "#CBD5E1" : "#B45309",
-                        cursor: (!rsDato || !rsGrund.trim() || rsGemmer) ? "not-allowed" : "pointer" }}
-                      onClick={sendOnskeOmNyTid}>{rsGemmer ? "Sender…" : "Send til kontoret"}</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
         </div>
 
         {/* Fast bjaelke. Den handling der afslutter besoeget skal kunne rammes uden at
@@ -1814,10 +1852,14 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               <button style={s.primaerStor} onClick={() => setVisAfslut(true)}>
                 {tr.finishOpen}
               </button>
-              {!visProblem && !rsSendt && (
-                <div style={s.trinSpring} onClick={() => setVisProblem(true)}>
-                  {tr.reportProblem}
+              {problemSendt ? (
+                <div style={s.problemSendt}>
+                  ✓ {problemSendt === "forgaeves" ? tr.reportSentNoEntryShort : tr.reportSentNewTimeShort}
                 </div>
+              ) : (
+                <button style={s.problemBtn} onClick={() => setVisProblem(true)}>
+                  🚩 {tr.reportProblem}
+                </button>
               )}
             </>
           )}
@@ -1830,6 +1872,30 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           onLogMinutes={onLogMinutes} onSetStatus={onSetStatus}
           onAfbryd={() => setVisAfslut(false)}
           onFaerdig={() => { setVisAfslut(false); onClose(); }}
+        />
+      )}
+
+      {visProblem && (
+        <MeldProblem
+          task={task} employee={employee} lang={lang} tr={tr} supabaseClient={supabaseClient}
+          onAfbryd={() => setVisProblem(false)}
+          onSendt={(art, nytNotat) => {
+            setProblemSendt(art);
+            // Notatet vises med det samme paa opgaven, saa hun kan se at billederne
+            // rent faktisk kom med — og ikke sender det hele en gang mere.
+            if (nytNotat) {
+              setNoter((prev) => [nytNotat, ...prev]);
+              if ((nytNotat.photos || []).length > 0) {
+                signeredeFotoUrls(supabaseClient, nytNotat.photos).then((urls) => {
+                  setFotoUrls((prev) => {
+                    const kort = { ...prev };
+                    nytNotat.photos.forEach((sti, i) => { if (urls[i]) kort[sti] = urls[i]; });
+                    return kort;
+                  });
+                });
+              }
+            }
+          }}
         />
       )}
     </div>
@@ -2561,12 +2627,25 @@ const s = {
   trinSpoergsmaal: { fontSize:19, fontWeight:600, color:"#111111", lineHeight:1.35 },
   trinHjaelp: { fontSize:14, color:"#64748B", lineHeight:1.5, marginTop:6 },
   trinFod: { fontSize:12.5, color:"#94A3B8", marginTop:12, textAlign:"center", lineHeight:1.5 },
-  trinSpring: { fontSize:13.5, color:"#64748B", textAlign:"center", marginTop:12, cursor:"pointer",
-    textDecoration:"underline", padding:"6px 0" },
   springBtn: { width:"100%", border:"none", background:"none", fontSize:13.5, color:"#64748B",
     textDecoration:"underline", padding:"10px 0", marginTop:6, cursor:"pointer", fontFamily:"inherit" },
   trinAllerede: { fontSize:13, color:"#9C1B5D", background:"#FFF6FA", borderRadius:8,
     padding:"8px 11px", marginTop:10, lineHeight:1.45 },
+
+  // Meld et problem
+  problemBtn: { width:"100%", border:"1.5px solid #E2E8F0", background:"#fff", borderRadius:12,
+    padding:"13px 0", marginTop:10, fontSize:15, fontWeight:600, color:"#475569",
+    cursor:"pointer", fontFamily:"inherit" },
+  problemSendt: { fontSize:13.5, color:"#065F46", background:"#ECFDF5", border:"1px solid #A7F3D0",
+    borderRadius:12, padding:"12px 14px", marginTop:10, textAlign:"center", lineHeight:1.45 },
+  valgKortGul: { width:"100%", textAlign:"left", border:"1.5px solid #FCD34D", background:"#FFFBEB",
+    borderRadius:14, padding:"16px 15px", marginTop:14, cursor:"pointer", fontFamily:"inherit", display:"block" },
+  valgKortRoed: { width:"100%", textAlign:"left", border:"1.5px solid #FCA5A5", background:"#FEF2F2",
+    borderRadius:14, padding:"16px 15px", marginTop:10, cursor:"pointer", fontFamily:"inherit", display:"block" },
+  valgKortTitel: { fontSize:16.5, fontWeight:700, color:"#111111" },
+  valgKortTekst: { fontSize:13.5, color:"#475569", lineHeight:1.5, marginTop:5 },
+  datoFelt: { width:"100%", boxSizing:"border-box", padding:"14px 12px", fontSize:16,
+    borderRadius:10, border:"1.5px solid #E2E8F0", fontFamily:"inherit", color:"#111111", background:"#fff" },
   storTid: { fontSize:44, fontWeight:600, color:"#111111", lineHeight:1.05 },
   storTidEnhed: { fontSize:22, fontWeight:500, color:"#94A3B8" },
   maerkeOk: { display:"inline-block", background:"#ECFDF5", color:"#166534", borderRadius:99, padding:"4px 13px", fontSize:12.5, fontWeight:600, marginTop:9 },
@@ -2608,7 +2687,6 @@ const s = {
   notatSlettet: { fontSize:11, color:"#94A3B8", fontStyle:"italic", marginTop:6 },
   notatInput: { width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:"1.5px solid #E2E8F0",
     fontSize:15, fontFamily:"inherit", resize:"vertical", outline:"none", background:"#fff", color:"#111111" },
-  notatRyd: { background:"none", border:"none", color:"#0F766E", fontSize:13, fontWeight:700, textDecoration:"underline", cursor:"pointer" },
   notatFejl: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:8 },
   notatFotoBtn: { flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff",
     fontSize:15, fontWeight:600, color:"#111111", cursor:"pointer", fontFamily:"inherit" },
