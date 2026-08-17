@@ -79,6 +79,7 @@ const T = {
     notesAddPhoto: "Tag billede",
     notesSend: "Gem",
     notesSending: "Gemmer…",
+    notesPhotoProgress: "Sender billede",
     notesEmpty: "Ingen kommentarer endnu.",
     notesPhotosDeleted: "Billederne er slettet efter 12 måneder.",
     reportTitle: "Meld til kontoret",
@@ -161,6 +162,7 @@ const T = {
     notesAddPhoto: "Take photo",
     notesSend: "Save",
     notesSending: "Saving…",
+    notesPhotoProgress: "Sending photo",
     notesEmpty: "No comments yet.",
     notesPhotosDeleted: "Photos were deleted after 12 months.",
     reportTitle: "Report to the office",
@@ -341,6 +343,10 @@ function todayWorkdayKey() {
 // paa et gulv eller en laast doer.
 const FOTO_MAKS_KANT = 1600;
 const FOTO_KVALITET = 0.72;
+// Ti billeder pr. notat. Ved ~200 KB stykket er det 2 MB i alt, hvilket stadig kan
+// sendes fra en mark i Jammerbugt — men det tager laenge nok til at medarbejderen
+// skal kunne se at der sker noget undervejs.
+const MAKS_FOTOS = 10;
 
 function komprimerBillede(fil) {
   return new Promise((resolve, reject) => {
@@ -371,9 +377,10 @@ function komprimerBillede(fil) {
 // Stien er altid <opgave-id>/<notat-id>-<nr>.jpg. Adgangspolitikken i databasen
 // laeser opgavens id ud af foerste mappeniveau, saa moenstret maa ikke aendres
 // uden at politikken paa storage.objects aendres samtidig.
-async function uploadOpgavefotos(klient, opgaveId, notatId, filer) {
+async function uploadOpgavefotos(klient, opgaveId, notatId, filer, onFremdrift) {
   const stier = [];
   for (let i = 0; i < filer.length; i++) {
+    if (onFremdrift) onFremdrift(i + 1, filer.length);
     const blob = await komprimerBillede(filer[i]);
     const sti = `${opgaveId}/${notatId}-${i}.jpg`;
     const { error } = await klient.storage.from("opgavefotos").upload(sti, blob, {
@@ -466,7 +473,8 @@ const HELP_DA = [
   { t: "Kommentar og billeder", p: [
     "På alle opgaver kan du skrive en kommentar til kontoret og tage billeder. Du finder det inde i opgaven under «Kommentar og billeder».",
     "Brug det når noget skal dokumenteres: der var meget mere beskidt end normalt, noget var i stykker, eller kunden har bedt om noget ekstra.",
-    "Tryk «Tag billede» for at bruge kameraet. Du kan tage op til fem billeder ad gangen. Skriv gerne en linje om hvad man ser.",
+    "Tryk «Tag billede» for at bruge kameraet. Du kan tage op til ti billeder ad gangen. Skriv gerne en linje om hvad man ser.",
+    "Sender du mange billeder, tæller knappen dem op undervejs — vent til den er færdig, og tryk ikke igen.",
     "Billederne bliver mindre af sig selv, før de sendes, så det virker også på dårligt mobilnet.",
     "Kontoret kan se det hele, når de laver fakturaen. Billederne slettes automatisk efter 12 måneder."] },
   { t: "Sådan finder du dine opgaver", p: [
@@ -517,7 +525,8 @@ const HELP_EN = [
   { t: "Comments and photos", p: [
     "On every task you can write a comment to the office and take photos. You find it inside the task under «Comments and photos».",
     "Use it when something needs documenting: it was far dirtier than usual, something was broken, or the customer asked for extra work.",
-    "Tap «Take photo» to use the camera. You can add up to five photos at a time. Write a line about what can be seen.",
+    "Tap «Take photo» to use the camera. You can add up to ten photos at a time. Write a line about what can be seen.",
+    "If you send many photos, the button counts them as it goes — wait until it finishes and do not tap again.",
     "The photos are made smaller before they are sent, so it works on a poor mobile connection too.",
     "The office sees all of it when they prepare the invoice. Photos are deleted automatically after 12 months."] },
   { t: "Finding your jobs", p: [
@@ -1033,6 +1042,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const [notatFiler, setNotatFiler] = useState([]);
   const [notatGemmer, setNotatGemmer] = useState(false);
   const [notatFejl, setNotatFejl] = useState("");
+  // Hvilket billede der sendes lige nu. Uden den staar knappen bare og siger
+  // "Gemmer…" i et halvt minut ved ti billeder, og saa trykker folk igen.
+  const [fotoFremdrift, setFotoFremdrift] = useState(null);
   const [fotoUrls, setFotoUrls] = useState({});
   const filInput = useRef(null);
 
@@ -1080,7 +1092,8 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
     if (insErr) throw new Error(insErr.message);
     let stier = [];
     if (filer && filer.length > 0) {
-      stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, filer);
+      stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, filer,
+        (nr, i_alt) => setFotoFremdrift({ nr, i_alt }));
       const { error: updErr } = await supabaseClient
         .from("task_notes").update({ photos: stier }).eq("id", notatId);
       if (updErr) throw new Error(updErr.message);
@@ -1114,6 +1127,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
     } catch (e) {
       setNotatFejl(e?.message || String(e));
     }
+    setFotoFremdrift(null);
     setNotatGemmer(false);
   }
 
@@ -1370,7 +1384,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               capture="environment"
               multiple
               style={{ display: "none" }}
-              onChange={(e) => setNotatFiler(Array.from(e.target.files || []).slice(0, 5))} />
+              onChange={(e) => setNotatFiler(Array.from(e.target.files || []).slice(0, MAKS_FOTOS))} />
 
             {notatFiler.length > 0 && (
               <div style={s.notatValgte}>
@@ -1393,7 +1407,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                 style={{ ...s.notatGemBtn,
                   opacity: notatGemmer || (!notatTekst.trim() && notatFiler.length === 0) ? 0.45 : 1 }}
                 onClick={sendKommentar}>
-                {notatGemmer ? tr.notesSending : tr.notesSend}
+                {notatGemmer
+                  ? (fotoFremdrift ? `${tr.notesPhotoProgress} ${fotoFremdrift.nr}/${fotoFremdrift.i_alt}` : tr.notesSending)
+                  : tr.notesSend}
               </button>
             </div>
           </div>
@@ -1432,7 +1448,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                     style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCA5A5", margin: "4px 0 10px" }} />
                   <input ref={rsFilInput} type="file" accept="image/*" capture="environment" multiple
                     style={{ display: "none" }}
-                    onChange={(e) => setRsFiler(Array.from(e.target.files || []).slice(0, 5))} />
+                    onChange={(e) => setRsFiler(Array.from(e.target.files || []).slice(0, MAKS_FOTOS))} />
                   <button type="button"
                     style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px solid #FCA5A5", background: "#fff", fontSize: 15, fontWeight: 600, color: "#991B1B", cursor: "pointer", marginBottom: 10, fontFamily: "inherit" }}
                     onClick={() => rsFilInput.current?.click()}>
@@ -1445,7 +1461,11 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                       style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", fontSize: 15, fontWeight: 700, color: "#fff",
                         background: (!rsGrund.trim() || rsGemmer) ? "#CBD5E1" : "#B91C1C",
                         cursor: (!rsGrund.trim() || rsGemmer) ? "not-allowed" : "pointer" }}
-                      onClick={sendOnskeOmNyTid}>{rsGemmer ? "Sender…" : "Send til kontoret"}</button>
+                      onClick={sendOnskeOmNyTid}>
+                      {rsGemmer
+                        ? (fotoFremdrift ? `${tr.notesPhotoProgress} ${fotoFremdrift.nr}/${fotoFremdrift.i_alt}` : "Sender…")
+                        : "Send til kontoret"}
+                    </button>
                   </div>
                 </div>
               ) : (
