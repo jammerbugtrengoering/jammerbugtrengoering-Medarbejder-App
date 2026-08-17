@@ -60,33 +60,61 @@ const T = {
     planned: "planlagt",
     allTeam: "Alle:",
     inTotal: "i alt",
-    minutesPlaceholder: "Antal minutter",
     openNexus: "Åbn KMD Nexus Mobile",
     overrunTitle: "Registreret tid overskrider planlagt tid",
     overrunBody: (reg, plan) => `Med denne registrering bliver der brugt ${reg} på opgaven, men der er kun planlagt ${plan}. Angiv en begrundelse for overskridelsen.`,
     overrunPlaceholder: "Begrundelse for overskridelsen…",
     overrunRequired: "Du skal angive en begrundelse for at registrere tiden.",
-    overrunNoteLabel: "Begrundelse",
-    logTime: "Registrér tid",
     saving: "Gemmer…",
-    markDone: "Marker som udført",
     markNotDone: "Marker som ikke udført",
     status: { planlagt: "Planlagt", i_gang: "I gang", udført: "Udført" },
     taskVideo: "Se video",
     notesTitle: "Kommentar og billeder",
-    notesHint: "Skriv til kontoret, og tag billeder hvis noget skal dokumenteres — f.eks. særligt beskidt arbejde eller en skade.",
     notesPlaceholder: "Hvad skal kontoret vide?",
-    notesAddPhoto: "Tag billede",
     photoCamera: "Tag billede",
     photoLibrary: "Fra galleri",
     photoCount: "billeder klar",
     photoMax: "Du kan sende 10 billeder ad gangen",
-    notesSend: "Gem",
+    photos: "Billeder",
+    products: "Produkter",
+    back: "Tilbage",
+    ofSteps: "af",
+    finishTask: "Afslut opgaven",
+    finishNextStep: "Videre",
+    finishTimeQ: "Hvor lang tid brugte du?",
+    finishTimePlanned: (t) => `Der er sat ${t} af til opgaven`,
+    finishHours: "Timer",
+    finishMinutes: "Minutter — i spring af 5",
+    finishAsPlanned: "som planlagt",
+    finishMoreThan: (t) => `${t} mere end planlagt`,
+    finishLessThan: (t) => `${t} mindre end planlagt`,
+    finishWhyMore: "Skriv hvorfor der gik længere tid — så kan kontoret forklare det til kunden.",
+    finishNeedTime: "Sæt tiden, før du går videre.",
+    finishProductsQ: "Brugte du produkter hos kunden?",
+    finishProductsHint: "Rengøringsmidler og andet, der skal trækkes fra lageret og faktureres.",
+    finishPickProducts: "Vælg produkter",
+    finishProductsSaved: "Produkterne er registreret og trukket fra lageret. Skal noget rettes, så sig det til kontoret.",
+    finishAlready: (t) => `Der er allerede registreret ${t} på opgaven. Skriv kun din egen tid herunder.`,
+    finishSaveFailed: "Kunne ikke gemme. Tjek at du har forbindelse, og prøv igen.",
+    finishNoteQ: "Er der noget kontoret skal vide?",
+    finishNoteHint: "Var der ekstra beskidt, eller noget i stykker? Tag et billede.",
+    finishNothingHappened: "Spring over — der skete ikke noget",
+    finishDone: "Opgaven er afsluttet",
+    finishNext: "Tilbage til dagens opgaver",
+    finishKmNote: "Din kørsel bliver beregnet i nat, nu hvor tiden er registreret.",
+    nexusQ: "Husk at kvittere i Nexus",
+    nexusHint: "Kommunen betaler efter det der står i Nexus — ikke efter det du skriver her.",
+    nexusOpenNow: "Åbn Nexus nu",
+    nexusConfirm: "Ja, jeg har kvitteret i Nexus",
+    nexusSkipNote: "Kom du ikke i Nexus? Sæt ikke flueben — så følger kontoret op. Du kan godt afslutte alligevel.",
+    nexusDone: "kvitteret",
+    nexusMissing: "mangler",
+    finishOpen: "Afslut opgave",
+    reportProblem: "Der er et problem",
+    reportProblemTitle: "Hvad er der sket?",
     notesSending: "Gemmer…",
     notesPhotoProgress: "Sender billede",
-    notesEmpty: "Ingen kommentarer endnu.",
     notesPhotosDeleted: "Billederne er slettet efter 12 måneder.",
-    reportTitle: "Meld til kontoret",
     reportNewTime: "Foreslå ny tid",
     reportNoEntry: "Kunne ikke komme ind",
     reportNoEntryHint: "Kontoret afgør om kunden skal betale alligevel. Tag gerne et billede som dokumentation.",
@@ -147,33 +175,61 @@ const T = {
     planned: "planned",
     allTeam: "Team total:",
     inTotal: "in total",
-    minutesPlaceholder: "Number of minutes",
     openNexus: "Open KMD Nexus Mobile",
     overrunTitle: "Registered time exceeds planned time",
     overrunBody: (reg, plan) => `With this entry, ${reg} will have been spent on the task, but only ${plan} is planned. Please state a reason for the overrun.`,
     overrunPlaceholder: "Reason for the overrun…",
     overrunRequired: "You must state a reason to register the time.",
-    overrunNoteLabel: "Reason",
-    logTime: "Log time",
     saving: "Saving…",
-    markDone: "Mark as completed",
     markNotDone: "Mark as not completed",
     status: { planlagt: "Planned", i_gang: "In progress", udført: "Completed" },
     taskVideo: "Watch video",
     notesTitle: "Comments and photos",
-    notesHint: "Write to the office, and take photos if something needs documenting — for example unusually dirty work or damage.",
     notesPlaceholder: "What should the office know?",
-    notesAddPhoto: "Take photo",
     photoCamera: "Take photo",
     photoLibrary: "From gallery",
     photoCount: "photos ready",
     photoMax: "You can send 10 photos at a time",
-    notesSend: "Save",
+    photos: "Photos",
+    products: "Products",
+    back: "Back",
+    ofSteps: "of",
+    finishTask: "Complete the job",
+    finishNextStep: "Next",
+    finishTimeQ: "How long did it take?",
+    finishTimePlanned: (t) => `${t} is planned for this job`,
+    finishHours: "Hours",
+    finishMinutes: "Minutes — in steps of 5",
+    finishAsPlanned: "as planned",
+    finishMoreThan: (t) => `${t} more than planned`,
+    finishLessThan: (t) => `${t} less than planned`,
+    finishWhyMore: "Write why it took longer — so the office can explain it to the customer.",
+    finishNeedTime: "Set the time before you continue.",
+    finishProductsQ: "Did you use any products?",
+    finishProductsHint: "Cleaning supplies and anything else to deduct from stock and invoice.",
+    finishPickProducts: "Select products",
+    finishProductsSaved: "The products are registered and deducted from stock. If something needs changing, tell the office.",
+    finishAlready: (t) => `${t} is already registered on this job. Only enter your own time below.`,
+    finishSaveFailed: "Could not save. Check your connection and try again.",
+    finishNoteQ: "Anything the office should know?",
+    finishNoteHint: "Was it extra dirty, or was something broken? Take a photo.",
+    finishNothingHappened: "Skip — nothing happened",
+    finishDone: "The job is complete",
+    finishNext: "Back to today's jobs",
+    finishKmNote: "Your mileage will be calculated tonight, now that the time is logged.",
+    nexusQ: "Remember to sign off in Nexus",
+    nexusHint: "The municipality pays according to Nexus — not according to what you write here.",
+    nexusOpenNow: "Open Nexus now",
+    nexusConfirm: "Yes, I have signed off in Nexus",
+    nexusSkipNote: "Could not get into Nexus? Leave it unticked — the office will follow up. You can still finish.",
+    nexusDone: "signed off",
+    nexusMissing: "missing",
+    finishOpen: "Complete job",
+    reportProblem: "There is a problem",
+    reportProblemTitle: "What happened?",
     notesSending: "Saving…",
     notesPhotoProgress: "Sending photo",
-    notesEmpty: "No comments yet.",
     notesPhotosDeleted: "Photos were deleted after 12 months.",
-    reportTitle: "Report to the office",
     reportNewTime: "Suggest a new time",
     reportNoEntry: "Could not get in",
     reportNoEntryHint: "The office decides whether the customer still pays. Please add a photo as documentation.",
@@ -557,19 +613,32 @@ const HELP_DA = [
       "Pilene skifter uge. «I dag» hopper tilbage til dagens dato.",
       "«+ Weekend» viser lørdag og søndag, hvis du har vagter der.",
       "Tryk på opgaven for at åbne den." ] },
-  { t: "Inde i opgaven", p: [
-      "Øverst står kunden og adressen.",
-      "«Naviger — Google Maps» viser vej til adressen.",
+  { t: "Inde i opgaven — mens du arbejder", p: [
+      "Skærmen viser kun det du skal bruge for at gøre arbejdet: kunden, adressen, hvordan du kommer ind, og hvad der skal gøres.",
+      "«Vis vej» åbner Google Maps.",
       "«Adgang» viser fx nøgleboks og kode, hvis der er en.",
-      "Under «Tasks» sætter du flueben, når du har gjort en ting. Tælleren viser hvor langt du er." ] },
-  { t: "Registrér din tid", p: [
-      "1. Vælg timer i den første boks og minutter i den anden.",
-      "2. Tryk «Registrér tid».",
-      "3. Tryk «Marker som udført», når du er helt færdig." ], warn:
-      "Husk at registrere din tid samme dag. Registrerer du ikke din tid, bliver din kørsel ikke beregnet — og så får du ikke kørselspenge for turen. Hver dag kl. 18 får du en mail, hvis du mangler noget." },
-  { t: "Produkter du har brugt", p: [
-      "Brugte du fx rengøringsmidler hos kunden, så tryk «Vælg produkter brugt» inde i opgaven og sæt antal.",
-      "Så trækkes det fra lageret, og kunden bliver faktureret rigtigt." ] },
+      "Under «Tasks» sætter du flueben, når du har gjort en ting. Tælleren viser hvor langt du er.",
+      "Der skal ikke registreres noget her. Det kommer bagefter." ] },
+  { t: "Når du er færdig — «Afslut opgave»", p: [
+      "Nederst på skærmen står «Afslut opgave». Den knap er der altid, også hvis du har scrollet ned i en lang liste.",
+      "Så bliver du ledt gennem nogle få spørgsmål, ét ad gangen. Øverst kan du se hvor langt du er — fx «1 af 3».",
+      "Til sidst får du en kvittering med det du har registreret. Så ved du at det er gemt, og du behøver ikke ringe til kontoret for at spørge.",
+      "Har du glemt noget, kan du åbne opgaven igen og afslutte igen. Tiden bliver lagt oveni den du allerede har registreret — den bliver ikke overskrevet.",
+      "Arbejder I to på samme opgave, afslutter I hver for sig med hver jeres tid." ], warn:
+      "Husk at afslutte samme dag. Registrerer du ikke din tid, bliver din kørsel ikke beregnet — og så får du ikke kørselspenge for turen. Hver dag kl. 18 får du en mail, hvis du mangler noget." },
+  { t: "Trin 1 — hvor lang tid brugte du?", p: [
+      "Feltet er sat til den tid der er afsat til opgaven. Passer det, trykker du bare «Videre» uden at ændre noget.",
+      "Skal det rettes, er der to rækker med − og + : øverst timer, nederst minutter. Minutterne går i spring af 5.",
+      "Det store tal foroven er det du registrerer i alt. Under det står om det passer med det planlagte.",
+      "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden." ] },
+  { t: "Trin 2 — produkter du har brugt", p: [
+      "Brugte du fx rengøringsmidler hos kunden, så vælg dem her og sæt antal.",
+      "Så trækkes det fra lageret, og kunden bliver faktureret rigtigt.",
+      "Brugte du ingenting, trykker du bare «Videre»." ] },
+  { t: "Nexus-borgere", p: [
+      "Er opgaven hos en Nexus-borger, står det øverst på opgaven, og der er en knap til at åbne KMD Nexus.",
+      "Når du afslutter, kommer der et ekstra trin hvor du bliver mindet om at kvittere i Nexus. Kommunen betaler efter det der står i Nexus — ikke efter det du skriver her.",
+      "Har du kvitteret, sætter du fluebenet. Kunne du ikke komme i Nexus, så lad det stå tomt — du kan afslutte alligevel, og kontoret følger op." ] },
   { t: "Bestil arbejdstøj", p: [
       "Tryk på trøje-ikonet 👕 øverst.",
       "Sæt antal med + og − og tryk «Vælg produkter».",
@@ -612,19 +681,32 @@ const HELP_EN = [
       "The arrows change week. \"Today\" jumps back to today.",
       "\"+ Weekend\" shows Saturday and Sunday if you have shifts.",
       "Tap a job to open it." ] },
-  { t: "Inside the job", p: [
-      "The customer and address are at the top.",
-      "\"Navigate — Google Maps\" shows the way there.",
+  { t: "Inside the job — while you work", p: [
+      "The screen shows only what you need to do the work: the customer, the address, how to get in, and what has to be done.",
+      "\"Show the way\" opens Google Maps.",
       "\"Access\" shows key box and code if there is one.",
-      "Under \"Tasks\" you tick off each thing as you finish it." ] },
-  { t: "Register your time", p: [
-      "1. Pick hours in the first box and minutes in the second.",
-      "2. Tap \"Register time\".",
-      "3. Tap \"Mark as done\" when you have finished." ], warn:
-      "Register your time the same day. If you do not, your mileage is not calculated — and you will not be paid for the drive. Every day at 18:00 you get an email if something is missing." },
-  { t: "Products you used", p: [
-      "If you used products at the customer, tap \"Select products used\" inside the job and set the amount.",
-      "It is then deducted from stock and billed to the customer." ] },
+      "Under \"Tasks\" you tick off each thing as you finish it.",
+      "Nothing needs to be registered here. That comes afterwards." ] },
+  { t: "When you are done — \"Complete job\"", p: [
+      "\"Complete job\" sits at the bottom of the screen. It is always there, even if you have scrolled down a long list.",
+      "You are then taken through a few questions, one at a time. The top shows how far you are — for example \"1 of 3\".",
+      "At the end you get a receipt with what was registered, so you know it is saved and do not have to call the office to check.",
+      "Forgot something? Open the job again and complete it again. The time is added to what you already registered — it is not overwritten.",
+      "If two of you work the same job, you each complete it with your own time." ], warn:
+      "Complete the job the same day. If you do not register your time, your mileage is not calculated — and you will not be paid for the drive. Every day at 18:00 you get an email if something is missing." },
+  { t: "Step 1 — how long did it take?", p: [
+      "The field is preset to the time planned for the job. If that is right, just tap \"Next\" without changing anything.",
+      "To change it, use the two rows of − and + : hours on top, minutes below. Minutes move in steps of 5.",
+      "The large number at the top is the total you are registering. Below it you can see whether it matches the plan.",
+      "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer." ] },
+  { t: "Step 2 — products you used", p: [
+      "If you used cleaning supplies at the customer, select them here and set the amount.",
+      "It is then deducted from stock and billed to the customer.",
+      "If you used nothing, just tap \"Next\"." ] },
+  { t: "Nexus citizens", p: [
+      "If the job is for a Nexus citizen, it says so at the top of the job, and there is a button to open KMD Nexus.",
+      "When you complete the job there is an extra step reminding you to sign off in Nexus. The municipality pays according to Nexus — not according to what you write here.",
+      "If you have signed off, tick the box. If you could not get into Nexus, leave it empty — you can still finish, and the office will follow up." ] },
   { t: "Order workwear", p: [
       "Tap the shirt icon 👕 at the top.",
       "Set the amount with + and − and tap \"Select products\".",
@@ -957,53 +1039,337 @@ function ProductPage({ task, employee, lang, onClose, onSave, supabaseClient }) 
   );
 }
 
-// ── Completion confirmation ───────────────────────────────────────────────────
-function CompletionConfirm({ task, employee, usedProducts, minutes, lang, onConfirm, onCancel }) {
-  const myLogged = (task.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
-  const totalMin = myLogged + (Number(minutes) || 0);
-  return (
-    <div style={s.overlay} onClick={onCancel}>
-      <div style={{ ...s.sheet, maxHeight: "80svh" }} onClick={(e) => e.stopPropagation()}>
-        <div style={s.dragHandle} />
-        <div style={{ padding: "16px 20px 0", fontWeight: 800, fontSize: 18, color: "#111111" }}>
-          ✓ {lang === "da" ? "Bekræft afslutning" : "Confirm completion"}
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px 20px" }}>
-          <div style={{ background: "#F8FAFC", borderRadius: 12, padding: 14, marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#111111", marginBottom: 8 }}>{task.title}</div>
-            <div style={{ fontSize: 13, color: "#64748B" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F1F5F9" }}>
-                <span>⏱ {lang === "da" ? "Registreret tid" : "Logged time"}</span>
-                <strong>{fmtMin(totalMin)}</strong>
-              </div>
+// ── Afslut opgave ────────────────────────────────────────────────────────────
+// Alt der skal registreres, samlet ét sted og ét spoergsmaal ad gangen. Foer laa
+// tidsregistrering, produkter og kommentarfelt paa selve opgaveskaermen, hvor de
+// stod og forstyrrede mens arbejdet blev udfoert — og afslut-knappen laa nederst
+// efter dem alle. Nu ser man opgaven mens man arbejder, og registrerer bagefter.
+//
+// Flowet kan gennemloebes flere gange paa samme opgave. Tiden laegges oveni det der
+// allerede staar, saa en pause midt i arbejdet eller to medarbejdere paa samme
+// opgave fungerer praecis som foer.
+function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, onSetStatus, onAfbryd, onFaerdig }) {
+  const erNexus = task.contractType === "nexus";
+  // Trinnene bygges op efter opgaven. En erhvervsopgave skal ikke spoerges om Nexus,
+  // og traellingen "3 af 4" skal passe til det man faktisk faar at se.
+  const trin = ["tid", "produkter", ...(erNexus ? ["nexus"] : []), "besked"];
+
+  const [trinNr, setTrinNr] = useState(0);
+  const [gemmer, setGemmer] = useState(false);
+  const [fejl, setFejl] = useState("");
+  const [kvittering, setKvittering] = useState(null);
+
+  // Tiden starter paa det planlagte. Det er svaret i de fleste tilfaelde, saa den
+  // almindelige dag kraever ingen indtastning — kun et tryk paa Videre.
+  const alleredeLogget = (task.timeLog || []).reduce((s, l) => s + (l.minutes || 0), 0);
+  const planlagt = task.duration || 0;
+
+  // Én tilstand i samlede minutter, ikke to. Med timer og minutter hver for sig skal
+  // 55 + 5 baade nulstille minutterne og laegge en time til, og 0 − 5 skal blokeres
+  // hvis der ikke er en time at tage af — to afhaengige tilstande der kan komme i
+  // utakt. Med ét tal er begge dele almindelig plus og minus.
+  //
+  // Startvaerdien er det der er TILBAGE af det planlagte, ikke hele varigheden. Er
+  // der allerede registreret tid — af en kollega, eller af hende selv foer en pause —
+  // ville hele varigheden vaere en overskridelse fra foerste sekund, og hun ville
+  // blive tvunget til at skrive en begrundelse for noget der passer fint.
+  const [samletMin, setSamletMin] = useState(
+    Math.round(Math.max(0, planlagt - alleredeLogget) / 5) * 5,
+  );
+  const timer = Math.floor(samletMin / 60);
+  const minutter = samletMin % 60;
+  const [begrundelse, setBegrundelse] = useState("");
+  const [begrundelseFejl, setBegrundelseFejl] = useState(false);
+
+  const [produkter, setProdukter] = useState([]);
+  const [visProdukter, setVisProdukter] = useState(false);
+
+  const [nexusOk, setNexusOk] = useState(false);
+
+  const [beskedTekst, setBeskedTekst] = useState("");
+  const [beskedFiler, setBeskedFiler] = useState([]);
+  const [fotoFremdrift, setFotoFremdrift] = useState(null);
+
+  const minutterIAlt = samletMin;
+  // Overskridelsen maales paa opgavens samlede tid, ikke paa den enkelte medarbejders.
+  // Varigheden er planlagt for hele opgaven, saa to personer paa en time hver har
+  // brugt to timer af noget der maaske kun var sat til halvanden.
+  const iAltPaaOpgaven = alleredeLogget + minutterIAlt;
+  const afvigelse = iAltPaaOpgaven - planlagt;
+  // Er der ingen planlagt varighed, findes der ingen overskridelse at begrunde.
+  const overskrider = planlagt > 0 && afvigelse > 0;
+
+  // Loftet paa 12 timer er det samme som i den gamle timevaelger. Nedad stopper vi
+  // ved 0 — en registrering paa nul minutter afvises alligevel af naeste trin.
+  function skift(delta) {
+    setFejl("");
+    setSamletMin((v) => Math.max(0, Math.min(12 * 60, v + delta)));
+  }
+
+  function videre() {
+    setFejl("");
+    if (trin[trinNr] === "tid") {
+      if (minutterIAlt <= 0) { setFejl(tr.finishNeedTime); return; }
+      if (overskrider && !begrundelse.trim()) { setBegrundelseFejl(true); return; }
+    }
+    // Fejlmarkeringen nulstilles ved skift af trin. Ellers stod den roede ramme og
+    // lyste naar man gik tilbage til tiden igen, uden at man havde trykket paa noget.
+    setBegrundelseFejl(false);
+    setTrinNr((n) => n + 1);
+  }
+
+  // Huskes paa tvaers af forsoeg. Fejler fotouploaden efter at tiden er skrevet, maa
+  // et nyt tryk paa Afslut ikke logge tiden igen — append_time_log laegger til, saa
+  // to forsoeg ville blive to registreringer paa den samme opgave.
+  const tidErGemt = useRef(false);
+
+  async function afslut() {
+    setGemmer(true);
+    setFejl("");
+    try {
+      if (minutterIAlt > 0 && !tidErGemt.current) {
+        const ok = await onLogMinutes(task.id, minutterIAlt, overskrider ? begrundelse.trim() : null);
+        if (ok === false) throw new Error(tr.finishSaveFailed);
+        tidErGemt.current = true;
+      }
+      // Kommentar og billeder gemmes som et notat, praecis som fra opgaveskaermen.
+      let antalFotos = 0;
+      if (beskedTekst.trim() || beskedFiler.length > 0) {
+        const notatId = nytId("tn");
+        const { error: insErr } = await supabaseClient.from("task_notes").insert({
+          id: notatId, instance_id: task.id, employee_id: employee?.id || null,
+          kind: "kommentar", text: beskedTekst.trim() || null, photos: [],
+        });
+        if (insErr) throw new Error(insErr.message);
+        if (beskedFiler.length > 0) {
+          const stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, beskedFiler,
+            (nr, iAlt) => setFotoFremdrift({ nr, iAlt }));
+          const { error: updErr } = await supabaseClient
+            .from("task_notes").update({ photos: stier }).eq("id", notatId);
+          if (updErr) throw new Error(updErr.message);
+          antalFotos = stier.length;
+        }
+      }
+      // Nexus-kvitteringen er ikke en spaerring, men den skal registreres — ogsaa
+      // naar fluebenet IKKE er sat, saa kontoret kan foelge op paa netop de opgaver.
+      if (erNexus) {
+        const { error: nxErr } = await supabaseClient
+          .from("instances").update({ nexus_confirmed: nexusOk }).eq("id", task.id);
+        if (nxErr) throw new Error(nxErr.message);
+      }
+      const statusOk = await onSetStatus(task.id, true);
+      if (statusOk === false) throw new Error(tr.finishSaveFailed);
+      setKvittering({
+        minutter: alleredeLogget + minutterIAlt,
+        produkter: produkter.length,
+        fotos: antalFotos,
+        nexus: erNexus ? nexusOk : null,
+      });
+    } catch (e) {
+      setFejl(e?.message || String(e));
+    }
+    setFotoFremdrift(null);
+    setGemmer(false);
+  }
+
+  const aktuelt = trin[trinNr];
+  const sidsteTrin = trinNr === trin.length - 1;
+
+  if (kvittering) {
+    return (
+      // stopPropagation er ikke pynt: flowet ligger inde i opgavens overlay, som
+      // lukker paa klik. Uden den ville ethvert tryk paa plus, minus eller Videre
+      // boble op og lukke hele opgaven med alt det indtastede.
+      <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+        <div style={s.sheet}>
+          <div style={s.afslutTop}>{task.customerName || task.title}</div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "28px 20px", textAlign: "center" }}>
+            <div style={s.kvitteringCirkel}><Check size={34} color="#16A34A" strokeWidth={3} /></div>
+            <div style={s.kvitteringTitel}>{tr.finishDone}</div>
+            <div style={s.kvitteringKunde}>{task.title}</div>
+            <div style={s.kvitteringKort}>
+              <div style={s.kvitteringRaekke}><span>{tr.timeTracking}</span><strong>{fmtMin(kvittering.minutter)}</strong></div>
               {(task.checklist || []).length > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F1F5F9" }}>
-                  <span>✓ Tasks</span>
+                <div style={s.kvitteringRaekke}>
+                  <span>{tr.tasks}</span>
                   <strong>{(task.checklist || []).filter((i) => i.done).length}/{(task.checklist || []).length}</strong>
                 </div>
               )}
-              {usedProducts.length > 0 && (
-                <div style={{ padding: "6px 0" }}>
-                  <div style={{ marginBottom: 4 }}>📦 {lang === "da" ? "Produkter brugt" : "Products used"}</div>
-                  {usedProducts.map((p) => (
-                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#111111", padding: "2px 0" }}>
-                      <span>{p.name}</span><strong>{p.qty} stk</strong>
-                    </div>
-                  ))}
+              {kvittering.produkter > 0 && (
+                <div style={s.kvitteringRaekke}><span>{tr.products}</span><strong>{kvittering.produkter}</strong></div>
+              )}
+              {kvittering.fotos > 0 && (
+                <div style={s.kvitteringRaekke}><span>{tr.photos}</span><strong>{kvittering.fotos}</strong></div>
+              )}
+              {kvittering.nexus !== null && (
+                <div style={s.kvitteringRaekke}>
+                  <span>Nexus</span>
+                  <strong style={{ color: kvittering.nexus ? "#16A34A" : "#B45309" }}>
+                    {kvittering.nexus ? "✓ " + tr.nexusDone : tr.nexusMissing}
+                  </strong>
                 </div>
               )}
             </div>
+            <div style={s.kvitteringNote}>{tr.finishKmNote}</div>
+          </div>
+          <div style={s.afslutBund}>
+            <button style={s.primaerStor} onClick={onFaerdig}>{tr.finishNext}</button>
           </div>
         </div>
-        <div style={{ padding: "12px 20px 32px", display: "flex", gap: 10 }}>
-          <button style={{ ...s.doneLarge, flex: 1, fontSize: 14 }} onClick={onCancel}>
-            {lang === "da" ? "Tilbage" : "Back"}
+      </div>
+    );
+  }
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+      <div style={s.sheet}>
+        <div style={s.afslutTop}>
+          <button style={s.afslutTilbage} onClick={() => (trinNr === 0 ? onAfbryd() : setTrinNr((n) => n - 1))}>
+            <ChevronLeft size={16} /> {tr.back}
           </button>
-          <button style={{ ...s.doneActiveLarge, flex: 1, fontSize: 14 }} onClick={onConfirm}>
-            {lang === "da" ? "Bekræft & afslut" : "Confirm & complete"}
-          </button>
+          <span>{trinNr + 1} {tr.ofSteps} {trin.length}</span>
+        </div>
+        <div style={s.fremdriftSpor}>
+          <div style={{ ...s.fremdriftFyld, width: `${((trinNr + 1) / trin.length) * 100}%` }} />
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "18px 16px 20px" }}>
+          {aktuelt === "tid" && (
+            <>
+              <div style={s.trinSpoergsmaal}>{tr.finishTimeQ}</div>
+              <div style={s.trinHjaelp}>{tr.finishTimePlanned(fmtMin(planlagt))}</div>
+              {/* Er der registreret tid i forvejen, skal det staa her. Ellers ser
+                  maerkatet under det store tal ud som ren volapyk: "0t 30m" og
+                  lige under "1t mere end planlagt". */}
+              {alleredeLogget > 0 && (
+                <div style={s.trinAllerede}>{tr.finishAlready(fmtMin(alleredeLogget))}</div>
+              )}
+
+              <div style={{ textAlign: "center", margin: "18px 0 4px" }}>
+                <div style={s.storTid}>
+                  {timer}<span style={s.storTidEnhed}>t</span> {String(minutter).padStart(2, "0")}<span style={s.storTidEnhed}>m</span>
+                </div>
+                {planlagt > 0 && (
+                  <div style={afvigelse === 0 ? s.maerkeOk : overskrider ? s.maerkeOver : s.maerkeUnder}>
+                    {afvigelse === 0 ? tr.finishAsPlanned
+                      : overskrider ? tr.finishMoreThan(fmtMin(afvigelse))
+                      : tr.finishLessThan(fmtMin(-afvigelse))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <div style={s.stepperLabel}>{tr.finishHours}</div>
+                <div style={s.stepperRaekke}>
+                  <button style={s.stepperBtn} onClick={() => skift(-60)} aria-label="minus">−</button>
+                  <div style={s.stepperTal}>{timer}</div>
+                  <button style={s.stepperBtn} onClick={() => skift(60)} aria-label="plus">+</button>
+                </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <div style={s.stepperLabel}>{tr.finishMinutes}</div>
+                <div style={s.stepperRaekke}>
+                  <button style={s.stepperBtn} onClick={() => skift(-5)} aria-label="minus">−</button>
+                  <div style={s.stepperTal}>{String(minutter).padStart(2, "0")}</div>
+                  <button style={s.stepperBtn} onClick={() => skift(5)} aria-label="plus">+</button>
+                </div>
+              </div>
+
+              {overskrider && (
+                <div style={s.overrunBox}>
+                  <div style={s.overrunTitle}>{tr.overrunTitle}</div>
+                  <div style={s.overrunBody}>{tr.finishWhyMore}</div>
+                  <textarea rows={2} value={begrundelse}
+                    onChange={(e) => { setBegrundelse(e.target.value); if (e.target.value.trim()) setBegrundelseFejl(false); }}
+                    placeholder={tr.overrunPlaceholder}
+                    style={{ ...s.overrunInput, borderColor: begrundelseFejl ? "#DC2626" : "#F59E0B" }} />
+                  {begrundelseFejl && <div style={s.overrunError}>{tr.overrunRequired}</div>}
+                </div>
+              )}
+            </>
+          )}
+
+          {aktuelt === "produkter" && (
+            <>
+              <div style={s.trinSpoergsmaal}>{tr.finishProductsQ}</div>
+              <div style={s.trinHjaelp}>{tr.finishProductsHint}</div>
+              {produkter.length > 0 ? (
+                <>
+                  <div style={s.kvitteringKort}>
+                    {produkter.map((p) => (
+                      <div key={p.id} style={s.kvitteringRaekke}><span>{p.name}</span><strong>{p.qty} stk</strong></div>
+                    ))}
+                  </div>
+                  {/* Ingen "ret produkter". Produktvalget skriver til lageret med det
+                      samme, saa en anden runde ville traekke de samme varer fra igen.
+                      Skal noget rettes, gør kontoret det — det staar i teksten. */}
+                  <div style={s.trinFod}>{tr.finishProductsSaved}</div>
+                </>
+              ) : (
+                <button style={{ ...s.sekundaerStor, marginTop: 14 }} onClick={() => setVisProdukter(true)}>
+                  📦 {tr.finishPickProducts}
+                </button>
+              )}
+            </>
+          )}
+
+          {aktuelt === "nexus" && (
+            <>
+              <div style={s.trinSpoergsmaal}>{tr.nexusQ}</div>
+              <div style={s.trinHjaelp}>{tr.nexusHint}</div>
+              <button style={s.nexusBtn} onClick={openNexusApp}>{tr.nexusOpenNow}</button>
+              {/* Hele feltet er trykflade, ikke bare et lille afkrydsningsfelt.
+                  Det skal kunne rammes med en behandsket finger. */}
+              <button style={nexusOk ? s.nexusTjekAktiv : s.nexusTjek} onClick={() => setNexusOk((v) => !v)}>
+                <span style={nexusOk ? s.tjekFirkantAktiv : s.tjekFirkant}>
+                  {nexusOk && <Check size={16} color="#fff" strokeWidth={3} />}
+                </span>
+                <span>{tr.nexusConfirm}</span>
+              </button>
+              <div style={s.trinFod}>{tr.nexusSkipNote}</div>
+            </>
+          )}
+
+          {aktuelt === "besked" && (
+            <>
+              <div style={s.trinSpoergsmaal}>{tr.finishNoteQ}</div>
+              <div style={s.trinHjaelp}>{tr.finishNoteHint}</div>
+              <textarea rows={3} value={beskedTekst} onChange={(e) => setBeskedTekst(e.target.value)}
+                placeholder={tr.notesPlaceholder} style={{ ...s.notatInput, marginTop: 12 }} />
+              <div style={{ marginTop: 8 }}>
+                <FotoVaelger filer={beskedFiler} setFiler={setBeskedFiler} tr={tr} />
+              </div>
+            </>
+          )}
+
+          {fejl && <div style={s.notatFejl}>{fejl}</div>}
+        </div>
+
+        <div style={s.afslutBund}>
+          {sidsteTrin ? (
+            <button style={{ ...s.afslutBtn, opacity: gemmer ? 0.6 : 1 }} disabled={gemmer} onClick={afslut}>
+              {gemmer
+                ? (fotoFremdrift ? `${tr.notesPhotoProgress} ${fotoFremdrift.nr}/${fotoFremdrift.iAlt}` : tr.notesSending)
+                : tr.finishTask}
+            </button>
+          ) : (
+            <button style={s.primaerStor} onClick={videre}>{tr.finishNextStep}</button>
+          )}
+          {/* Kun naar der faktisk ikke er skrevet eller fotograferet noget. Ellers
+              hed knappen "spring over" men gemte alligevel det man havde skrevet. */}
+          {aktuelt === "besked" && !gemmer && !beskedTekst.trim() && beskedFiler.length === 0 && (
+            <button style={s.springBtn} onClick={afslut}>{tr.finishNothingHappened}</button>
+          )}
         </div>
       </div>
+
+      {visProdukter && (
+        <ProductPage
+          task={task} employee={employee} lang={lang} supabaseClient={supabaseClient}
+          onClose={() => setVisProdukter(false)}
+          onSave={(valgte) => { setProdukter(valgte); setVisProdukter(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -1099,29 +1465,15 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
     setRsGemmer(false);
   }
   const tr = T[lang];
-  const [hours, setHours] = useState("0");
-  const [mins, setMins] = useState("00");
-  const [saving, setSaving] = useState(false);
   const [translatedTask, setTranslatedTask] = useState(null);
   const [translating, setTranslating] = useState(false);
-  const [showProducts, setShowProducts] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [usedProducts, setUsedProducts] = useState([]);
-  // Begrundelse ved overskridelse af planlagt tid
-  const [overrunNote, setOverrunNote] = useState("");
-  const [overrunError, setOverrunError] = useState(false);
-
-  // Kommentar og billeder. Kan bruges paa enhver opgave — baade til at dokumentere
-  // saerligt beskidt arbejde og til at forklare hvorfor noget ikke gik som planlagt.
+  // De to veje ud af denne skaerm: afslut opgaven, eller meld et problem.
+  const [visAfslut, setVisAfslut] = useState(false);
+  const [visProblem, setVisProblem] = useState(false);
+  // Gemte kommentarer og billeder vises her, men skrives i afslutningsflowet.
   const [noter, setNoter] = useState([]);
-  const [notatTekst, setNotatTekst] = useState("");
-  const [notatFiler, setNotatFiler] = useState([]);
-  const [notatGemmer, setNotatGemmer] = useState(false);
-  const [notatFejl, setNotatFejl] = useState("");
-  // Hvilket billede der sendes lige nu. Uden den staar knappen bare og siger
-  // "Gemmer…" i et halvt minut ved ti billeder, og saa trykker folk igen.
-  const [fotoFremdrift, setFotoFremdrift] = useState(null);
   const [fotoUrls, setFotoUrls] = useState({});
+  const [fotoFremdrift, setFotoFremdrift] = useState(null);
 
   useEffect(() => {
     if (!task) return;
@@ -1168,41 +1520,12 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
     let stier = [];
     if (filer && filer.length > 0) {
       stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, filer,
-        (nr, i_alt) => setFotoFremdrift({ nr, i_alt }));
+        (nr, iAlt) => setFotoFremdrift({ nr, iAlt }));
       const { error: updErr } = await supabaseClient
         .from("task_notes").update({ photos: stier }).eq("id", notatId);
       if (updErr) throw new Error(updErr.message);
     }
     return { notatId, stier };
-  }
-
-  async function sendKommentar() {
-    if (!notatTekst.trim() && notatFiler.length === 0) return;
-    setNotatGemmer(true);
-    setNotatFejl("");
-    try {
-      const { notatId, stier } = await gemNotat("kommentar", notatTekst, notatFiler);
-      const nyt = {
-        id: notatId, instance_id: task.id, employee_id: employee?.id || null,
-        kind: "kommentar", text: notatTekst.trim() || null, photos: stier,
-        created_at: new Date().toISOString(),
-      };
-      setNoter((prev) => [nyt, ...prev]);
-      if (stier.length > 0) {
-        const urls = await signeredeFotoUrls(supabaseClient, stier);
-        setFotoUrls((prev) => {
-          const kort = { ...prev };
-          stier.forEach((sti, i) => { if (urls[i]) kort[sti] = urls[i]; });
-          return kort;
-        });
-      }
-      setNotatTekst("");
-      setNotatFiler([]);
-    } catch (e) {
-      setNotatFejl(e?.message || String(e));
-    }
-    setFotoFremdrift(null);
-    setNotatGemmer(false);
   }
 
   if (!task) return null;
@@ -1216,26 +1539,6 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(task.address)}`
     : null;
 
-  // Overskrider den SAMLEDE registrerede tid (alle medarbejdere) det planlagte,
-  // naar denne registrering laegges til? Summen bruges bevidst, fordi opgavens
-  // varighed er planlagt for hele opgaven - ikke pr. medarbejder.
-  const pendingMinutes = Number(hours) * 60 + Number(mins) || 0;
-  const projectedTotal = totalLogged + pendingMinutes;
-  const willExceed = pendingMinutes > 0 && projectedTotal > t.duration;
-
-  async function handleLog() {
-    const m = pendingMinutes;
-    if (!m || m <= 0) return;
-    if (willExceed && !overrunNote.trim()) { setOverrunError(true); return; }
-    if (!window.confirm(lang === "da" ? `Registrér ${fmtMin(m)}?` : `Log ${fmtMin(m)}?`)) return;
-    setSaving(true);
-    await onLogMinutes(t.id, m, willExceed ? overrunNote.trim() : null);
-    setHours("0");
-    setMins("00");
-    setOverrunNote("");
-    setOverrunError(false);
-    setSaving(false);
-  }
 
   return (
     <div style={s.overlay} onClick={onClose}>
@@ -1346,72 +1649,37 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
             </div>
           )}
 
-          {/* Produkter brugt */}
-          <div style={s.sheetSection}>
-            <div style={s.sheetSectionTitle}>📦 {lang === "da" ? "Produkter" : "Products"}</div>
-            {usedProducts.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                {usedProducts.map((p) => (
-                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "#111111" }}>
-                    <span>{p.name}</span><strong>{p.qty} stk</strong>
-                  </div>
-                ))}
+          {/* Registreret tid staar her, men kan ikke rettes. Selve registreringen sker
+              i afslutningsflowet — det er dét der holder denne skaerm ren. Visningen
+              bliver dog: har man arbejdet i to omgange, skal man kunne se hvad der
+              allerede er registreret, foer man afslutter igen. */}
+          {totalLogged > 0 && (
+            <div style={s.sheetSection}>
+              <div style={s.sheetSectionTitle}><Clock size={14} /> {tr.timeTracking}</div>
+              <div style={s.timeProgress}>
+                <div style={s.timeBar}>
+                  <div style={{ ...s.timeBarFill, width: `${Math.min(100, (myLogged / t.duration) * 100)}%` }} />
+                </div>
+                <div style={s.timeMeta}>
+                  <span>{fmtMin(myLogged)} {tr.registered}</span>
+                  <span style={{ color: "#94A3B8" }}>/ {fmtMin(t.duration)} {tr.planned}</span>
+                </div>
+                {totalLogged !== myLogged && (
+                  <div style={s.timeMeta2}>{tr.allTeam} {fmtMin(totalLogged)} {tr.inTotal}</div>
+                )}
               </div>
-            )}
-            <button style={{ ...s.doneLarge, fontSize: 14 }} onClick={() => setShowProducts(true)}>
-              📦 {usedProducts.length > 0 ? (lang === "da" ? "Ret produkter" : "Edit products") : (lang === "da" ? "Vælg produkter brugt" : "Select products used")}
-            </button>
-          </div>
-
-          {/* Time tracking */}
-          <div style={s.sheetSection}>
-            <div style={s.sheetSectionTitle}><Clock size={14} /> {tr.timeTracking}</div>
-            <div style={s.timeProgress}>
-              <div style={s.timeBar}>
-                <div style={{ ...s.timeBarFill, width: `${Math.min(100, (myLogged / t.duration) * 100)}%` }} />
-              </div>
-              <div style={s.timeMeta}>
-                <span>{fmtMin(myLogged)} {tr.registered}</span>
-                <span style={{ color: "#94A3B8" }}>/ {fmtMin(t.duration)} {tr.planned}</span>
-              </div>
-              {totalLogged !== myLogged && (
-                <div style={s.timeMeta2}>{tr.allTeam} {fmtMin(totalLogged)} {tr.inTotal}</div>
-              )}
             </div>
-            {willExceed && (
-              <div style={s.overrunBox}>
-                <div style={s.overrunTitle}>⚠️ {tr.overrunTitle}</div>
-                <div style={s.overrunBody}>{tr.overrunBody(fmtMin(projectedTotal), fmtMin(t.duration))}</div>
-                <textarea
-                  style={{ ...s.overrunInput, borderColor: overrunError ? "#DC2626" : "#F59E0B" }}
-                  placeholder={tr.overrunPlaceholder}
-                  value={overrunNote}
-                  onChange={(e) => { setOverrunNote(e.target.value); if (e.target.value.trim()) setOverrunError(false); }}
-                  rows={2} />
-                {overrunError && <div style={s.overrunError}>{tr.overrunRequired}</div>}
-              </div>
-            )}
-            <div style={s.timeInputRow}>
-              <select style={{ ...s.timeInput, flex: 0.3 }} value={hours} onChange={(e) => setHours(e.target.value)}>
-                {Array.from({length: 13}, (_, i) => i).map(h => <option key={h} value={h}>{h}t</option>)}
-              </select>
-              <select style={{ ...s.timeInput, flex: 0.3 }} value={mins} onChange={(e) => setMins(e.target.value)}>
-                {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => <option key={m} value={m}>{m}m</option>)}
-              </select>
-              <button style={{ ...s.timeLogBtn, opacity: (Number(hours) === 0 && mins === "00") || saving ? 0.4 : 1 }}
-                onClick={handleLog} disabled={saving}>
-                {saving ? tr.saving : tr.logTime}
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* Kommentar og billeder — altid tilgaengelig, ogsaa paa en opgave der gik fint.
               Ellers kunne man ikke dokumentere et beskidt koekken paa en normal opgave. */}
+          {/* Kun laesning her. Nye kommentarer skrives i afslutningsflowet — men en
+              note fra en kollega ("noeglen sidder stramt") er information man skal
+              have FOER man gaar ind, saa de gemte noter bliver staaende. */}
+          {noter.length > 0 && (
           <div style={s.sheetSection}>
             <div style={s.sheetSectionTitle}>💬 {tr.notesTitle}</div>
-            <div style={s.notatHint}>{tr.notesHint}</div>
 
-            {noter.length === 0 && <div style={s.notatTom}>{tr.notesEmpty}</div>}
             {noter.map((n) => {
               const skrevetAf = n.employee_id === employee.id ? "" : " ";
               const tid = new Date(n.created_at).toLocaleString("da-DK", {
@@ -1441,37 +1709,21 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                 </div>
               );
             })}
-
-            <textarea
-              rows={2}
-              value={notatTekst}
-              onChange={(e) => setNotatTekst(e.target.value)}
-              placeholder={tr.notesPlaceholder}
-              style={s.notatInput} />
-
-            <div style={{ marginTop: 8 }}>
-              <FotoVaelger filer={notatFiler} setFiler={setNotatFiler} tr={tr} />
-            </div>
-
-            {notatFejl && <div style={s.notatFejl}>{notatFejl}</div>}
-
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button
-                type="button"
-                disabled={notatGemmer || (!notatTekst.trim() && notatFiler.length === 0)}
-                style={{ ...s.notatGemBtn,
-                  opacity: notatGemmer || (!notatTekst.trim() && notatFiler.length === 0) ? 0.45 : 1 }}
-                onClick={sendKommentar}>
-                {notatGemmer
-                  ? (fotoFremdrift ? `${tr.notesPhotoProgress} ${fotoFremdrift.nr}/${fotoFremdrift.i_alt}` : tr.notesSending)
-                  : tr.notesSend}
-              </button>
-            </div>
           </div>
+          )}
 
-          {/* Oenske om ny tid — medarbejderen aftaler med kunden, backoffice planlaegger */}
-          {!done && (
-            <div style={{ padding: "0 0 18px" }}>
+          {/* Meld til kontoret. Ligger bag "Der er et problem" nederst, saa den ikke
+              konkurrerer med den almindelige vej gennem opgaven. */}
+          {(visProblem || rsSendt) && !done && (
+            <div style={s.sheetSection}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={s.sheetSectionTitle}>🚩 {tr.reportProblemTitle}</div>
+                {!rsSendt && (
+                  <button style={s.notatRyd} onClick={() => { setVisProblem(false); setRsArt(null); setRsFiler([]); }}>
+                    {tr.back}
+                  </button>
+                )}
+              </div>
               {rsSendt ? (
                 <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46", borderRadius: 12, padding: "12px 14px", fontSize: 14 }}>
                   {rsSendt === "forgaeves"
@@ -1513,7 +1765,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                         cursor: (!rsGrund.trim() || rsGemmer) ? "not-allowed" : "pointer" }}
                       onClick={sendOnskeOmNyTid}>
                       {rsGemmer
-                        ? (fotoFremdrift ? `${tr.notesPhotoProgress} ${fotoFremdrift.nr}/${fotoFremdrift.i_alt}` : "Sender…")
+                        ? (fotoFremdrift ? `${tr.notesPhotoProgress} ${fotoFremdrift.nr}/${fotoFremdrift.iAlt}` : "Sender…")
                         : "Send til kontoret"}
                     </button>
                   </div>
@@ -1547,41 +1799,37 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
             </div>
           )}
 
-          {/* Done button → confirmation */}
-          <div style={{ padding: "0 0 32px" }}>
-            {done ? (
-              <button style={s.doneActiveLarge} onClick={() => onSetStatus(task.id, false)}>
-                <CheckCircle2 size={18} /> {tr.markNotDone}
+        </div>
+
+        {/* Fast bjaelke. Den handling der afslutter besoeget skal kunne rammes uden at
+            scrolle — paa en opgave med femten tjeklistepunkter laa den foer helt nede
+            under kunde, adgang, video, produkter, tid og kommentarfelt. */}
+        <div style={s.afslutBund}>
+          {done ? (
+            <button style={s.doneActiveLarge} onClick={() => onSetStatus(task.id, false)}>
+              <CheckCircle2 size={18} /> {tr.markNotDone}
+            </button>
+          ) : (
+            <>
+              <button style={s.primaerStor} onClick={() => setVisAfslut(true)}>
+                {tr.finishOpen}
               </button>
-            ) : (
-              <button style={s.doneLarge} onClick={() => setShowConfirm(true)}>
-                <CheckCircle2 size={18} /> {tr.markDone}
-              </button>
-            )}
-          </div>
+              {!visProblem && !rsSendt && (
+                <div style={s.trinSpring} onClick={() => setVisProblem(true)}>
+                  {tr.reportProblem}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      {showProducts && (
-        <ProductPage
-          task={task} employee={employee} lang={lang}
-          supabaseClient={supabaseClient}
-          onClose={() => setShowProducts(false)}
-          onSave={(products) => { setUsedProducts(products); setShowProducts(false); }}
-        />
-      )}
-      {showConfirm && (
-        <CompletionConfirm
-          task={task} employee={employee} lang={lang}
-          usedProducts={usedProducts} minutes={mins}
-          onCancel={() => setShowConfirm(false)}
-          onConfirm={async () => {
-            const totalMinutes = Number(hours) * 60 + Number(mins);
-    if (totalMinutes > 0) await onLogMinutes(task.id, totalMinutes, willExceed ? overrunNote.trim() : null);
-            await onSetStatus(task.id, true);
-            setShowConfirm(false);
-            onClose();
-          }}
+      {visAfslut && (
+        <AfslutOpgave
+          task={task} employee={employee} lang={lang} tr={tr} supabaseClient={supabaseClient}
+          onLogMinutes={onLogMinutes} onSetStatus={onSetStatus}
+          onAfbryd={() => setVisAfslut(false)}
+          onFaerdig={() => { setVisAfslut(false); onClose(); }}
         />
       )}
     </div>
@@ -1652,7 +1900,10 @@ function weekMeta(weekNo, year) {
 }
 
 export default function MedarbejderApp() {
-  const [lang, setLang] = useState(() => localStorage.getItem("wl_lang") || "en");
+  // Dansk som udgangspunkt. Alle 20 medarbejdere staar med dansk i databasen, men
+  // profilen hentes foerst efter foerste render — med "en" som standard blinkede
+  // appen paa engelsk hver gang den blev aabnet.
+  const [lang, setLang] = useState(() => localStorage.getItem("wl_lang") || "da");
   const tr = T[lang];
 
   useEffect(() => { localStorage.setItem("wl_lang", lang); }, [lang]);
@@ -1813,12 +2064,15 @@ useEffect(() => {
     }
   }, [instances]);
 
+  // Returnerer true/false. Afslutningsflowet er nødt til at kunne se om det gik godt:
+  // før returnerede funktionen ingenting, og et lydløst afbrud — fx når en planlægger
+  // kigger i en kollegas plan — endte i en kvittering på noget der aldrig blev gemt.
   async function logMinutes(taskId, minutes, note = null) {
-    if (viewingOther) return;
+    if (viewingOther) return false;
     const m = Number(minutes);
-    if (!employee || !m || m <= 0) return;
+    if (!employee || !m || m <= 0) return false;
     const task = instances.find((t) => t.id === taskId);
-    if (!task) return;
+    if (!task) return false;
     // Atomar tilføjelse i databasen. Tidligere blev hele time_log-arrayet læst,
     // udvidet og skrevet tilbage — loggede to medarbejdere tid på samme opgave
     // samtidig, forsvandt den enes registrering sporløst.
@@ -1827,14 +2081,15 @@ useEffect(() => {
     });
     if (error) {
       console.error("append_time_log:", error.message);
-      alert("Kunne ikke gemme tiden — prøv igen.");
-      return;
+      return false;
     }
     setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, timeLog: newLog, time_log: newLog } : t));
+    return true;
   }
 
+  // Returnerer ogsaa true/false, af samme grund som logMinutes.
   async function setStatus(taskId, done) {
-    if (viewingOther) return;
+    if (viewingOther) return false;
     // Afslutning er nu PR. MEDARBEJDER, ikke fælles for hele opgaven — ellers
     // ville én medarbejders "udført" lukke opgaven for de andre tilknyttede
     // medarbejdere, så de ikke længere kunne registrere tid eller afslutte
@@ -1846,8 +2101,7 @@ useEffect(() => {
     });
     if (error) {
       console.error("setStatus:", error.message);
-      alert("Kunne ikke opdatere status — prøv igen.");
-      return;
+      return false;
     }
     setInstances((prev) => prev.map((t) => t.id === taskId
       ? {
@@ -1861,6 +2115,7 @@ useEffect(() => {
           completedByEmployee: data.completed_by_employee,
         }
       : t));
+    return true;
   }
 
   async function toggleChecklistItem(taskId, itemId) {
@@ -2143,9 +2398,12 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
         />
       )}
 
-      {/* Task modal */}
+      {/* Task modal. key paa opgavens id tvinger en frisk komponent pr. opgave — uden
+          den genbruger React samme instans, og tilstande som "melding sendt" eller et
+          halvt udfyldt afslutningsflow ville følge med over på næste opgave. */}
       {openTask && (
         <TaskModal
+          key={openTask.id}
           task={instances.find((t) => t.id === openTask.id) || openTask}
           employee={employee}
           lang={lang}
@@ -2185,7 +2443,6 @@ const s = {
   headerIcon: { width:34, height:34, borderRadius:8, objectFit:"cover" },
   headerTitle: { fontWeight:700, fontSize:15, color:"#fff" },
   headerSub: { fontSize:11, color:"#94A3B8" },
-  empName: { fontSize:13, fontWeight:600, color:"#E2E8F0" },
   signOutBtn: { border:"none", background:"transparent", color:"#64748B", cursor:"pointer", padding:4, display:"flex", alignItems:"center" },
 
   profilePanel: { background:"#fff", borderBottom:"1px solid #F1F5F9", padding:"20px 16px 16px", display:"flex", flexDirection:"column", gap:16, boxShadow:"0 4px 16px rgba(0,0,0,0.08)" },
@@ -2263,7 +2520,6 @@ const s = {
   timeBarFill: { height:"100%", background:"#D6247A", borderRadius:99, transition:"width 0.3s" },
   timeMeta: { display:"flex", gap:6, fontSize:13, fontWeight:600, color:"#111111" },
   timeMeta2: { fontSize:12, color:"#94A3B8", marginTop:2 },
-  timeInputRow: { display:"flex", gap:8 },
   // Advarsel + begrundelsesfelt naar registreret tid overskrider planlagt tid
   overrunBox: { background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:10, padding:"12px 14px", marginBottom:10 },
   overrunTitle: { fontSize:14, fontWeight:700, color:"#92400E", marginBottom:4 },
@@ -2273,8 +2529,6 @@ const s = {
   overrunError: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:6 },
 
   // Kommentar og billeder
-  notatHint: { fontSize:13, color:"#64748B", lineHeight:1.45, marginBottom:10 },
-  notatTom: { fontSize:13, color:"#94A3B8", fontStyle:"italic", marginBottom:10 },
   notatKort: { background:"#F8FAFC", border:"1px solid #F1F5F9", borderRadius:10, padding:"10px 12px", marginBottom:8 },
   notatTid: { fontSize:11, fontWeight:700, color:"#94A3B8", marginBottom:4, display:"flex", alignItems:"center", gap:6 },
   notatArt: { background:"#FEE2E2", color:"#B91C1C", borderRadius:999, padding:"1px 8px", fontSize:10, fontWeight:800 },
@@ -2292,19 +2546,72 @@ const s = {
   fjernFoto: { position:"absolute", top:-6, right:-6, width:20, height:20, borderRadius:999, border:"none",
     background:"#111", color:"#fff", fontSize:14, lineHeight:"18px", cursor:"pointer", padding:0, fontFamily:"inherit" },
   fotoTaeller: { fontSize:11, color:"#94A3B8", marginTop:5, textAlign:"right" },
+
+  // Afslut opgave
+  afslutTop: { background:"#111", color:"#fff", padding:"11px 14px", fontSize:13, display:"flex",
+    alignItems:"center", justifyContent:"space-between", flexShrink:0 },
+  afslutTilbage: { border:"none", background:"none", color:"#fff", fontSize:13, display:"flex",
+    alignItems:"center", gap:4, cursor:"pointer", padding:0, fontFamily:"inherit" },
+  fremdriftSpor: { height:4, background:"#E2E8F0", flexShrink:0 },
+  fremdriftFyld: { height:4, background:"#D6247A", transition:"width 160ms ease-out" },
+  // Bunden er en fast bjaelke, saa den handling der foerer videre altid er synlig.
+  // Foer laa afslut-knappen nederst efter alt indhold, og paa en opgave med en lang
+  // tjekliste skulle man scrolle forbi hele skaermen for at komme til den.
+  afslutBund: { borderTop:"1px solid #F1F5F9", padding:"12px 16px 26px", background:"#fff", flexShrink:0 },
+  trinSpoergsmaal: { fontSize:19, fontWeight:600, color:"#111111", lineHeight:1.35 },
+  trinHjaelp: { fontSize:14, color:"#64748B", lineHeight:1.5, marginTop:6 },
+  trinFod: { fontSize:12.5, color:"#94A3B8", marginTop:12, textAlign:"center", lineHeight:1.5 },
+  trinSpring: { fontSize:13.5, color:"#64748B", textAlign:"center", marginTop:12, cursor:"pointer",
+    textDecoration:"underline", padding:"6px 0" },
+  springBtn: { width:"100%", border:"none", background:"none", fontSize:13.5, color:"#64748B",
+    textDecoration:"underline", padding:"10px 0", marginTop:6, cursor:"pointer", fontFamily:"inherit" },
+  trinAllerede: { fontSize:13, color:"#9C1B5D", background:"#FFF6FA", borderRadius:8,
+    padding:"8px 11px", marginTop:10, lineHeight:1.45 },
+  storTid: { fontSize:44, fontWeight:600, color:"#111111", lineHeight:1.05 },
+  storTidEnhed: { fontSize:22, fontWeight:500, color:"#94A3B8" },
+  maerkeOk: { display:"inline-block", background:"#ECFDF5", color:"#166534", borderRadius:99, padding:"4px 13px", fontSize:12.5, fontWeight:600, marginTop:9 },
+  maerkeOver: { display:"inline-block", background:"#FFFBEB", color:"#92400E", borderRadius:99, padding:"4px 13px", fontSize:12.5, fontWeight:600, marginTop:9 },
+  maerkeUnder: { display:"inline-block", background:"#F1F5F9", color:"#475569", borderRadius:99, padding:"4px 13px", fontSize:12.5, fontWeight:600, marginTop:9 },
+  stepperLabel: { fontSize:12.5, color:"#64748B", marginBottom:6 },
+  stepperRaekke: { display:"flex", alignItems:"center", gap:10 },
+  // 60 px hoeje knapper. Maalgruppen staar ofte med vaade eller behandskede haender,
+  // og den gamle rullevaelger havde en trykflade paa under 20 px.
+  stepperBtn: { width:64, height:58, border:"1.5px solid #E2E8F0", borderRadius:12, background:"#fff",
+    fontSize:28, fontWeight:500, color:"#111111", cursor:"pointer", flexShrink:0, fontFamily:"inherit",
+    display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 },
+  stepperTal: { flex:1, textAlign:"center", fontSize:26, fontWeight:600, color:"#111111" },
+  primaerStor: { width:"100%", padding:"16px 0", borderRadius:12, border:"none", background:"#D6247A",
+    color:"#fff", fontWeight:700, fontSize:16, cursor:"pointer", fontFamily:"inherit" },
+  sekundaerStor: { width:"100%", padding:"15px 0", borderRadius:12, border:"1.5px solid #E2E8F0",
+    background:"#fff", color:"#111111", fontWeight:600, fontSize:15, cursor:"pointer", fontFamily:"inherit" },
+  afslutBtn: { width:"100%", padding:"16px 0", borderRadius:12, border:"none", background:"#16A34A",
+    color:"#fff", fontWeight:700, fontSize:16, cursor:"pointer", fontFamily:"inherit" },
+  nexusBtn: { width:"100%", padding:"15px 0", borderRadius:12, border:"none", background:"#4F46E5",
+    color:"#fff", fontWeight:700, fontSize:15, cursor:"pointer", marginTop:14, fontFamily:"inherit" },
+  nexusTjek: { width:"100%", display:"flex", alignItems:"center", gap:12, textAlign:"left",
+    padding:"15px 14px", borderRadius:12, border:"1.5px solid #E2E8F0", background:"#fff",
+    fontSize:15, color:"#111111", cursor:"pointer", marginTop:10, fontFamily:"inherit" },
+  nexusTjekAktiv: { width:"100%", display:"flex", alignItems:"center", gap:12, textAlign:"left",
+    padding:"15px 14px", borderRadius:12, border:"2px solid #4F46E5", background:"#EEF2FF",
+    fontSize:15, fontWeight:600, color:"#312E81", cursor:"pointer", marginTop:10, fontFamily:"inherit" },
+  tjekFirkant: { width:26, height:26, borderRadius:7, border:"2px solid #CBD5E1", flexShrink:0 },
+  tjekFirkantAktiv: { width:26, height:26, borderRadius:7, background:"#4F46E5", flexShrink:0,
+    display:"flex", alignItems:"center", justifyContent:"center" },
+  kvitteringCirkel: { width:64, height:64, borderRadius:"50%", background:"#ECFDF5", margin:"0 auto",
+    display:"flex", alignItems:"center", justifyContent:"center" },
+  kvitteringTitel: { fontSize:19, fontWeight:600, color:"#111111", marginTop:14 },
+  kvitteringKunde: { fontSize:14, color:"#64748B", marginTop:4 },
+  kvitteringKort: { background:"#F8FAFC", borderRadius:12, padding:"6px 14px", marginTop:16, textAlign:"left" },
+  kvitteringRaekke: { display:"flex", justifyContent:"space-between", alignItems:"center",
+    fontSize:14.5, color:"#111111", padding:"11px 0", borderBottom:"1px solid #F1F5F9" },
+  kvitteringNote: { fontSize:12.5, color:"#94A3B8", marginTop:14, lineHeight:1.5 },
   notatSlettet: { fontSize:11, color:"#94A3B8", fontStyle:"italic", marginTop:6 },
   notatInput: { width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:"1.5px solid #E2E8F0",
     fontSize:15, fontFamily:"inherit", resize:"vertical", outline:"none", background:"#fff", color:"#111111" },
-  notatValgte: { fontSize:13, color:"#0F766E", background:"#F0FDFA", border:"1px solid #99F6E4", borderRadius:8,
-    padding:"7px 10px", marginTop:8, display:"flex", alignItems:"center", justifyContent:"space-between" },
   notatRyd: { background:"none", border:"none", color:"#0F766E", fontSize:13, fontWeight:700, textDecoration:"underline", cursor:"pointer" },
   notatFejl: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:8 },
   notatFotoBtn: { flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff",
     fontSize:15, fontWeight:600, color:"#111111", cursor:"pointer", fontFamily:"inherit" },
-  notatGemBtn: { flex:1, padding:"12px", borderRadius:10, border:"none", background:"#D6247A",
-    fontSize:15, fontWeight:700, color:"#fff", cursor:"pointer", fontFamily:"inherit" },
-  timeInput: { flex:1, padding:"13px 14px", borderRadius:10, border:"1.5px solid #E2E8F0", fontSize:15, color:"#111111", background:"#fff" },
-  timeLogBtn: { padding:"13px 18px", borderRadius:10, border:"none", background:"#111111", color:"#fff", fontWeight:700, fontSize:14, cursor:"pointer", whiteSpace:"nowrap" },
   doneLarge: { width:"100%", padding:"16px 0", borderRadius:14, border:"2px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:700, fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
   doneActiveLarge: { width:"100%", padding:"16px 0", borderRadius:14, border:"2px solid #22C55E", background:"#ECFDF5", color:"#16A34A", fontWeight:700, fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
 };
