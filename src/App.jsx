@@ -77,6 +77,10 @@ const T = {
     notesHint: "Skriv til kontoret, og tag billeder hvis noget skal dokumenteres — f.eks. særligt beskidt arbejde eller en skade.",
     notesPlaceholder: "Hvad skal kontoret vide?",
     notesAddPhoto: "Tag billede",
+    photoCamera: "Tag billede",
+    photoLibrary: "Fra galleri",
+    photoCount: "billeder klar",
+    photoMax: "Du kan sende 10 billeder ad gangen",
     notesSend: "Gem",
     notesSending: "Gemmer…",
     notesPhotoProgress: "Sender billede",
@@ -160,6 +164,10 @@ const T = {
     notesHint: "Write to the office, and take photos if something needs documenting — for example unusually dirty work or damage.",
     notesPlaceholder: "What should the office know?",
     notesAddPhoto: "Take photo",
+    photoCamera: "Take photo",
+    photoLibrary: "From gallery",
+    photoCount: "photos ready",
+    photoMax: "You can send 10 photos at a time",
     notesSend: "Save",
     notesSending: "Saving…",
     notesPhotoProgress: "Sending photo",
@@ -406,6 +414,69 @@ function nytId(praefiks) {
   return praefiks + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// To knapper og to skjulte felter, fordi det ene udelukker det andet:
+// capture="environment" aabner kameraet med det samme, men slaar samtidig multivalg
+// OG adgangen til kamerarullen fra — det gaelder baade iPhone og Android. Uden
+// capture faar man systemets vaelger, hvor flere billeder kan markeres, men saa er
+// der et ekstra tryk for at fotografere. Derfor begge dele, hver for sig.
+function FotoVaelger({ filer, setFiler, farve, tr }) {
+  const kamera = useRef(null);
+  const galleri = useRef(null);
+
+  // Billeder laegges oveni de allerede valgte. Ellers ville det andet billede
+  // erstatte det foerste, og man kunne aldrig faa mere end ét med fra kameraet.
+  function tilfoej(nye) {
+    setFiler((prev) => [...prev, ...Array.from(nye || [])].slice(0, MAKS_FOTOS));
+  }
+
+  // Miniaturer af det der ligger klar. Object-URL'erne frigives naar listen aendrer
+  // sig — ellers holder browseren fat i hvert eneste billede resten af besoeget.
+  const [previews, setPreviews] = useState([]);
+  useEffect(() => {
+    const urls = filer.map((f) => URL.createObjectURL(f));
+    setPreviews(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [filer]);
+
+  const fuldt = filer.length >= MAKS_FOTOS;
+  const knap = { ...s.notatFotoBtn, borderColor: farve || "#E2E8F0", color: farve || "#111111" };
+
+  return (
+    <div>
+      <input ref={kamera} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+        onChange={(e) => { tilfoej(e.target.files); e.target.value = ""; }} />
+      <input ref={galleri} type="file" accept="image/*" multiple style={{ display: "none" }}
+        onChange={(e) => { tilfoej(e.target.files); e.target.value = ""; }} />
+
+      {filer.length > 0 && (
+        <div style={s.valgteRaekke}>
+          {previews.map((url, i) => (
+            <div key={url} style={{ position: "relative", flexShrink: 0 }}>
+              <img src={url} alt="" style={s.valgtFoto} />
+              <button type="button" style={s.fjernFoto} title="Fjern"
+                onClick={() => setFiler((prev) => prev.filter((_, j) => j !== i))}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" style={{ ...knap, opacity: fuldt ? 0.45 : 1 }} disabled={fuldt}
+          onClick={() => kamera.current?.click()}>
+          📷 {tr.photoCamera}
+        </button>
+        <button type="button" style={{ ...knap, opacity: fuldt ? 0.45 : 1 }} disabled={fuldt}
+          onClick={() => galleri.current?.click()}>
+          🖼️ {tr.photoLibrary}
+        </button>
+      </div>
+      <div style={s.fotoTaeller}>
+        {fuldt ? tr.photoMax : `${filer.length}/${MAKS_FOTOS} ${tr.photoCount}`}
+      </div>
+    </div>
+  );
+}
+
 function travelKey(a, b) { return [a, b].sort().join(" || "); }
 function getTravelMinutes(addrA, addrB, settings) {
   if (!addrA || !addrB || addrA === addrB) return 0;
@@ -473,7 +544,10 @@ const HELP_DA = [
   { t: "Kommentar og billeder", p: [
     "På alle opgaver kan du skrive en kommentar til kontoret og tage billeder. Du finder det inde i opgaven under «Kommentar og billeder».",
     "Brug det når noget skal dokumenteres: der var meget mere beskidt end normalt, noget var i stykker, eller kunden har bedt om noget ekstra.",
-    "Tryk «Tag billede» for at bruge kameraet. Du kan tage op til ti billeder ad gangen. Skriv gerne en linje om hvad man ser.",
+    "Der er to knapper. «Tag billede» åbner kameraet og tager ét billede ad gangen — tryk bare igen for det næste, de lægges oveni hinanden.",
+    "«Fra galleri» åbner telefonens billeder, og der kan du markere flere på én gang. Det virker både på iPhone og Android.",
+    "Du kan have op til ti billeder klar. Tælleren under knapperne viser hvor mange du har. Fortryder du et, så tryk × i hjørnet af det.",
+    "Skriv gerne en linje om hvad man ser — et billede uden tekst er svært for kontoret at bruge.",
     "Sender du mange billeder, tæller knappen dem op undervejs — vent til den er færdig, og tryk ikke igen.",
     "Billederne bliver mindre af sig selv, før de sendes, så det virker også på dårligt mobilnet.",
     "Kontoret kan se det hele, når de laver fakturaen. Billederne slettes automatisk efter 12 måneder."] },
@@ -525,7 +599,10 @@ const HELP_EN = [
   { t: "Comments and photos", p: [
     "On every task you can write a comment to the office and take photos. You find it inside the task under «Comments and photos».",
     "Use it when something needs documenting: it was far dirtier than usual, something was broken, or the customer asked for extra work.",
-    "Tap «Take photo» to use the camera. You can add up to ten photos at a time. Write a line about what can be seen.",
+    "There are two buttons. «Take photo» opens the camera and takes one photo at a time — just tap again for the next one, they add up.",
+    "«From gallery» opens your phone's photos, where you can select several at once. This works on both iPhone and Android.",
+    "You can have up to ten photos ready. The counter below the buttons shows how many. To drop one, tap the × in its corner.",
+    "Write a line about what can be seen — a photo without text is hard for the office to use.",
     "If you send many photos, the button counts them as it goes — wait until it finishes and do not tap again.",
     "The photos are made smaller before they are sent, so it works on a poor mobile connection too.",
     "The office sees all of it when they prepare the invoice. Photos are deleted automatically after 12 months."] },
@@ -945,7 +1022,6 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const [rsFiler, setRsFiler] = React.useState([]);
   const [rsGemmer, setRsGemmer] = React.useState(false);
   const [rsSendt, setRsSendt] = React.useState(null);
-  const rsFilInput = useRef(null);
 
   async function sendOnskeOmNyTid() {
     const forgaeves = rsArt === "forgaeves";
@@ -1046,7 +1122,6 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   // "Gemmer…" i et halvt minut ved ti billeder, og saa trykker folk igen.
   const [fotoFremdrift, setFotoFremdrift] = useState(null);
   const [fotoUrls, setFotoUrls] = useState({});
-  const filInput = useRef(null);
 
   useEffect(() => {
     if (!task) return;
@@ -1123,7 +1198,6 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
       }
       setNotatTekst("");
       setNotatFiler([]);
-      if (filInput.current) filInput.current.value = "";
     } catch (e) {
       setNotatFejl(e?.message || String(e));
     }
@@ -1375,32 +1449,13 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
               placeholder={tr.notesPlaceholder}
               style={s.notatInput} />
 
-            {/* capture="environment" aabner bagkameraet direkte i stedet for et
-                filvaelger-menupunkt. Medarbejderen staar med telefonen i haanden. */}
-            <input
-              ref={filInput}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              style={{ display: "none" }}
-              onChange={(e) => setNotatFiler(Array.from(e.target.files || []).slice(0, MAKS_FOTOS))} />
+            <div style={{ marginTop: 8 }}>
+              <FotoVaelger filer={notatFiler} setFiler={setNotatFiler} tr={tr} />
+            </div>
 
-            {notatFiler.length > 0 && (
-              <div style={s.notatValgte}>
-                {notatFiler.length} {notatFiler.length === 1 ? "billede" : "billeder"} klar
-                <button type="button" style={s.notatRyd}
-                  onClick={() => { setNotatFiler([]); if (filInput.current) filInput.current.value = ""; }}>
-                  Fjern
-                </button>
-              </div>
-            )}
             {notatFejl && <div style={s.notatFejl}>{notatFejl}</div>}
 
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button type="button" style={s.notatFotoBtn} onClick={() => filInput.current?.click()}>
-                📷 {tr.notesAddPhoto}
-              </button>
               <button
                 type="button"
                 disabled={notatGemmer || (!notatTekst.trim() && notatFiler.length === 0)}
@@ -1446,14 +1501,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#991B1B" }}>{tr.reportNewDateOptional}</label>
                   <input type="date" value={rsDato} onChange={(e) => setRsDato(e.target.value)}
                     style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCA5A5", margin: "4px 0 10px" }} />
-                  <input ref={rsFilInput} type="file" accept="image/*" capture="environment" multiple
-                    style={{ display: "none" }}
-                    onChange={(e) => setRsFiler(Array.from(e.target.files || []).slice(0, MAKS_FOTOS))} />
-                  <button type="button"
-                    style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px solid #FCA5A5", background: "#fff", fontSize: 15, fontWeight: 600, color: "#991B1B", cursor: "pointer", marginBottom: 10, fontFamily: "inherit" }}
-                    onClick={() => rsFilInput.current?.click()}>
-                    📷 {rsFiler.length > 0 ? `${rsFiler.length} ${rsFiler.length === 1 ? "billede" : "billeder"} valgt` : tr.notesAddPhoto}
-                  </button>
+                  <div style={{ marginBottom: 10 }}>
+                    <FotoVaelger filer={rsFiler} setFiler={setRsFiler} farve="#991B1B" tr={tr} />
+                  </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", fontSize: 15, cursor: "pointer" }}
                       onClick={() => { setRsArt(null); setRsFiler([]); }}>Fortryd</button>
@@ -2229,10 +2279,19 @@ const s = {
   notatTid: { fontSize:11, fontWeight:700, color:"#94A3B8", marginBottom:4, display:"flex", alignItems:"center", gap:6 },
   notatArt: { background:"#FEE2E2", color:"#B91C1C", borderRadius:999, padding:"1px 8px", fontSize:10, fontWeight:800 },
   notatTekst: { fontSize:14, color:"#111111", lineHeight:1.45, whiteSpace:"pre-wrap" },
-  notatFotoRaekke: { display:"flex", gap:6, flexWrap:"wrap", marginTop:8 },
+  // Én linje der kan skubbes til siden, frem for ombrydning. Ti billeder i en
+  // ombrudt raekke ville skubbe tidsregistreringen langt ned paa en telefonskaerm.
+  notatFotoRaekke: { display:"flex", gap:6, marginTop:8, overflowX:"auto", paddingBottom:4,
+    WebkitOverflowScrolling:"touch", scrollbarWidth:"thin" },
   // Faste kvadrater. Billeder fra en telefon har vidt forskellige formater, og uden
   // en fast stoerrelse hopper hele opgavevisningen hver gang et billede er laest ind.
-  notatFoto: { width:72, height:72, objectFit:"cover", borderRadius:8, display:"block", border:"1px solid #E2E8F0" },
+  notatFoto: { width:64, height:64, objectFit:"cover", borderRadius:8, display:"block", border:"1px solid #E2E8F0", flexShrink:0 },
+  valgteRaekke: { display:"flex", gap:6, marginBottom:8, overflowX:"auto", paddingBottom:4,
+    WebkitOverflowScrolling:"touch", scrollbarWidth:"thin" },
+  valgtFoto: { width:56, height:56, objectFit:"cover", borderRadius:8, display:"block", border:"1px solid #99F6E4" },
+  fjernFoto: { position:"absolute", top:-6, right:-6, width:20, height:20, borderRadius:999, border:"none",
+    background:"#111", color:"#fff", fontSize:14, lineHeight:"18px", cursor:"pointer", padding:0, fontFamily:"inherit" },
+  fotoTaeller: { fontSize:11, color:"#94A3B8", marginTop:5, textAlign:"right" },
   notatSlettet: { fontSize:11, color:"#94A3B8", fontStyle:"italic", marginTop:6 },
   notatInput: { width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:"1.5px solid #E2E8F0",
     fontSize:15, fontFamily:"inherit", resize:"vertical", outline:"none", background:"#fff", color:"#111111" },
