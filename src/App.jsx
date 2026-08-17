@@ -73,6 +73,22 @@ const T = {
     markNotDone: "Marker som ikke udført",
     status: { planlagt: "Planlagt", i_gang: "I gang", udført: "Udført" },
     taskVideo: "Se video",
+    notesTitle: "Kommentar og billeder",
+    notesHint: "Skriv til kontoret, og tag billeder hvis noget skal dokumenteres — f.eks. særligt beskidt arbejde eller en skade.",
+    notesPlaceholder: "Hvad skal kontoret vide?",
+    notesAddPhoto: "Tag billede",
+    notesSend: "Gem",
+    notesSending: "Gemmer…",
+    notesEmpty: "Ingen kommentarer endnu.",
+    notesPhotosDeleted: "Billederne er slettet efter 12 måneder.",
+    reportTitle: "Meld til kontoret",
+    reportNewTime: "Foreslå ny tid",
+    reportNoEntry: "Kunne ikke komme ind",
+    reportNoEntryHint: "Kontoret afgør om kunden skal betale alligevel. Tag gerne et billede som dokumentation.",
+    reportNoEntryWhy: "Hvad skete der?",
+    reportNoEntryPlaceholder: "F.eks. ingen svarede, og nøglen passede ikke",
+    reportNewDateOptional: "Ny dato (valgfrit)",
+    reportSentNoEntry: "Kontoret har fået besked. De afgør om opgaven skal faktureres.",
   },
   en: {
     appName: "Worklist",
@@ -139,6 +155,22 @@ const T = {
     markNotDone: "Mark as not completed",
     status: { planlagt: "Planned", i_gang: "In progress", udført: "Completed" },
     taskVideo: "Watch video",
+    notesTitle: "Comments and photos",
+    notesHint: "Write to the office, and take photos if something needs documenting — for example unusually dirty work or damage.",
+    notesPlaceholder: "What should the office know?",
+    notesAddPhoto: "Take photo",
+    notesSend: "Save",
+    notesSending: "Saving…",
+    notesEmpty: "No comments yet.",
+    notesPhotosDeleted: "Photos were deleted after 12 months.",
+    reportTitle: "Report to the office",
+    reportNewTime: "Suggest a new time",
+    reportNoEntry: "Could not get in",
+    reportNoEntryHint: "The office decides whether the customer still pays. Please add a photo as documentation.",
+    reportNoEntryWhy: "What happened?",
+    reportNoEntryPlaceholder: "E.g. nobody answered and the key did not fit",
+    reportNewDateOptional: "New date (optional)",
+    reportSentNoEntry: "The office has been notified. They decide whether the task is invoiced.",
   },
 };
 
@@ -301,6 +333,72 @@ function todayWorkdayKey() {
   if (k === "Sun") return "Mon";
   return k;
 }
+// ── Opgavefotos ──────────────────────────────────────────────────────────────
+// Et telefonbillede fylder 3-5 MB raat. Medarbejderne staar ude hos kunderne paa
+// mobilnet, og en upload paa 4 MB kan tage et halvt minut i Jammerbugt — laenge nok
+// til at man giver op og lader vaere med at dokumentere noget. Derfor skaleres og
+// komprimeres billedet i browseren foerst; ~200 KB er rigeligt til at vise en plet
+// paa et gulv eller en laast doer.
+const FOTO_MAKS_KANT = 1600;
+const FOTO_KVALITET = 0.72;
+
+function komprimerBillede(fil) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(fil);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const skala = Math.min(1, FOTO_MAKS_KANT / Math.max(img.width, img.height));
+      const bredde = Math.round(img.width * skala);
+      const hoejde = Math.round(img.height * skala);
+      const canvas = document.createElement("canvas");
+      canvas.width = bredde;
+      canvas.height = hoejde;
+      canvas.getContext("2d").drawImage(img, 0, 0, bredde, hoejde);
+      // JPEG frem for PNG: et foto af et rum komprimerer 10 gange bedre som JPEG,
+      // og vi har ingen brug for skarpe kanter eller gennemsigtighed.
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Kunne ikke behandle billedet"))),
+        "image/jpeg",
+        FOTO_KVALITET,
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Filen er ikke et billede")); };
+    img.src = url;
+  });
+}
+
+// Stien er altid <opgave-id>/<notat-id>-<nr>.jpg. Adgangspolitikken i databasen
+// laeser opgavens id ud af foerste mappeniveau, saa moenstret maa ikke aendres
+// uden at politikken paa storage.objects aendres samtidig.
+async function uploadOpgavefotos(klient, opgaveId, notatId, filer) {
+  const stier = [];
+  for (let i = 0; i < filer.length; i++) {
+    const blob = await komprimerBillede(filer[i]);
+    const sti = `${opgaveId}/${notatId}-${i}.jpg`;
+    const { error } = await klient.storage.from("opgavefotos").upload(sti, blob, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    stier.push(sti);
+  }
+  return stier;
+}
+
+// Bucket'en er privat, fordi billederne er fra kundernes hjem. Derfor kan der ikke
+// gemmes en fast URL noget sted — den skal signeres hver gang og udloeber af sig selv.
+async function signeredeFotoUrls(klient, stier) {
+  if (!stier || stier.length === 0) return [];
+  const { data, error } = await klient.storage.from("opgavefotos").createSignedUrls(stier, 3600);
+  if (error) return [];
+  return (data || []).map((d) => d.signedUrl).filter(Boolean);
+}
+
+function nytId(praefiks) {
+  return praefiks + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
 function travelKey(a, b) { return [a, b].sort().join(" || "); }
 function getTravelMinutes(addrA, addrB, settings) {
   if (!addrA || !addrB || addrA === addrB) return 0;
@@ -359,6 +457,18 @@ const HELP_DA = [
     "Opgaven bliver stående hos dig, indtil kontoret har flyttet den. Den forsvinder altså ikke, fordi du har sendt ønsket.",
     "Kontoret får besked med det samme. Godkender de det, flytter opgaven sig i din plan.",
     "Kan det ikke lade sig gøre, får du en mail med begrundelsen, og så skal du ringe til kunden igen."] },
+  { t: "Hvis du ikke kan komme ind", p: [
+    "Kunne du ikke komme ind — ingen svarede, nøglen passede ikke, eller døren var låst — så meld det med det samme.",
+    "Åbn opgaven, tryk «Kunne ikke komme ind», skriv hvad der skete, og tag gerne et billede af fx døren eller nøgleboksen.",
+    "Kan du allerede nu se hvornår du kan komme igen, kan du foreslå en ny dato. Det er frivilligt.",
+    "Kontoret får besked med det samme og afgør, om kunden skal betale for turen alligevel. Det er ikke noget du skal tage stilling til.",
+    "Registrér ikke tid på opgaven som om den var udført. Skriv i stedet hvad der skete."] },
+  { t: "Kommentar og billeder", p: [
+    "På alle opgaver kan du skrive en kommentar til kontoret og tage billeder. Du finder det inde i opgaven under «Kommentar og billeder».",
+    "Brug det når noget skal dokumenteres: der var meget mere beskidt end normalt, noget var i stykker, eller kunden har bedt om noget ekstra.",
+    "Tryk «Tag billede» for at bruge kameraet. Du kan tage op til fem billeder ad gangen. Skriv gerne en linje om hvad man ser.",
+    "Billederne bliver mindre af sig selv, før de sendes, så det virker også på dårligt mobilnet.",
+    "Kontoret kan se det hele, når de laver fakturaen. Billederne slettes automatisk efter 12 måneder."] },
   { t: "Sådan finder du dine opgaver", p: [
       "Når du åbner appen, ser du denne uge. Øverst vælger du dag.",
       "Tallet i den lille boble på dagen viser, hvor mange opgaver du har.",
@@ -398,6 +508,18 @@ const HELP_EN = [
     "The task stays with you until the office has moved it. Sending the request does not remove it.",
     "The office is notified straight away. If they approve, the task moves in your plan.",
     "If it is not possible, you get an email explaining why, and you need to call the customer again."] },
+  { t: "If you cannot get in", p: [
+    "If you could not get in — nobody answered, the key did not fit, or the door was locked — report it straight away.",
+    "Open the task, tap «Could not get in», write what happened, and please take a photo of the door or the key box.",
+    "If you already know when you can come back, you can suggest a new date. That is optional.",
+    "The office is notified immediately and decides whether the customer still pays for the trip. That is not for you to judge.",
+    "Do not log time on the task as if it had been done. Write what happened instead."] },
+  { t: "Comments and photos", p: [
+    "On every task you can write a comment to the office and take photos. You find it inside the task under «Comments and photos».",
+    "Use it when something needs documenting: it was far dirtier than usual, something was broken, or the customer asked for extra work.",
+    "Tap «Take photo» to use the camera. You can add up to five photos at a time. Write a line about what can be seen.",
+    "The photos are made smaller before they are sent, so it works on a poor mobile connection too.",
+    "The office sees all of it when they prepare the invoice. Photos are deleted automatically after 12 months."] },
   { t: "Finding your jobs", p: [
       "When you open the app you see this week. Pick a day at the top.",
       "The small bubble shows how many jobs you have that day.",
@@ -804,43 +926,91 @@ function CompletionConfirm({ task, employee, usedProducts, minutes, lang, onConf
 function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
   // Oenske om ny tid. Medarbejderen aftaler selv med kunden, men aendringen skal
   // planlaegges af backoffice — derfor sendes et oenske, ikke en aendring.
-  const [rsAaben, setRsAaben] = React.useState(false);
+  // rsArt afgoer hvad medarbejderen melder: en aftalt ny tid, eller at hun ikke kunne
+  // komme ind. Begge dele gaar gennem samme flow, fordi kontoret skal traeffe
+  // beslutningen ét sted — ogsaa beslutningen om kunden skal betale alligevel.
+  const [rsArt, setRsArt] = React.useState(null);
   const [rsDato, setRsDato] = React.useState("");
   const [rsTid, setRsTid] = React.useState("");
   const [rsGrund, setRsGrund] = React.useState("");
+  const [rsFiler, setRsFiler] = React.useState([]);
   const [rsGemmer, setRsGemmer] = React.useState(false);
-  const [rsSendt, setRsSendt] = React.useState(false);
+  const [rsSendt, setRsSendt] = React.useState(null);
+  const rsFilInput = useRef(null);
+
   async function sendOnskeOmNyTid() {
-    if (!rsDato || !rsGrund.trim()) return;
+    const forgaeves = rsArt === "forgaeves";
+    // Ved forgaeves besoeg er en ny dato frivillig — man ved ikke altid hvornaar
+    // man kan komme til igen, og meldingen maa ikke braende inde af den grund.
+    if (!rsGrund.trim() || (!forgaeves && !rsDato)) return;
     setRsGemmer(true);
     try {
-      const id = "rr" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      // Notatet foerst: det er dét der baerer billederne, og kontoret skal kunne se
+      // dokumentationen ved siden af opgaven — ogsaa efter oensket er lukket.
+      let notatId = null;
+      let notatStier = [];
+      if (forgaeves) {
+        const gemt = await gemNotat("forgaeves", rsGrund, rsFiler);
+        notatId = gemt.notatId;
+        notatStier = gemt.stier;
+      }
+      const id = nytId("rr");
       const { error } = await supabaseClient.from("reschedule_requests").insert({
         id,
         instance_id: task.id,
         employee_id: employee?.id || null,
-        requested_date: rsDato,
+        kind: forgaeves ? "forgaeves" : "ny_tid",
+        note_id: notatId,
+        requested_date: rsDato || null,
         requested_time: rsTid || null,
         reason: rsGrund.trim(),
         old_year: task.year, old_week: task.week, old_day: task.day,
         old_time: task.scheduled_time || null,
       });
-      if (error) { alert("Kunne ikke sende ønsket: " + error.message); setRsGemmer(false); return; }
+      if (error) { alert("Kunne ikke sende beskeden: " + error.message); setRsGemmer(false); return; }
       // Backoffice skal vide det med det samme — de kigger ikke nødvendigvis i appen.
       const { data: adm } = await supabaseClient.from("employees").select("name,app_email").eq("is_admin", true).not("app_email", "is", null);
-      const naar = rsDato + (rsTid ? " kl. " + rsTid : "");
+      const naar = rsDato ? rsDato + (rsTid ? " kl. " + rsTid : "") : "";
       for (const a of (adm || [])) {
         await supabaseClient.functions.invoke("send-email", { body: {
           email: a.app_email, name: a.name,
-          subject: "Ønske om ny tid: " + (task.title || "opgave"),
-          html: `<p><b>${employee?.name || "En medarbejder"}</b> har aftalt en ny tid med kunden og beder om at få opgaven flyttet.</p>` +
-                `<p><b>Opgave:</b> ${task.title || ""}<br/><b>Kunde:</b> ${task.customerName || ""}<br/>` +
-                `<b>Ønsket:</b> ${naar}</p><p><b>Begrundelse:</b><br/>${rsGrund.trim()}</p>` +
-                `<p>Åbn ugeplanen for at godkende eller afvise.</p>`,
+          subject: forgaeves
+            ? "Forgæves besøg: " + (task.title || "opgave")
+            : "Ønske om ny tid: " + (task.title || "opgave"),
+          html: forgaeves
+            ? `<p><b>${employee?.name || "En medarbejder"}</b> kunne ikke komme ind og fik ikke udført opgaven.</p>` +
+              `<p><b>Opgave:</b> ${task.title || ""}<br/><b>Kunde:</b> ${task.customerName || ""}</p>` +
+              `<p><b>Hvad skete der:</b><br/>${rsGrund.trim()}</p>` +
+              (rsFiler.length > 0 ? `<p>Der er vedhæftet ${rsFiler.length} billede(r) i planlægningsappen.</p>` : "") +
+              (naar ? `<p><b>Foreslået ny tid:</b> ${naar}</p>` : "") +
+              `<p>Åbn ugeplanen og afgør om opgaven skal flyttes, eller sættes til udført så den kan faktureres.</p>`
+            : `<p><b>${employee?.name || "En medarbejder"}</b> har aftalt en ny tid med kunden og beder om at få opgaven flyttet.</p>` +
+              `<p><b>Opgave:</b> ${task.title || ""}<br/><b>Kunde:</b> ${task.customerName || ""}<br/>` +
+              `<b>Ønsket:</b> ${naar}</p><p><b>Begrundelse:</b><br/>${rsGrund.trim()}</p>` +
+              `<p>Åbn ugeplanen for at godkende eller afvise.</p>`,
         }});
       }
-      setRsSendt(true); setRsAaben(false);
-    } catch (e) { alert("Kunne ikke sende ønsket: " + (e?.message || e)); }
+      if (forgaeves) {
+        // Notatet vises med det samme i listen ovenfor, saa medarbejderen kan se at
+        // billederne rent faktisk kom med.
+        setNoter((prev) => [{
+          id: notatId, instance_id: task.id, employee_id: employee?.id || null,
+          kind: "forgaeves", text: rsGrund.trim(), photos: notatStier,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
+        if (notatStier.length > 0) {
+          const urls = await signeredeFotoUrls(supabaseClient, notatStier);
+          setFotoUrls((prev) => {
+            const kort = { ...prev };
+            notatStier.forEach((sti, i) => { if (urls[i]) kort[sti] = urls[i]; });
+            return kort;
+          });
+        }
+      }
+      setRsSendt(forgaeves ? "forgaeves" : "ny_tid");
+      setRsArt(null);
+      setRsFiler([]);
+    } catch (e) { alert("Kunne ikke sende beskeden: " + (e?.message || e)); }
     setRsGemmer(false);
   }
   const tr = T[lang];
@@ -856,6 +1026,16 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const [overrunNote, setOverrunNote] = useState("");
   const [overrunError, setOverrunError] = useState(false);
 
+  // Kommentar og billeder. Kan bruges paa enhver opgave — baade til at dokumentere
+  // saerligt beskidt arbejde og til at forklare hvorfor noget ikke gik som planlagt.
+  const [noter, setNoter] = useState([]);
+  const [notatTekst, setNotatTekst] = useState("");
+  const [notatFiler, setNotatFiler] = useState([]);
+  const [notatGemmer, setNotatGemmer] = useState(false);
+  const [notatFejl, setNotatFejl] = useState("");
+  const [fotoUrls, setFotoUrls] = useState({});
+  const filInput = useRef(null);
+
   useEffect(() => {
     if (!task) return;
     if (lang === "da") { setTranslatedTask(null); return; }
@@ -865,6 +1045,77 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
       setTranslating(false);
     });
   }, [task?.id, lang]);
+
+  // Hent noterne paa opgaven, og signér billed-URL'erne med det samme. De udloeber
+  // efter en time, hvilket er rigeligt for en opgave man har aabnet paa telefonen.
+  useEffect(() => {
+    if (!task?.id || !supabaseClient) return;
+    let afbrudt = false;
+    (async () => {
+      const { data, error } = await supabaseClient
+        .from("task_notes").select("*").eq("instance_id", task.id)
+        .order("created_at", { ascending: false });
+      if (afbrudt || error) return;
+      setNoter(data || []);
+      const alleStier = (data || []).flatMap((n) => n.photos || []);
+      if (alleStier.length === 0) { setFotoUrls({}); return; }
+      const urls = await signeredeFotoUrls(supabaseClient, alleStier);
+      if (afbrudt) return;
+      const kort = {};
+      alleStier.forEach((sti, i) => { if (urls[i]) kort[sti] = urls[i]; });
+      setFotoUrls(kort);
+    })();
+    return () => { afbrudt = true; };
+  }, [task?.id, supabaseClient]);
+
+  // Gemmer notatet foerst og billederne bagefter. Rækkefølgen er med vilje: notatets
+  // id indgaar i filnavnet, og et notat uden billeder er stadig brugbart — mens et
+  // billede uden et notat ville vaere hjemloest.
+  async function gemNotat(art, tekst, filer) {
+    const notatId = nytId("tn");
+    const { error: insErr } = await supabaseClient.from("task_notes").insert({
+      id: notatId, instance_id: task.id, employee_id: employee?.id || null,
+      kind: art, text: (tekst || "").trim() || null, photos: [],
+    });
+    if (insErr) throw new Error(insErr.message);
+    let stier = [];
+    if (filer && filer.length > 0) {
+      stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, filer);
+      const { error: updErr } = await supabaseClient
+        .from("task_notes").update({ photos: stier }).eq("id", notatId);
+      if (updErr) throw new Error(updErr.message);
+    }
+    return { notatId, stier };
+  }
+
+  async function sendKommentar() {
+    if (!notatTekst.trim() && notatFiler.length === 0) return;
+    setNotatGemmer(true);
+    setNotatFejl("");
+    try {
+      const { notatId, stier } = await gemNotat("kommentar", notatTekst, notatFiler);
+      const nyt = {
+        id: notatId, instance_id: task.id, employee_id: employee?.id || null,
+        kind: "kommentar", text: notatTekst.trim() || null, photos: stier,
+        created_at: new Date().toISOString(),
+      };
+      setNoter((prev) => [nyt, ...prev]);
+      if (stier.length > 0) {
+        const urls = await signeredeFotoUrls(supabaseClient, stier);
+        setFotoUrls((prev) => {
+          const kort = { ...prev };
+          stier.forEach((sti, i) => { if (urls[i]) kort[sti] = urls[i]; });
+          return kort;
+        });
+      }
+      setNotatTekst("");
+      setNotatFiler([]);
+      if (filInput.current) filInput.current.value = "";
+    } catch (e) {
+      setNotatFejl(e?.message || String(e));
+    }
+    setNotatGemmer(false);
+  }
 
   if (!task) return null;
   // Brug oversat version hvis tilgængeligt, ellers original
@@ -1066,18 +1317,137 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
             </div>
           </div>
 
+          {/* Kommentar og billeder — altid tilgaengelig, ogsaa paa en opgave der gik fint.
+              Ellers kunne man ikke dokumentere et beskidt koekken paa en normal opgave. */}
+          <div style={s.sheetSection}>
+            <div style={s.sheetSectionTitle}>💬 {tr.notesTitle}</div>
+            <div style={s.notatHint}>{tr.notesHint}</div>
+
+            {noter.length === 0 && <div style={s.notatTom}>{tr.notesEmpty}</div>}
+            {noter.map((n) => {
+              const skrevetAf = n.employee_id === employee.id ? "" : " ";
+              const tid = new Date(n.created_at).toLocaleString("da-DK", {
+                day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+              });
+              return (
+                <div key={n.id} style={s.notatKort}>
+                  <div style={s.notatTid}>
+                    {tid}{skrevetAf}
+                    {n.kind === "forgaeves" && <span style={s.notatArt}>Kom ikke ind</span>}
+                  </div>
+                  {n.text && <div style={s.notatTekst}>{n.text}</div>}
+                  {(n.photos || []).length > 0 && (
+                    <div style={s.notatFotoRaekke}>
+                      {(n.photos || []).map((sti) => (
+                        fotoUrls[sti]
+                          ? <a key={sti} href={fotoUrls[sti]} target="_blank" rel="noreferrer">
+                              <img src={fotoUrls[sti]} alt="" style={s.notatFoto} />
+                            </a>
+                          : <div key={sti} style={{ ...s.notatFoto, background: "#F1F5F9" }} />
+                      ))}
+                    </div>
+                  )}
+                  {n.photos_deleted_at && (
+                    <div style={s.notatSlettet}>{tr.notesPhotosDeleted}</div>
+                  )}
+                </div>
+              );
+            })}
+
+            <textarea
+              rows={2}
+              value={notatTekst}
+              onChange={(e) => setNotatTekst(e.target.value)}
+              placeholder={tr.notesPlaceholder}
+              style={s.notatInput} />
+
+            {/* capture="environment" aabner bagkameraet direkte i stedet for et
+                filvaelger-menupunkt. Medarbejderen staar med telefonen i haanden. */}
+            <input
+              ref={filInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              style={{ display: "none" }}
+              onChange={(e) => setNotatFiler(Array.from(e.target.files || []).slice(0, 5))} />
+
+            {notatFiler.length > 0 && (
+              <div style={s.notatValgte}>
+                {notatFiler.length} {notatFiler.length === 1 ? "billede" : "billeder"} klar
+                <button type="button" style={s.notatRyd}
+                  onClick={() => { setNotatFiler([]); if (filInput.current) filInput.current.value = ""; }}>
+                  Fjern
+                </button>
+              </div>
+            )}
+            {notatFejl && <div style={s.notatFejl}>{notatFejl}</div>}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button type="button" style={s.notatFotoBtn} onClick={() => filInput.current?.click()}>
+                📷 {tr.notesAddPhoto}
+              </button>
+              <button
+                type="button"
+                disabled={notatGemmer || (!notatTekst.trim() && notatFiler.length === 0)}
+                style={{ ...s.notatGemBtn,
+                  opacity: notatGemmer || (!notatTekst.trim() && notatFiler.length === 0) ? 0.45 : 1 }}
+                onClick={sendKommentar}>
+                {notatGemmer ? tr.notesSending : tr.notesSend}
+              </button>
+            </div>
+          </div>
+
           {/* Oenske om ny tid — medarbejderen aftaler med kunden, backoffice planlaegger */}
           {!done && (
             <div style={{ padding: "0 0 18px" }}>
               {rsSendt ? (
                 <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", color: "#065F46", borderRadius: 12, padding: "12px 14px", fontSize: 14 }}>
-                  Dit ønske er sendt til kontoret. Opgaven bliver stående her, indtil planlæggeren har flyttet den.
+                  {rsSendt === "forgaeves"
+                    ? tr.reportSentNoEntry
+                    : "Dit ønske er sendt til kontoret. Opgaven bliver stående her, indtil planlæggeren har flyttet den."}
                 </div>
-              ) : !rsAaben ? (
-                <button style={{ ...s.doneLarge, background: "#fff", color: "#B45309", border: "1.5px solid #FCD34D" }}
-                  onClick={() => setRsAaben(true)}>
-                  Foreslå ny tid
-                </button>
+              ) : !rsArt ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button style={{ ...s.doneLarge, background: "#fff", color: "#B45309", border: "1.5px solid #FCD34D" }}
+                    onClick={() => { setRsArt("ny_tid"); setRsGrund(""); }}>
+                    {tr.reportNewTime}
+                  </button>
+                  {/* Roed frem for gul: det er ikke et oenske, det er en melding om at
+                      arbejdet ikke blev udfoert, og den skal skille sig ud. */}
+                  <button style={{ ...s.doneLarge, background: "#fff", color: "#B91C1C", border: "1.5px solid #FCA5A5" }}
+                    onClick={() => { setRsArt("forgaeves"); setRsGrund(""); setRsDato(""); setRsTid(""); }}>
+                    🚫 {tr.reportNoEntry}
+                  </button>
+                </div>
+              ) : rsArt === "forgaeves" ? (
+                <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontSize: 13, color: "#991B1B", marginBottom: 10 }}>{tr.reportNoEntryHint}</div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#991B1B" }}>{tr.reportNoEntryWhy}</label>
+                  <textarea rows={3} value={rsGrund} onChange={(e) => setRsGrund(e.target.value)}
+                    placeholder={tr.reportNoEntryPlaceholder}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 15, borderRadius: 10, border: "1px solid #FCA5A5", margin: "4px 0 10px", fontFamily: "inherit" }} />
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#991B1B" }}>{tr.reportNewDateOptional}</label>
+                  <input type="date" value={rsDato} onChange={(e) => setRsDato(e.target.value)}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCA5A5", margin: "4px 0 10px" }} />
+                  <input ref={rsFilInput} type="file" accept="image/*" capture="environment" multiple
+                    style={{ display: "none" }}
+                    onChange={(e) => setRsFiler(Array.from(e.target.files || []).slice(0, 5))} />
+                  <button type="button"
+                    style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px solid #FCA5A5", background: "#fff", fontSize: 15, fontWeight: 600, color: "#991B1B", cursor: "pointer", marginBottom: 10, fontFamily: "inherit" }}
+                    onClick={() => rsFilInput.current?.click()}>
+                    📷 {rsFiler.length > 0 ? `${rsFiler.length} ${rsFiler.length === 1 ? "billede" : "billeder"} valgt` : tr.notesAddPhoto}
+                  </button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", fontSize: 15, cursor: "pointer" }}
+                      onClick={() => { setRsArt(null); setRsFiler([]); }}>Fortryd</button>
+                    <button disabled={!rsGrund.trim() || rsGemmer}
+                      style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", fontSize: 15, fontWeight: 700, color: "#fff",
+                        background: (!rsGrund.trim() || rsGemmer) ? "#CBD5E1" : "#B91C1C",
+                        cursor: (!rsGrund.trim() || rsGemmer) ? "not-allowed" : "pointer" }}
+                      onClick={sendOnskeOmNyTid}>{rsGemmer ? "Sender…" : "Send til kontoret"}</button>
+                  </div>
+                </div>
               ) : (
                 <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: 14 }}>
                   <div style={{ fontSize: 13, color: "#92400E", marginBottom: 10 }}>
@@ -1085,17 +1455,17 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
                   </div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Ny dato</label>
                   <input type="date" value={rsDato} onChange={(e) => setRsDato(e.target.value)}
-                    style={{ width: "100%", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 10px" }} />
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 10px" }} />
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Klokkeslæt (valgfrit)</label>
                   <input type="time" value={rsTid} onChange={(e) => setRsTid(e.target.value)}
-                    style={{ width: "100%", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 10px" }} />
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 16, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 10px" }} />
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#92400E" }}>Hvorfor skal den flyttes?</label>
                   <textarea rows={3} value={rsGrund} onChange={(e) => setRsGrund(e.target.value)}
                     placeholder="F.eks. kunden er til lægen, eller der var håndværkere"
-                    style={{ width: "100%", padding: "10px 12px", fontSize: 15, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 12px", fontFamily: "inherit" }} />
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 15, borderRadius: 10, border: "1px solid #FCD34D", margin: "4px 0 12px", fontFamily: "inherit" }} />
                   <div style={{ display: "flex", gap: 8 }}>
                     <button style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", fontSize: 15, cursor: "pointer" }}
-                      onClick={() => setRsAaben(false)}>Fortryd</button>
+                      onClick={() => setRsArt(null)}>Fortryd</button>
                     <button disabled={!rsDato || !rsGrund.trim() || rsGemmer}
                       style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", fontSize: 15, fontWeight: 700, color: "#fff",
                         background: (!rsDato || !rsGrund.trim() || rsGemmer) ? "#CBD5E1" : "#B45309",
@@ -1831,6 +2201,29 @@ const s = {
   overrunInput: { width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:8, border:"1px solid #F59E0B",
     fontSize:15, fontFamily:"inherit", resize:"vertical", outline:"none", background:"#fff", color:"#111111" },
   overrunError: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:6 },
+
+  // Kommentar og billeder
+  notatHint: { fontSize:13, color:"#64748B", lineHeight:1.45, marginBottom:10 },
+  notatTom: { fontSize:13, color:"#94A3B8", fontStyle:"italic", marginBottom:10 },
+  notatKort: { background:"#F8FAFC", border:"1px solid #F1F5F9", borderRadius:10, padding:"10px 12px", marginBottom:8 },
+  notatTid: { fontSize:11, fontWeight:700, color:"#94A3B8", marginBottom:4, display:"flex", alignItems:"center", gap:6 },
+  notatArt: { background:"#FEE2E2", color:"#B91C1C", borderRadius:999, padding:"1px 8px", fontSize:10, fontWeight:800 },
+  notatTekst: { fontSize:14, color:"#111111", lineHeight:1.45, whiteSpace:"pre-wrap" },
+  notatFotoRaekke: { display:"flex", gap:6, flexWrap:"wrap", marginTop:8 },
+  // Faste kvadrater. Billeder fra en telefon har vidt forskellige formater, og uden
+  // en fast stoerrelse hopper hele opgavevisningen hver gang et billede er laest ind.
+  notatFoto: { width:72, height:72, objectFit:"cover", borderRadius:8, display:"block", border:"1px solid #E2E8F0" },
+  notatSlettet: { fontSize:11, color:"#94A3B8", fontStyle:"italic", marginTop:6 },
+  notatInput: { width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:"1.5px solid #E2E8F0",
+    fontSize:15, fontFamily:"inherit", resize:"vertical", outline:"none", background:"#fff", color:"#111111" },
+  notatValgte: { fontSize:13, color:"#0F766E", background:"#F0FDFA", border:"1px solid #99F6E4", borderRadius:8,
+    padding:"7px 10px", marginTop:8, display:"flex", alignItems:"center", justifyContent:"space-between" },
+  notatRyd: { background:"none", border:"none", color:"#0F766E", fontSize:13, fontWeight:700, textDecoration:"underline", cursor:"pointer" },
+  notatFejl: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:8 },
+  notatFotoBtn: { flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff",
+    fontSize:15, fontWeight:600, color:"#111111", cursor:"pointer", fontFamily:"inherit" },
+  notatGemBtn: { flex:1, padding:"12px", borderRadius:10, border:"none", background:"#D6247A",
+    fontSize:15, fontWeight:700, color:"#fff", cursor:"pointer", fontFamily:"inherit" },
   timeInput: { flex:1, padding:"13px 14px", borderRadius:10, border:"1.5px solid #E2E8F0", fontSize:15, color:"#111111", background:"#fff" },
   timeLogBtn: { padding:"13px 18px", borderRadius:10, border:"none", background:"#111111", color:"#fff", fontWeight:700, fontSize:14, cursor:"pointer", whiteSpace:"nowrap" },
   doneLarge: { width:"100%", padding:"16px 0", borderRadius:14, border:"2px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:700, fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
