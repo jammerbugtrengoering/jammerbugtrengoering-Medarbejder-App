@@ -50,6 +50,8 @@ const T = {
     noTasks: (day) => `Ingen opgaver ${day}`,
     freeDayNote: "Fri dag eller ingen tildelte opgaver",
     travel: "Kørsel",
+    travelFromHome: "Kørsel hjemmefra",
+    travelToHome: "Kørsel hjem",
     navigate: "Naviger",
     customer: "Kunde",
     access: "Adgang",
@@ -181,6 +183,8 @@ const T = {
     noTasks: (day) => `No tasks ${day}`,
     freeDayNote: "Day off or no assigned tasks",
     travel: "Travel",
+    travelFromHome: "Travel from home",
+    travelToHome: "Travel home",
     navigate: "Navigate",
     customer: "Customer",
     access: "Access",
@@ -590,6 +594,16 @@ function computeDaySchedule(dayTasks, settings, employee) {
   // planlaeggeren regner. Ellers ved det generelle standardtidspunkt.
   let cursor = parseTimeToMinutes((employee && (employee.start_time || employee.startTime)) || settings.dayStart);
   const segments = [];
+  // Er koerslen en del af hendes arbejdstid, begynder dagen hjemme. Moedetiden er saa
+  // tidspunktet hvor hun tager hjemmefra — ikke hvor hun staar hos den foerste kunde.
+  const hjemTaeller = !!(employee && employee.travel_in_worktime && employee.home_address);
+  if (hjemTaeller && sorted.length > 0) {
+    const ud = getTravelMinutes(employee.home_address, sorted[0].address, settings);
+    if (ud > 0) {
+      segments.push({ type: "transport", hjem: "ud", minutes: ud, start: cursor, key: "hjem-ud" });
+      cursor += ud;
+    }
+  }
   sorted.forEach((t, idx) => {
     if (idx > 0) {
       const travel = getTravelMinutes(sorted[idx - 1].address, t.address, settings);
@@ -608,6 +622,11 @@ function computeDaySchedule(dayTasks, settings, employee) {
     segments.push({ type: "task", task: t, start: cursor });
     cursor += t.duration;
   });
+  // Turen hjem, saa hun kan se hvornaar arbejdsdagen faktisk er slut.
+  if (hjemTaeller && sorted.length > 0) {
+    const hjem = getTravelMinutes(sorted[sorted.length - 1].address, employee.home_address, settings);
+    if (hjem > 0) segments.push({ type: "transport", hjem: "hjem", minutes: hjem, start: cursor, key: "hjem-retur" });
+  }
   return segments;
 }
 
@@ -672,7 +691,9 @@ const HELP_DA = [
       "Din bestilling går til kontoret, som godkender den. Under «Historik» ser du dine tidligere bestillinger." ] },
   { t: "Din kørsel", p: [
       "Tryk på bil-ikonet 🚗 øverst for at se din beregnede kørsel.",
-      "Du skal ikke selv taste kilometer — det regnes ud fra dine opgaver, når du har registreret din tid." ] },
+      "Du skal ikke selv taste kilometer — det regnes ud fra dine opgaver, når du har registreret din tid.",
+      "Har du kørsel med i din arbejdstid, står der «Kørsel hjemmefra» øverst på dagen og «Kørsel hjem» nederst. Klokkeslættet øverst er altså hvornår du tager hjemmefra, ikke hvornår du skal være hos den første kunde.",
+      "Ser du ikke de to linjer, er du ikke på den ordning, og din kørsel afregnes med kilometerpenge i stedet. Spørg kontoret hvis du er i tvivl om hvad der gælder for dig." ] },
   { t: "Hvis noget driller", p: [
       "Kan du ikke logge ind? Tjek din e-mail og brug «Glemt adgangskode?».",
       "Kan du ikke se dine opgaver? Tjek at du står på den rigtige uge og dag.",
@@ -734,6 +755,8 @@ const HELP_EN = [
       "Set the amount with + and − and tap \"Select products\".",
       "Your order goes to the office for approval. \"History\" shows earlier orders." ] },
   { t: "Your mileage", p: [
+      "If travel is part of your working hours, the day starts with \"Travel from home\" and ends with \"Travel home\". The time at the top is when you leave home, not when you must be at the first customer.",
+      "If you do not see those two lines, you are not on that arrangement, and your driving is paid as mileage instead. Ask the office if you are unsure what applies to you.",
       "Tap the car icon 🚗 at the top to see your calculated mileage.",
       "You do not enter kilometres yourself — it is calculated from your jobs once you register your time." ] },
   { t: "If something goes wrong", p: [
@@ -2062,7 +2085,17 @@ useEffect(() => {
       setDataLoading(true);
       const { data: empData } = await supabase.from("employees").select("*").eq("auth_user_id", session.user.id).single();
       if (!empData) { setDataLoading(false); return; }
-      setEmployee(empData);
+      // Hjemmeadresse og transportordning ligger i sin egen tabel, hvor politikken kun
+      // slipper hendes EGEN raekke igennem. Kollegernes privatadresser kan appen altsaa
+      // ikke naa, uanset hvad man spoerger om.
+      const { data: homeData } = await supabase
+        .from("employee_home").select("home_address, travel_in_worktime")
+        .eq("employee_id", empData.id).maybeSingle();
+      setEmployee({
+        ...empData,
+        home_address: homeData?.home_address ?? null,
+        travel_in_worktime: homeData?.travel_in_worktime ?? false,
+      });
       // Medarbejderlisten hentes kun til administratorer, og kun paa computer.
       // Databasen har i forvejen sidste ord: en almindelig medarbejder kan slet
       // ikke laese andres opgaver, uanset hvad brugerfladen viser.
@@ -2425,7 +2458,11 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
               <div key={seg.key} style={s.transportRow}>
                 <div style={s.transportIcon}><Car size={14} color="#64748B" /></div>
                 <div style={s.transportInfo}>
-                  <div style={s.transportTime}>{fmtClock(seg.start)} · {tr.travel} · {fmtMin(seg.minutes)}</div>
+                  {/* Hjemmebenene navngives, saa hun kan se hvornaar arbejdsdagen
+                      begynder og slutter — og ikke tror det er en tur til en kunde. */}
+                  <div style={s.transportTime}>
+                    {fmtClock(seg.start)} · {seg.hjem === "ud" ? tr.travelFromHome : seg.hjem === "hjem" ? tr.travelToHome : tr.travel} · {fmtMin(seg.minutes)}
+                  </div>
                   {seg.to && (
                     <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(seg.to)}`}
                       target="_blank" rel="noreferrer" style={s.transportNav}>
