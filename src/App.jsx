@@ -696,10 +696,12 @@ const HELP_DA = [
       "Skal det rettes, er der to rækker med − og + : øverst timer, nederst minutter. Minutterne går i spring af 5.",
       "Det store tal foroven er det du registrerer i alt. Under det står om det passer med det planlagte.",
       "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden." ] },
-  { t: "Trin 2 — produkter du har brugt", p: [
-      "Brugte du fx rengøringsmidler hos kunden, så vælg dem her og sæt antal.",
-      "Så trækkes det fra lageret, og kunden bliver faktureret rigtigt.",
-      "Brugte du ingenting, trykker du bare «Videre»." ] },
+  { t: "Produkter du har brugt", p: [
+      "På de aftaler hvor der udleveres produkter til kunden, bliver du spurgt om det når du afslutter.",
+      "Brugte du fx rengøringsmidler hos kunden, så vælg dem og sæt antal. Så trækkes det fra lageret, og kunden bliver faktureret rigtigt.",
+      "Brugte du ingenting, trykker du bare «Videre».",
+      "Bliver du ikke spurgt, er det fordi der ikke udleveres produkter på den aftale. Så er der ét trin mindre, og tælleren øverst siger fx «1 af 2».",
+      "Mener du at der burde udleveres produkter, så skriv det til kontoret i kommentaren på det sidste trin." ] },
   { t: "Nexus-borgere", p: [
       "Er opgaven hos en Nexus-borger, står det øverst på opgaven, og der er en knap til at åbne KMD Nexus.",
       "Når du afslutter, kommer der et ekstra trin hvor du bliver mindet om at kvittere i Nexus. Kommunen betaler efter det der står i Nexus — ikke efter det du skriver her.",
@@ -766,10 +768,12 @@ const HELP_EN = [
       "To change it, use the two rows of − and + : hours on top, minutes below. Minutes move in steps of 5.",
       "The large number at the top is the total you are registering. Below it you can see whether it matches the plan.",
       "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer." ] },
-  { t: "Step 2 — products you used", p: [
-      "If you used cleaning supplies at the customer, select them here and set the amount.",
-      "It is then deducted from stock and billed to the customer.",
-      "If you used nothing, just tap \"Next\"." ] },
+  { t: "Products you used", p: [
+      "On the agreements where products are supplied to the customer, you are asked about it when you complete the job.",
+      "If you used cleaning supplies, select them and set the amount. It is then deducted from stock and billed to the customer.",
+      "If you used nothing, just tap \"Next\".",
+      "If you are not asked, it is because no products are supplied on that agreement. Then there is one step fewer, and the counter at the top says for example \"1 of 2\".",
+      "If you think products should be supplied, write it to the office in the comment on the last step." ] },
   { t: "Nexus citizens", p: [
       "If the job is for a Nexus citizen, it says so at the top of the job, and there is a button to open KMD Nexus.",
       "When you complete the job there is an extra step reminding you to sign off in Nexus. The municipality pays according to Nexus — not according to what you write here.",
@@ -1307,9 +1311,17 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
 // opgave fungerer praecis som foer.
 function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, onSetStatus, onAfbryd, onFaerdig }) {
   const erNexus = task.contractType === "nexus";
-  // Trinnene bygges op efter opgaven. En erhvervsopgave skal ikke spoerges om Nexus,
-  // og traellingen "3 af 4" skal passe til det man faktisk faar at se.
-  const trin = ["tid", "produkter", ...(erNexus ? ["nexus"] : []), "besked"];
+  // Trinnene bygges op efter opgaven, saa taellingen "3 af 4" passer til det man
+  // faktisk faar at se. En erhvervsopgave spoerges ikke om Nexus, og en aftale uden
+  // produktudlevering spoerges ikke om produkter — det trin blev vist paa hver eneste
+  // opgave uden at der nogensinde blev registreret en udlevering.
+  const spoergOmProdukter = !!task.deliversProducts;
+  const trin = [
+    "tid",
+    ...(spoergOmProdukter ? ["produkter"] : []),
+    ...(erNexus ? ["nexus"] : []),
+    "besked",
+  ];
 
   const [trinNr, setTrinNr] = useState(0);
   const [gemmer, setGemmer] = useState(false);
@@ -2203,6 +2215,7 @@ useEffect(() => {
             // indholdet, og saa var vi tilbage ved at afsloere noget. Er der ingenting,
             // siger svaret det — og opslaget staar i loggen, hvilket er helt i orden.
             needsKeyPickup: i.needs_key_pickup ?? false,
+            deliversProducts: i.delivers_products ?? false,
             contractType: i.contract_type || i.contractType || "privat",
           };
         });
