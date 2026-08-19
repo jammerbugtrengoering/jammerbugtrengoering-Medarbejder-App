@@ -52,6 +52,12 @@ const T = {
     travel: "Kørsel",
     travelFromHome: "Kørsel hjemmefra",
     travelToHome: "Kørsel hjem",
+    accessShow: "Vis adgangsoplysninger",
+    accessOpening: "Henter…",
+    accessHint: "Nøglebokskoder og alarmkoder er skjult. Når du åbner dem, registreres det med dit navn og tidspunkt.",
+    accessLogged: "Åbningen er registreret.",
+    accessNone: "Der er ingen adgangsoplysninger på denne opgave.",
+    accessFailed: "Kunne ikke hente adgangsoplysningerne. Tjek forbindelsen og prøv igen.",
     navigate: "Naviger",
     customer: "Kunde",
     access: "Adgang",
@@ -185,6 +191,12 @@ const T = {
     travel: "Travel",
     travelFromHome: "Travel from home",
     travelToHome: "Travel home",
+    accessShow: "Show access details",
+    accessOpening: "Loading…",
+    accessHint: "Key box and alarm codes are hidden. When you open them, it is recorded with your name and the time.",
+    accessLogged: "This opening has been recorded.",
+    accessNone: "There are no access details on this job.",
+    accessFailed: "Could not load the access details. Check your connection and try again.",
     navigate: "Navigate",
     customer: "Customer",
     access: "Access",
@@ -326,16 +338,18 @@ async function translateText(text, targetLang) {
 
 async function translateTask(task, targetLang) {
   if (targetLang === "da") return task;
-  const [title, accessInstructions, checklist] = await Promise.all([
+  // Adgangsteksten oversaettes ikke laengere: den findes slet ikke paa opgaven, men
+  // hentes foerst naar medarbejderen aabner den. Den skal i oevrigt ikke sendes til en
+  // oversaettelsestjeneste — en noeglebokskode har intet at goere hos en tredjepart.
+  const [title, checklist] = await Promise.all([
     translateText(task.title, targetLang),
-    translateText(task.accessInstructions, targetLang),
     Promise.all((task.checklist || []).map(async (item) => ({
       ...item,
       text: await translateText(item.text, targetLang),
       description: await translateText(item.description, targetLang),
     }))),
   ]);
-  return { ...task, title, accessInstructions, checklist };
+  return { ...task, title, checklist };
 }
 function fmtMin(min) {
   if (!min || min <= 0) return "0m";
@@ -662,9 +676,14 @@ const HELP_DA = [
   { t: "Inde i opgaven — mens du arbejder", p: [
       "Skærmen viser kun det du skal bruge for at gøre arbejdet: kunden, adressen, hvordan du kommer ind, og hvad der skal gøres.",
       "«Vis vej» åbner Google Maps.",
-      "«Adgang» viser fx nøgleboks og kode, hvis der er en.",
+      "Under «Adgang» trykker du for at se nøgleboks og kode — se afsnittet nedenfor.",
       "Under «Tasks» sætter du flueben, når du har gjort en ting. Tælleren viser hvor langt du er.",
       "Der skal ikke registreres noget her. Det kommer bagefter." ] },
+  { t: "Nøglebokskoder og adgang", p: [
+      "Koderne er skjulte, indtil du selv trykker «Vis adgangsoplysninger». Det er ikke fordi vi ikke stoler på dig — det er fordi koderne hører til kundernes hjem, og vi skal kunne dokumentere hvem der har set dem.",
+      "Når du åbner dem, registreres det med dit navn og tidspunktet. Det står på knappen inden du trykker.",
+      "Åbn dem gerne så tit du har brug for det. Der er ingen grænse, og du skal ikke spørge om lov.",
+      "Står der «Hent nøgle på kontoret» på opgaven i dagslisten, skal du forbi kontoret først. Så er der ingen kode — nøglen ligger og venter på dig." ] },
   { t: "Når du er færdig — «Afslut opgave»", p: [
       "Nederst på skærmen står «Afslut opgave». Den knap er der altid, også hvis du har scrollet ned i en lang liste.",
       "Så bliver du ledt gennem nogle få spørgsmål, ét ad gangen. Øverst kan du se hvor langt du er — fx «1 af 3».",
@@ -727,9 +746,14 @@ const HELP_EN = [
   { t: "Inside the job — while you work", p: [
       "The screen shows only what you need to do the work: the customer, the address, how to get in, and what has to be done.",
       "\"Show the way\" opens Google Maps.",
-      "\"Access\" shows key box and code if there is one.",
+      "Under \"Access\" you tap to see the key box and code — see the section below.",
       "Under \"Tasks\" you tick off each thing as you finish it.",
       "Nothing needs to be registered here. That comes afterwards." ] },
+  { t: "Key box codes and access", p: [
+      "Codes are hidden until you tap \"Show access details\" yourself. It is not that we do not trust you — the codes belong to the customers' homes, and we have to be able to document who has seen them.",
+      "When you open them, it is recorded with your name and the time. That is written on the button before you tap it.",
+      "Open them as often as you need. There is no limit, and you do not need to ask permission.",
+      "If the job in your day list says \"Pick up key at the office\", go by the office first. Then there is no code — the key is waiting for you." ] },
   { t: "When you are done — \"Complete job\"", p: [
       "\"Complete job\" sits at the bottom of the screen. It is always there, even if you have scrolled down a long list.",
       "You are then taken through a few questions, one at a time. The top shows how far you are — for example \"1 of 3\".",
@@ -1618,6 +1642,12 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   // Huskes efter meldingen er sendt, saa knappen erstattes af en kvittering. Ellers
   // ville hun ikke kunne se at kontoret allerede har faaet beskeden.
   const [problemSendt, setProblemSendt] = useState(null);
+  // Adgangsoplysningen. null betyder "endnu ikke aabnet" — tom streng betyder "aabnet,
+  // men der staar ingenting". De to skal kunne skelnes, ellers ville knappen dukke op
+  // igen paa en opgave uden adgangsoplysninger, og hun ville tro det ikke virkede.
+  const [adgangTekst, setAdgangTekst] = useState(null);
+  const [adgangHenter, setAdgangHenter] = useState(false);
+  const [adgangFejl, setAdgangFejl] = useState("");
   // Gemte kommentarer og billeder vises her, men skrives i afslutningsflowet.
   const [noter, setNoter] = useState([]);
   const [fotoUrls, setFotoUrls] = useState({});
@@ -1674,6 +1704,17 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
       if (updErr) throw new Error(updErr.message);
     }
     return { notatId, stier };
+  }
+
+  // Selve opslaget. Databasen afgoer om hun har adgang, skriver loggen, og svarer.
+  // Appen har ingen anden vej til teksten — heller ikke ved at spoerge om opgaven igen.
+  async function hentAdgang() {
+    setAdgangHenter(true);
+    setAdgangFejl("");
+    const { data, error } = await supabaseClient.rpc("hent_adgangsinfo", { p_instance_id: task.id });
+    if (error) setAdgangFejl(tr.accessFailed);
+    else setAdgangTekst(data ?? "");
+    setAdgangHenter(false);
   }
 
   if (!task) return null;
@@ -1748,13 +1789,26 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
             </div>
           )}
 
-          {/* Access */}
-          {t.accessInstructions && (
-            <div style={s.sheetSection}>
-              <div style={s.sheetSectionTitle}><Lock size={14} /> {tr.access}</div>
-              <div style={s.sheetAccessText}>{t.accessInstructions}</div>
-            </div>
-          )}
+          {/* Adgang. Teksten ligger ikke i appen — den hentes naar hun trykker, og hver
+              aabning registreres. Derfor staar det ogsaa paa knappen: hun skal vide det
+              foer hun trykker, ikke opdage det bagefter. */}
+          <div style={s.sheetSection}>
+            <div style={s.sheetSectionTitle}><Lock size={14} /> {tr.access}</div>
+            {adgangTekst !== null ? (
+              <>
+                <div style={s.sheetAccessText}>{adgangTekst || tr.accessNone}</div>
+                <div style={s.adgangLogget}>{tr.accessLogged}</div>
+              </>
+            ) : (
+              <>
+                <button type="button" style={s.adgangBtn} disabled={adgangHenter} onClick={hentAdgang}>
+                  🔒 {adgangHenter ? tr.accessOpening : tr.accessShow}
+                </button>
+                <div style={s.adgangHint}>{tr.accessHint}</div>
+                {adgangFejl && <div style={s.notatFejl}>{adgangFejl}</div>}
+              </>
+            )}
+          </div>
 
           {/* Video */}
           {t.videoUrl && (
@@ -1963,6 +2017,11 @@ function TaskCard({ seg, employee, lang, onClick }) {
             <span>{t.address}</span>
           </div>
         )}
+        {/* Noeglen skal hentes paa kontoret. Staar paa selve kortet i dagslisten, ikke
+            inde i opgaven — hun skal se det inden hun koerer, ikke naar hun staar der. */}
+        {t.needsKeyPickup && (
+          <div style={s.noegleMaerke}>🔑 {lang === "da" ? "Hent nøgle på kontoret" : "Pick up key at the office"}</div>
+        )}
         <div style={s.taskMeta}>
           <span style={s.taskDuration}>{fmtMin(t.duration)}</span>
           {clProg.total > 0 && <span style={s.taskChecklist}><ListChecks size={11} /> {clProg.done}/{clProg.total}</span>}
@@ -2135,7 +2194,15 @@ useEffect(() => {
             requiredSkills: i.required_skills ?? [],
             customerName: i.customer_name || cust?.name || "",
             address: i.address_text || cust?.address || "",
-            accessInstructions: i.access_instructions || cust?.access_instructions || "",
+            // accessInstructions hentes IKKE med her laengere. Kolonnen staar tom, og
+            // teksten ligger i en tabel appen ikke kan laese. Den hentes kun naar
+            // medarbejderen selv trykker, gennem hent_adgangsinfo, som logger opslaget.
+            //
+            // Knappen vises paa alle opgaver, ogsaa dem uden adgangsoplysninger. Et
+            // "der er noget at hente"-flag ville kraeve en kolonne der siger noget om
+            // indholdet, og saa var vi tilbage ved at afsloere noget. Er der ingenting,
+            // siger svaret det — og opslaget staar i loggen, hvilket er helt i orden.
+            needsKeyPickup: i.needs_key_pickup ?? false,
             contractType: i.contract_type || i.contractType || "privat",
           };
         });
@@ -2668,6 +2735,14 @@ const s = {
     textDecoration:"underline", padding:"10px 0", marginTop:6, cursor:"pointer", fontFamily:"inherit" },
   trinAllerede: { fontSize:13, color:"#9C1B5D", background:"#FFF6FA", borderRadius:8,
     padding:"8px 11px", marginTop:10, lineHeight:1.45 },
+
+  // Adgang og noegle
+  adgangBtn: { width:"100%", padding:"14px 0", borderRadius:12, border:"1.5px solid #E2E8F0",
+    background:"#fff", fontSize:15, fontWeight:600, color:"#111111", cursor:"pointer", fontFamily:"inherit" },
+  adgangHint: { fontSize:12.5, color:"#94A3B8", lineHeight:1.5, marginTop:8 },
+  adgangLogget: { fontSize:12, color:"#94A3B8", fontStyle:"italic", marginTop:8 },
+  noegleMaerke: { display:"inline-block", background:"#FFFBEB", border:"1px solid #FDE68A",
+    color:"#92400E", borderRadius:8, padding:"4px 9px", fontSize:12.5, fontWeight:700, marginTop:6 },
 
   // Meld et problem
   problemBtn: { width:"100%", border:"1.5px solid #E2E8F0", background:"#fff", borderRadius:12,
