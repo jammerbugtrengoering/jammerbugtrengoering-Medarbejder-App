@@ -90,7 +90,8 @@ const T = {
     finishTask: "Afslut opgaven",
     finishNextStep: "Videre",
     finishTimeQ: "Hvor lang tid brugte du?",
-    finishTimePlanned: (t) => `Der er sat ${t} af til opgaven`,
+    finishTimePlanned: (t) => `Der er sat ${t} af til dig på opgaven`,
+    finishPerPerson: (n, samlet) => `Der er ${n} på opgaven, så der er afsat ${samlet} i alt.`,
     finishHours: "Timer",
     finishMinutes: "Minutter — i spring af 5",
     finishAsPlanned: "som planlagt",
@@ -230,7 +231,8 @@ const T = {
     finishTask: "Complete the job",
     finishNextStep: "Next",
     finishTimeQ: "How long did it take?",
-    finishTimePlanned: (t) => `${t} is planned for this job`,
+    finishTimePlanned: (t) => `${t} is planned for you on this job`,
+    finishPerPerson: (n, samlet) => `There are ${n} of you on this job, so ${samlet} is planned in total.`,
     finishHours: "Hours",
     finishMinutes: "Minutes — in steps of 5",
     finishAsPlanned: "as planned",
@@ -694,7 +696,8 @@ const HELP_DA = [
       "Arbejder I to på samme opgave, afslutter I hver for sig med hver jeres tid." ], warn:
       "Husk at afslutte samme dag. Registrerer du ikke din tid, bliver din kørsel ikke beregnet — og så får du ikke kørselspenge for turen. Hver dag kl. 18 får du en mail, hvis du mangler noget." },
   { t: "Trin 1 — hvor lang tid brugte du?", p: [
-      "Feltet er sat til den tid der er afsat til opgaven. Passer det, trykker du bare «Videre» uden at ændre noget.",
+      "Feltet er sat til den tid der er afsat til dig. Passer det, trykker du bare «Videre» uden at ændre noget.",
+      "Er I flere på opgaven, gælder tiden pr. person. Er der sat 1 time af og I er to, er der afsat 2 timer i alt — du skal kun skrive din egen tid, og du får ikke besked om overskridelse fordi din kollega også har registreret.",
       "Skal det rettes, er der to rækker med − og + : øverst timer, nederst minutter. Minutterne går i spring af 5.",
       "Det store tal foroven er det du registrerer i alt. Under det står om det passer med det planlagte.",
       "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden.",
@@ -767,7 +770,8 @@ const HELP_EN = [
       "If two of you work the same job, you each complete it with your own time." ], warn:
       "Complete the job the same day. If you do not register your time, your mileage is not calculated — and you will not be paid for the drive. Every day at 18:00 you get an email if something is missing." },
   { t: "Step 1 — how long did it take?", p: [
-      "The field is preset to the time planned for the job. If that is right, just tap \"Next\" without changing anything.",
+      "The field is preset to the time planned for you. If that is right, just tap \"Next\" without changing anything.",
+      "If there are several of you on the job, the time is per person. If 1 hour is planned and there are two of you, 2 hours are planned in total — you only enter your own time, and you are not told about an overrun because your colleague also registered.",
       "To change it, use the two rows of − and + : hours on top, minutes below. Minutes move in steps of 5.",
       "The large number at the top is the total you are registering. Below it you can see whether it matches the plan.",
       "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer.",
@@ -1335,7 +1339,16 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
   // Tiden starter paa det planlagte. Det er svaret i de fleste tilfaelde, saa den
   // almindelige dag kraever ingen indtastning — kun et tryk paa Videre.
   const alleredeLogget = (task.timeLog || []).reduce((s, l) => s + (l.minutes || 0), 0);
-  const planlagt = task.duration || 0;
+  // Varigheden er tiden PR. PERSON. Er der to paa opgaven, er der ogsaa afsat dobbelt
+  // saa meget arbejde i alt — ellers ville to der begge gjorde praecis som planlagt
+  // faa besked om at de havde overskredet tiden med 100 %.
+  const antalPaa = Math.max(1, (task.assignees || []).length);
+  const minEgenTid = task.duration || 0;
+  const planlagt = minEgenTid * antalPaa;
+  // Hvad HUN selv har registreret. Startvaerdien skal vaere hendes egen resterende
+  // tid, ikke opgavens — ellers ville hun faa kollegaens andel foreslaaet.
+  const migLoggede = (task.timeLog || [])
+    .filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
 
   // Én tilstand i samlede minutter, ikke to. Med timer og minutter hver for sig skal
   // 55 + 5 baade nulstille minutterne og laegge en time til, og 0 − 5 skal blokeres
@@ -1347,7 +1360,7 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
   // ville hele varigheden vaere en overskridelse fra foerste sekund, og hun ville
   // blive tvunget til at skrive en begrundelse for noget der passer fint.
   const [samletMin, setSamletMin] = useState(
-    Math.round(Math.max(0, planlagt - alleredeLogget) / 5) * 5,
+    Math.round(Math.max(0, minEgenTid - migLoggede) / 5) * 5,
   );
   const timer = Math.floor(samletMin / 60);
   const minutter = samletMin % 60;
@@ -1515,7 +1528,10 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
           {aktuelt === "tid" && (
             <>
               <div style={s.trinSpoergsmaal}>{tr.finishTimeQ}</div>
-              <div style={s.trinHjaelp}>{tr.finishTimePlanned(fmtMin(planlagt))}</div>
+              <div style={s.trinHjaelp}>
+                {tr.finishTimePlanned(fmtMin(minEgenTid))}
+                {antalPaa > 1 && ` ${tr.finishPerPerson(antalPaa, fmtMin(planlagt))}`}
+              </div>
               {/* Er der registreret tid i forvejen, skal det staa her. Ellers ser
                   maerkatet under det store tal ud som ren volapyk: "0t 30m" og
                   lige under "1t mere end planlagt". */}
