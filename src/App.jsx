@@ -683,7 +683,7 @@ const HELP_DA = [
       "Koderne er skjulte, indtil du selv trykker «Vis adgangsoplysninger». Det er ikke fordi vi ikke stoler på dig — det er fordi koderne hører til kundernes hjem, og vi skal kunne dokumentere hvem der har set dem.",
       "Når du åbner dem, registreres det med dit navn og tidspunktet. Det står på knappen inden du trykker.",
       "Åbn dem gerne så tit du har brug for det. Der er ingen grænse, og du skal ikke spørge om lov.",
-      "Står der «Hent nøgle på kontoret» på opgaven i dagslisten, skal du forbi kontoret først. Så er der ingen kode — nøglen ligger og venter på dig." ] },
+      "Står der «Hent nøgle/adgangskort på kontoret» på opgaven i dagslisten, skal du forbi kontoret først. Så er der ingen kode — den ligger og venter på dig." ] },
   { t: "Når du er færdig — «Afslut opgave»", p: [
       "Nederst på skærmen står «Afslut opgave». Den knap er der altid, også hvis du har scrollet ned i en lang liste.",
       "Så bliver du ledt gennem nogle få spørgsmål, ét ad gangen. Øverst kan du se hvor langt du er — fx «1 af 3».",
@@ -755,7 +755,7 @@ const HELP_EN = [
       "Codes are hidden until you tap \"Show access details\" yourself. It is not that we do not trust you — the codes belong to the customers' homes, and we have to be able to document who has seen them.",
       "When you open them, it is recorded with your name and the time. That is written on the button before you tap it.",
       "Open them as often as you need. There is no limit, and you do not need to ask permission.",
-      "If the job in your day list says \"Pick up key at the office\", go by the office first. Then there is no code — the key is waiting for you." ] },
+      "If the job in your day list says \"Pick up key or access card at the office\", go by the office first. Then there is no code — it is waiting for you." ] },
   { t: "When you are done — \"Complete job\"", p: [
       "\"Complete job\" sits at the bottom of the screen. It is always there, even if you have scrolled down a long list.",
       "You are then taken through a few questions, one at a time. The top shows how far you are — for example \"1 of 3\".",
@@ -2032,7 +2032,7 @@ function TaskCard({ seg, employee, lang, onClick }) {
         {/* Noeglen skal hentes paa kontoret. Staar paa selve kortet i dagslisten, ikke
             inde i opgaven — hun skal se det inden hun koerer, ikke naar hun staar der. */}
         {t.needsKeyPickup && (
-          <div style={s.noegleMaerke}>🔑 {lang === "da" ? "Hent nøgle på kontoret" : "Pick up key at the office"}</div>
+          <div style={s.noegleMaerke}>🔑 {lang === "da" ? "Hent nøgle/adgangskort på kontoret" : "Pick up key or access card at the office"}</div>
         )}
         <div style={s.taskMeta}>
           <span style={s.taskDuration}>{fmtMin(t.duration)}</span>
