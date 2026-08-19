@@ -102,7 +102,8 @@ const T = {
     finishProductsHint: "Rengøringsmidler og andet, der skal trækkes fra lageret og faktureres.",
     finishPickProducts: "Vælg produkter",
     finishProductsSaved: "Produkterne er registreret og trukket fra lageret. Skal noget rettes, så sig det til kontoret.",
-    finishAlready: (t) => `Der er allerede registreret ${t} på opgaven. Skriv kun din egen tid herunder.`,
+    finishAlready: (t) => `Der er allerede registreret ${t} på opgaven. Skriv kun den tid du vil lægge til.`,
+    finishZeroOk: "Skal du ikke tilføje mere tid, lader du bare 0 stå og trykker Videre.",
     finishSaveFailed: "Kunne ikke gemme. Tjek at du har forbindelse, og prøv igen.",
     finishNoteQ: "Er der noget kontoret skal vide?",
     finishNoteHint: "Var der ekstra beskidt, eller noget i stykker? Tag et billede.",
@@ -241,7 +242,8 @@ const T = {
     finishProductsHint: "Cleaning supplies and anything else to deduct from stock and invoice.",
     finishPickProducts: "Select products",
     finishProductsSaved: "The products are registered and deducted from stock. If something needs changing, tell the office.",
-    finishAlready: (t) => `${t} is already registered on this job. Only enter your own time below.`,
+    finishAlready: (t) => `${t} is already registered on this job. Only enter the time you want to add.`,
+    finishZeroOk: "If you are not adding more time, just leave it at 0 and tap Next.",
     finishSaveFailed: "Could not save. Check your connection and try again.",
     finishNoteQ: "Anything the office should know?",
     finishNoteHint: "Was it extra dirty, or was something broken? Take a photo.",
@@ -695,7 +697,8 @@ const HELP_DA = [
       "Feltet er sat til den tid der er afsat til opgaven. Passer det, trykker du bare «Videre» uden at ændre noget.",
       "Skal det rettes, er der to rækker med − og + : øverst timer, nederst minutter. Minutterne går i spring af 5.",
       "Det store tal foroven er det du registrerer i alt. Under det står om det passer med det planlagte.",
-      "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden." ] },
+      "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden.",
+      "Har du fortrudt en afslutning og åbner opgaven igen — fx for at tilføje et billede — står der 0, og det er helt i orden. Din tid er registreret i forvejen, og du skal ikke taste mere for at komme videre." ] },
   { t: "Produkter du har brugt", p: [
       "På de aftaler hvor der udleveres produkter til kunden, bliver du spurgt om det når du afslutter.",
       "Brugte du fx rengøringsmidler hos kunden, så vælg dem og sæt antal. Så trækkes det fra lageret, og kunden bliver faktureret rigtigt.",
@@ -767,7 +770,8 @@ const HELP_EN = [
       "The field is preset to the time planned for the job. If that is right, just tap \"Next\" without changing anything.",
       "To change it, use the two rows of − and + : hours on top, minutes below. Minutes move in steps of 5.",
       "The large number at the top is the total you are registering. Below it you can see whether it matches the plan.",
-      "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer." ] },
+      "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer.",
+      "If you undid a completion and open the job again — for example to add a photo — it says 0, and that is fine. Your time is already registered, and you do not need to enter more to continue." ] },
   { t: "Products you used", p: [
       "On the agreements where products are supplied to the customer, you are asked about it when you complete the job.",
       "If you used cleaning supplies, select them and set the amount. It is then deducted from stock and billed to the customer.",
@@ -1366,7 +1370,9 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
   const iAltPaaOpgaven = alleredeLogget + minutterIAlt;
   const afvigelse = iAltPaaOpgaven - planlagt;
   // Er der ingen planlagt varighed, findes der ingen overskridelse at begrunde.
-  const overskrider = planlagt > 0 && afvigelse > 0;
+  // Og tilfoejer hun ingen tid, er der heller ikke noget nyt at forklare — den tid
+  // der allerede staar, er begrundet dengang den blev registreret.
+  const overskrider = planlagt > 0 && afvigelse > 0 && minutterIAlt > 0;
 
   // Loftet paa 12 timer er det samme som i den gamle timevaelger. Nedad stopper vi
   // ved 0 — en registrering paa nul minutter afvises alligevel af naeste trin.
@@ -1378,7 +1384,10 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
   function videre() {
     setFejl("");
     if (trin[trinNr] === "tid") {
-      if (minutterIAlt <= 0) { setFejl(tr.finishNeedTime); return; }
+      // Kravet om tid gaelder kun foerste gang. Aabner hun opgaven igen — fx for at
+      // tilfoeje et billede efter at have fortrudt en afslutning — er tiden allerede
+      // registreret, og at kraeve mere ville faa timerne til at vokse uden grund.
+      if (minutterIAlt <= 0 && alleredeLogget <= 0) { setFejl(tr.finishNeedTime); return; }
       if (overskrider && !begrundelse.trim()) { setBegrundelseFejl(true); return; }
     }
     // Fejlmarkeringen nulstilles ved skift af trin. Ellers stod den roede ramme og
@@ -1511,7 +1520,12 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
                   maerkatet under det store tal ud som ren volapyk: "0t 30m" og
                   lige under "1t mere end planlagt". */}
               {alleredeLogget > 0 && (
-                <div style={s.trinAllerede}>{tr.finishAlready(fmtMin(alleredeLogget))}</div>
+                <div style={s.trinAllerede}>
+                  {tr.finishAlready(fmtMin(alleredeLogget))}
+                  {/* Uden denne saetning ser et nul ud som en fejl, og hun begynder at
+                      lede efter tid at taste ind for at komme videre. */}
+                  {minutterIAlt === 0 && ` ${tr.finishZeroOk}`}
+                </div>
               )}
 
               <div style={{ textAlign: "center", margin: "18px 0 4px" }}>
