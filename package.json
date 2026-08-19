@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "oxlint && vite build",
+    "build:kun": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
