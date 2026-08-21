@@ -47,6 +47,53 @@ function laesKopi(empId, aar, uge) {
   }
 }
 
+// ── Adgangsoplysninger hentet paa forhaand ───────────────────────────────────
+// Noegleboks- og alarmkoder gemmes KUN naar hun selv har hentet dem — og saa kun
+// dagen ud. Det er et bevidst valg, truffet af Jonn:
+//
+// Pointen med adgangskontrollen er at OPSLAGET bliver logget, ikke at det skal ske ved
+// doeren. Har hun hentet koden mens hun havde daekning, staar linjen i access_log med
+// navn og tidspunkt. At koden derefter ligger paa telefonen aendrer ikke paa sporet.
+//
+// Til gengaeld ligger kundernes koder saa paa en privat telefon en hel arbejdsdag. Det
+// er borgeres og aeldres hjem, og ordningen skal staa i persondatadokumentationen.
+// Derfor: kun dagen ud, ryddet automatisk, og ryddet ved log ud.
+function iDagNoegle() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function gemAdgang(opgaveId, tekst) {
+  try {
+    const raa = localStorage.getItem("wl_adgang");
+    const gemt = raa ? JSON.parse(raa) : {};
+    // Skiftede dagen, starter vi forfra. Det er den automatiske oprydning.
+    const bog = gemt.dag === iDagNoegle() ? gemt : { dag: iDagNoegle(), koder: {} };
+    bog.koder[opgaveId] = tekst ?? "";
+    localStorage.setItem("wl_adgang", JSON.stringify(bog));
+  } catch { /* fuldt lager — kopien er en hjaelp, ikke et krav */ }
+}
+
+function laesAdgang(opgaveId) {
+  try {
+    const raa = localStorage.getItem("wl_adgang");
+    if (!raa) return null;
+    const bog = JSON.parse(raa);
+    if (bog.dag !== iDagNoegle()) {
+      // Gaar hun ind i appen dagen efter, ryddes gaarsdagens koder her.
+      localStorage.removeItem("wl_adgang");
+      return null;
+    }
+    const v = bog.koder?.[opgaveId];
+    return v === undefined ? null : v;
+  } catch {
+    return null;
+  }
+}
+
+function rydAdgang() {
+  try { localStorage.removeItem("wl_adgang"); } catch { /* ingenting at goere */ }
+}
+
 // Ryddes ved log ud. Ellers ville den naeste der loggede ind paa samme telefon kunne
 // se den forriges opgaver med kundenavne og adresser.
 function rydKopier() {
@@ -152,6 +199,12 @@ const T = {
     finishNeedTime: "Sæt tiden, før du går videre.",
     newVersion: "Ny version klar — tryk for at opdatere",
     savedCopy: "Gemt kopi — ingen forbindelse",
+    accessOffline: "Ingen forbindelse, og du har ikke hentet adgangen til denne opgave i dag. Ring til kontoret.",
+    accessFromCopy: "Hentet tidligere i dag — gemmes kun til i nat",
+    fetchAccessAll: "Hent dagens adgangsoplysninger",
+    fetchAccessHint: (n) => `${n} af dagens opgaver mangler. Hent dem mens du har dækning.`,
+    fetchAccessDone: "Dagens adgangsoplysninger er hentet",
+    fetchAccessWorking: "Henter…",
     savedCopyFrom: (t) => `Hentet ${t}. Nye ændringer fra kontoret er ikke med.`,
     offlineTitle: "Ingen forbindelse lige nu",
     offlineHint: "Dine opgaver kunne ikke hentes. Prøv igen når du har dækning — der er ikke noget galt med din bruger.",
@@ -301,6 +354,12 @@ const T = {
     finishNeedTime: "Set the time before you continue.",
     newVersion: "New version ready — tap to update",
     savedCopy: "Saved copy — no connection",
+    accessOffline: "No connection, and you have not fetched the access details for this job today. Call the office.",
+    accessFromCopy: "Fetched earlier today — kept only until tonight",
+    fetchAccessAll: "Fetch today's access details",
+    fetchAccessHint: (n) => `${n} of today's jobs are missing them. Fetch them while you have coverage.`,
+    fetchAccessDone: "Today's access details have been fetched",
+    fetchAccessWorking: "Fetching…",
     savedCopyFrom: (t) => `Fetched ${t}. Changes from the office since then are not included.`,
     offlineTitle: "No connection right now",
     offlineHint: "Your jobs could not be loaded. Try again when you have coverage — there is nothing wrong with your account.",
@@ -1750,6 +1809,8 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const [adgangTekst, setAdgangTekst] = useState(null);
   const [adgangHenter, setAdgangHenter] = useState(false);
   const [adgangFejl, setAdgangFejl] = useState("");
+  // Sand naar teksten kommer fra telefonens kopi og ikke fra et friskt opslag.
+  const [adgangFraKopi, setAdgangFraKopi] = useState(false);
   // Gemte kommentarer og billeder vises her, men skrives i afslutningsflowet.
   const [noter, setNoter] = useState([]);
   const [fotoUrls, setFotoUrls] = useState({});
@@ -1817,8 +1878,22 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
     setAdgangHenter(true);
     setAdgangFejl("");
     const { data, error } = await supabaseClient.rpc("hent_adgangsinfo", { p_instance_id: task.id });
-    if (error) setAdgangFejl(tr.accessFailed);
-    else setAdgangTekst(data ?? "");
+    if (error) {
+      // Har hun hentet koden tidligere i dag, ligger den paa telefonen. Saa er der
+      // ingen grund til at lade hende staa ved en laast doer uden at kunne komme ind —
+      // opslaget ER logget, dengang hun hentede den.
+      const gemt = laesAdgang(task.id);
+      if (gemt !== null) {
+        setAdgangTekst(gemt);
+        setAdgangFraKopi(true);
+      } else {
+        setAdgangFejl(navigator.onLine ? tr.accessFailed : tr.accessOffline);
+      }
+    } else {
+      setAdgangTekst(data ?? "");
+      setAdgangFraKopi(false);
+      gemAdgang(task.id, data ?? "");
+    }
     setAdgangHenter(false);
   }
 
@@ -1902,7 +1977,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
             {adgangTekst !== null ? (
               <>
                 <div style={s.sheetAccessText}>{adgangTekst || tr.accessNone}</div>
-                <div style={s.adgangLogget}>{tr.accessLogged}</div>
+                <div style={s.adgangLogget}>
+                  {adgangFraKopi ? tr.accessFromCopy : tr.accessLogged}
+                </div>
               </>
             ) : (
               <>
@@ -2207,6 +2284,8 @@ export default function MedarbejderApp() {
   const [ingenForbindelse, setIngenForbindelse] = useState(false);
   // Tidspunktet paa den gemte kopi vi ser paa. null betyder at data er friske.
   const [kopiHentet, setKopiHentet] = useState(null);
+  const [henterAdgang, setHenterAdgang] = useState(false);
+  const [adgangHentetNu, setAdgangHentetNu] = useState(false);
   const [employee, setEmployee] = useState(null);
   const [instances, setInstances] = useState([]);
   const [travelSettings, setTravelSettings] = useState({ defaultMinutes: 20, dayStart: "07:00", overrides: {} });
@@ -2558,6 +2637,30 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
   const myTasks = instances.filter((t) => t.day === day);
   const schedule = computeDaySchedule(myTasks, travelSettings, employee);
 
+  // Adgangsoplysninger kan ikke hentes uden daekning, og de maa ikke ligge klar paa
+  // forhaand uden at nogen har bedt om dem. Loesningen er at HUN henter dem, mens hun
+  // har daekning — og at appen minder om det inden hun koerer.
+  //
+  // Kun dagens opgaver, kun dem hun ikke allerede har hentet i dag, og kun naar der er
+  // forbindelse. Er der ingen, staar der ingenting.
+  const manglerAdgang = kopiHentet || !navigator.onLine
+    ? []
+    : myTasks.filter((t) => laesAdgang(t.id) === null);
+
+  async function hentDagensAdgang() {
+    setHenterAdgang(true);
+    for (const t of manglerAdgang) {
+      // p_kontekst = 'forhaand', saa loggen kan skelne. Ellers ville den se ud som om
+      // hele dagens kunder blev besoegt kl. 06:45.
+      const { data, error } = await supabase.rpc("hent_adgangsinfo", {
+        p_instance_id: t.id, p_kontekst: "forhaand",
+      });
+      if (!error) gemAdgang(t.id, data ?? "");
+    }
+    setHenterAdgang(false);
+    setAdgangHentetNu(true);
+  }
+
   return (
     <div style={s.app}>
 
@@ -2573,6 +2676,30 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
                    fontFamily: "inherit" }}>
           <span>{tr.newVersion}</span>
         </button>
+      )}
+
+      {/* Mindelsen om at hente adgangsoplysninger, mens der stadig er daekning.
+          Staar over dagslisten, for den skal ses INDEN hun koerer — ikke naar hun
+          staar ved doeren. */}
+      {manglerAdgang.length > 0 && !adgangHentetNu && (
+        <div style={{ background: "#EFF6FF", borderBottom: "1px solid #BFDBFE", padding: "10px 16px" }}>
+          <div style={{ fontSize: 12.5, color: "#1E40AF", marginBottom: 8, lineHeight: 1.45 }}>
+            {tr.fetchAccessHint(manglerAdgang.length)}
+          </div>
+          <button
+            onClick={hentDagensAdgang} disabled={henterAdgang}
+            style={{ width: "100%", border: "none", borderRadius: 9, background: "#1D4ED8", color: "#fff",
+                     padding: "11px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                     fontFamily: "inherit", opacity: henterAdgang ? 0.6 : 1 }}>
+            🔒 {henterAdgang ? tr.fetchAccessWorking : tr.fetchAccessAll}
+          </button>
+        </div>
+      )}
+      {adgangHentetNu && manglerAdgang.length === 0 && (
+        <div style={{ background: "#F0FDF4", borderBottom: "1px solid #BBF7D0", padding: "9px 16px",
+                      fontSize: 12.5, color: "#166534" }}>
+          ✓ {tr.fetchAccessDone}
+        </div>
       )}
 
       {/* Hun skal kunne se at listen ikke er frisk. Uden det ville hun tro at en
