@@ -99,10 +99,13 @@ const T = {
     finishLessThan: (t) => `${t} mindre end planlagt`,
     finishWhyMore: "Skriv hvorfor der gik længere tid — så kan kontoret forklare det til kunden.",
     finishNeedTime: "Sæt tiden, før du går videre.",
-    finishProductsQ: "Brugte du produkter hos kunden?",
-    finishProductsHint: "Rengøringsmidler og andet, der skal trækkes fra lageret og faktureres.",
-    finishPickProducts: "Vælg produkter",
-    finishProductsSaved: "Produkterne er registreret og trukket fra lageret. Skal noget rettes, så sig det til kontoret.",
+    newVersion: "Ny version klar — tryk for at opdatere",
+    finishHandoverQ: "Har kunden fået de produkter du hentede på kontoret?",
+    finishHandoverHint: "Det her fik du med. Bekræft kun det kunden faktisk har fået.",
+    finishHandoverYes: "Ja, kunden har fået dem",
+    finishHandoverNo: "Nej, ikke denne gang",
+    finishHandoverRequired: "Vælg ja eller nej, før du går videre.",
+    finishHandoverFoot: "Siger du nej, bliver de stående hos dig og dukker op igen næste gang du er hos kunden. Kunden får først en regning for dem når du har sagt ja.",
     finishAlready: (t) => `Der er allerede registreret ${t} på opgaven. Skriv kun den tid du vil lægge til.`,
     finishZeroOk: "Skal du ikke tilføje mere tid, lader du bare 0 stå og trykker Videre.",
     finishSaveFailed: "Kunne ikke gemme. Tjek at du har forbindelse, og prøv igen.",
@@ -240,10 +243,13 @@ const T = {
     finishLessThan: (t) => `${t} less than planned`,
     finishWhyMore: "Write why it took longer — so the office can explain it to the customer.",
     finishNeedTime: "Set the time before you continue.",
-    finishProductsQ: "Did you use any products?",
-    finishProductsHint: "Cleaning supplies and anything else to deduct from stock and invoice.",
-    finishPickProducts: "Select products",
-    finishProductsSaved: "The products are registered and deducted from stock. If something needs changing, tell the office.",
+    newVersion: "New version ready — tap to update",
+    finishHandoverQ: "Did the customer get the products you picked up at the office?",
+    finishHandoverHint: "This is what you were given. Only confirm what the customer actually received.",
+    finishHandoverYes: "Yes, the customer got them",
+    finishHandoverNo: "No, not this time",
+    finishHandoverRequired: "Choose yes or no before you continue.",
+    finishHandoverFoot: "If you say no, they stay with you and show up again next time you visit this customer. The customer is only invoiced once you say yes.",
     finishAlready: (t) => `${t} is already registered on this job. Only enter the time you want to add.`,
     finishZeroOk: "If you are not adding more time, just leave it at 0 and tap Next.",
     finishSaveFailed: "Could not save. Check your connection and try again.",
@@ -505,7 +511,14 @@ async function uploadOpgavefotos(klient, opgaveId, notatId, filer, onFremdrift) 
       contentType: "image/jpeg",
       upsert: false,
     });
-    if (error) throw new Error(error.message);
+    // Stien er fast, saa ligger filen der allerede, ER billedet sendt. Det sker naar
+    // forbindelsen falder ud efter uploaden men foer svaret naaede frem, og hun
+    // proever igen. Det er en succes, ikke en fejl — upsert: true undgaas med vilje,
+    // saa vi ikke ved et uheld overskriver et billede med et andet.
+    const findesAllerede = error && (error.statusCode === "409"
+      || error.statusCode === 409
+      || /exists/i.test(error.message || ""));
+    if (error && !findesAllerede) throw new Error(error.message);
     stier.push(sti);
   }
   return stier;
@@ -702,12 +715,12 @@ const HELP_DA = [
       "Det store tal foroven er det du registrerer i alt. Under det står om det passer med det planlagte.",
       "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden.",
       "Har du fortrudt en afslutning og åbner opgaven igen — fx for at tilføje et billede — står der 0, og det er helt i orden. Din tid er registreret i forvejen, og du skal ikke taste mere for at komme videre." ] },
-  { t: "Produkter du har brugt", p: [
-      "På de aftaler hvor der udleveres produkter til kunden, bliver du spurgt om det når du afslutter.",
-      "Brugte du fx rengøringsmidler hos kunden, så vælg dem og sæt antal. Så trækkes det fra lageret, og kunden bliver faktureret rigtigt.",
-      "Brugte du ingenting, trykker du bare «Videre».",
-      "Bliver du ikke spurgt, er det fordi der ikke udleveres produkter på den aftale. Så er der ét trin mindre, og tælleren øverst siger fx «1 af 2».",
-      "Mener du at der burde udleveres produkter, så skriv det til kontoret i kommentaren på det sidste trin." ] },
+  { t: "Produkter til kunden", p: [
+      "Produkter henter du på kontoret. Planlæggeren skriver ned hvad du har fået med, og til hvilken kunde. Du skal ikke selv vælge noget i appen.",
+      "Har du varer med til en kunde, kommer der et ekstra trin når du afslutter en opgave hos netop den kunde. Der står hvad du fik med, og du svarer ja eller nej til om kunden har fået det.",
+      "Det er lige meget hvilken opgave hos kunden du står på — udleveringen følger dig og kunden, ikke en bestemt dag. Bliver opgaven flyttet, følger den med.",
+      "Siger du nej, bliver varerne stående hos dig og dukker op igen næste gang du er hos kunden. Kunden får først en regning for dem når du har sagt ja.",
+      "Bliver du ikke spurgt, har du ingen varer med til den kunde. Så er der ét trin mindre, og tælleren øverst siger fx «1 af 2»." ] },
   { t: "Nexus-borgere", p: [
       "Er opgaven hos en Nexus-borger, står det øverst på opgaven, og der er en knap til at åbne KMD Nexus.",
       "Når du afslutter, kommer der et ekstra trin hvor du bliver mindet om at kvittere i Nexus. Kommunen betaler efter det der står i Nexus — ikke efter det du skriver her.",
@@ -776,12 +789,12 @@ const HELP_EN = [
       "The large number at the top is the total you are registering. Below it you can see whether it matches the plan.",
       "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer.",
       "If you undid a completion and open the job again — for example to add a photo — it says 0, and that is fine. Your time is already registered, and you do not need to enter more to continue." ] },
-  { t: "Products you used", p: [
-      "On the agreements where products are supplied to the customer, you are asked about it when you complete the job.",
-      "If you used cleaning supplies, select them and set the amount. It is then deducted from stock and billed to the customer.",
-      "If you used nothing, just tap \"Next\".",
-      "If you are not asked, it is because no products are supplied on that agreement. Then there is one step fewer, and the counter at the top says for example \"1 of 2\".",
-      "If you think products should be supplied, write it to the office in the comment on the last step." ] },
+  { t: "Products for the customer", p: [
+      "You pick up products at the office. The planner records what you were given, and for which customer. You do not select anything in the app yourself.",
+      "If you are carrying items for a customer, an extra step appears when you complete a job for that customer. It shows what you were given, and you answer yes or no to whether the customer received it.",
+      "It does not matter which job for that customer you are on — the handover follows you and the customer, not a particular day. If the job is moved, it comes along.",
+      "If you say no, the items stay with you and show up again next time you visit that customer. The customer is only invoiced once you say yes.",
+      "If you are not asked, you have nothing for that customer. Then there is one step fewer, and the counter at the top says for example \"1 of 2\"." ] },
   { t: "Nexus citizens", p: [
       "If the job is for a Nexus citizen, it says so at the top of the job, and there is a button to open KMD Nexus.",
       "When you complete the job there is an extra step reminding you to sign off in Nexus. The municipality pays according to Nexus — not according to what you write here.",
@@ -1001,124 +1014,10 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
   );
 }
 
-// ── Product usage page ────────────────────────────────────────────────────────
-function ProductPage({ task, employee, lang, onClose, onSave, supabaseClient }) {
-  const tr = T[lang];
-  const [items, setItems] = useState([]);
-  const [selected, setSelected] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      // Hent kun kundeprodukter
-      const { data: cats } = await supabaseClient.from("inventory_categories").select("id").eq("type", "kunde");
-      const catIds = (cats || []).map((c) => c.id);
-      if (!catIds.length) { setLoading(false); return; }
-      const { data } = await supabaseClient
-        .from("inventory_items")
-        .select("*, inventory_categories(name,icon)")
-        .in("category_id", catIds)
-        .order("name");
-      setItems(data || []);
-      setLoading(false);
-    }
-    load();
-  }, []);
-
-  async function save() {
-    const entries = Object.entries(selected).filter(([, qty]) => Number(qty) > 0);
-    if (!entries.length) { onClose(); return; }
-    setSaving(true);
-    for (const [itemId, qty] of entries) {
-      const amount = Number(qty);
-      const item = items.find((i) => i.id === itemId);
-      if (!item) continue;
-      const { error: txErr } = await supabaseClient.from("inventory_transactions").insert({
-        item_id: itemId, quantity: -amount, type: "out",
-        reason: `Brugt på: ${task.title}`,
-        instance_id: task.id, employee_id: employee.id,
-      });
-      if (txErr) { console.error("inventory_transactions insert:", txErr.message); alert(`Kunne ikke registrere forbrug af "${item.name}" — prøv igen.`); setSaving(false); return; }
-      // Atomart fradrag i databasen. Tidligere blev lagertallet læst i browseren,
-      // trukket fra og skrevet tilbage — hvis to medarbejdere udtog varer samtidig,
-      // overskrev den ene den andens opdatering, og lageret blev forkert.
-      const { error: stockErr } = await supabaseClient.rpc("consume_stock", { p_item_id: itemId, p_amount: amount });
-      if (stockErr) { console.error("consume_stock:", stockErr.message); alert(`Kunne ikke opdatere lageret for "${item.name}" — prøv igen.`); setSaving(false); return; }
-    }
-    setSaving(false);
-    onSave(entries.map(([id, qty]) => ({ id, qty: Number(qty), name: items.find((i) => i.id === id)?.name })));
-  }
-
-  const usedCount = Object.values(selected).filter((v) => Number(v) > 0).length;
-
-  return (
-    <div style={s.overlay} onClick={onClose}>
-      <div style={{ ...s.sheet, maxHeight: "95svh" }} onClick={(e) => e.stopPropagation()}>
-        <div style={s.dragHandle} />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px 0" }}>
-          <div style={{ fontWeight: 800, fontSize: 18, color: "#111111" }}>
-            📦 {lang === "da" ? "Produkter brugt" : "Products used"}
-          </div>
-          <button style={s.sheetClose} onClick={onClose}><X size={18} /></button>
-        </div>
-        <div style={{ fontSize: 13, color: "#64748B", padding: "4px 20px 12px" }}>{task.title}</div>
-
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 20px" }}>
-          {loading ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>Indlæser produkter…</div>
-          ) : items.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>
-              {lang === "da" ? "Ingen kundeprodukter på lager" : "No customer products in inventory"}
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {items.map((item) => {
-                const qty = selected[item.id] || "";
-                const hasQty = Number(qty) > 0;
-                return (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #F1F5F9", background: hasQty ? "#FFF6FA" : "transparent", borderRadius: hasQty ? 10 : 0, paddingLeft: hasQty ? 10 : 0, transition: "all 0.15s" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: hasQty ? 700 : 500, color: "#111111" }}>
-                        {item.inventory_categories?.icon} {item.name}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#94A3B8" }}>
-                        {lang === "da" ? "Lager" : "Stock"}: {item.stock} {item.unit}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button
-                        style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid #E2E8F0", background: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}
-                        onClick={() => setSelected((prev) => ({ ...prev, [item.id]: Math.max(0, (Number(prev[item.id]) || 0) - 1) || "" }))}>−</button>
-                      <input
-                        type="number" min={0} max={item.stock} step={1} inputMode="numeric" pattern="[0-9]*"
-                        style={{ width: 52, padding: "7px 4px", borderRadius: 8, border: hasQty ? "2px solid #D6247A" : "1.5px solid #E2E8F0", fontSize: 15, textAlign: "center", color: "#111111", background: "#fff", fontWeight: hasQty ? 700 : 400 }}
-                        value={qty}
-                        onChange={(e) => setSelected((prev) => ({ ...prev, [item.id]: e.target.value.replace(/[^0-9]/g, "") }))}
-                      />
-                      <button
-                        style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid #D6247A", background: "#FCE4EF", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#D6247A" }}
-                        onClick={() => setSelected((prev) => ({ ...prev, [item.id]: (Number(prev[item.id]) || 0) + 1 }))}>+</button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div style={{ padding: "12px 20px 32px", borderTop: "1px solid #F1F5F9" }}>
-          <button
-            style={{ ...s.doneLarge, background: usedCount > 0 ? "#D6247A" : "#fff", color: usedCount > 0 ? "#fff" : "#475569", borderColor: usedCount > 0 ? "#D6247A" : "#E2E8F0", fontWeight: 700 }}
-            onClick={save} disabled={saving}>
-            {saving ? "Gemmer…" : usedCount > 0 ? `${lang === "da" ? "Gem" : "Save"} ${usedCount} ${lang === "da" ? "produkter" : "products"}` : lang === "da" ? "Ingen produkter valgt — luk" : "No products — close"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// ProductPage er fjernet. Produkter udleveres nu paa kontoret af planlaeggeren, og
+// medarbejderen BEKRAEFTER blot i afslutningsflowet at kunden har faaet dem. Hun
+// vaelger altsaa ikke laengere varer i appen - hun koerer i privat bil og har
+// aldrig lagervarer med.
 
 // ── Meld et problem ──────────────────────────────────────────────────────────
 // Egen fuldskaerm, ikke et felt der klapper ud nederst paa opgaven. Foer laa de to
@@ -1135,6 +1034,13 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
   const [fotoFremdrift, setFotoFremdrift] = useState(null);
   const [sendt, setSendt] = useState(null);
 
+  // Id'erne laves EEN gang, naar skaermen aabnes — ikke inde i send(). Ellers faar
+  // hvert forsoeg sit eget id, og en melding der fejlede halvvejs og bliver sendt igen
+  // ville staa to gange hos kontoret. Med faste id'er og upsert nedenfor kan der
+  // trykkes send saa mange gange det skal vaere: der staar én melding bagefter.
+  const [notatId] = useState(() => nytId("tn"));
+  const [oenskeId] = useState(() => nytId("rr"));
+
   const forgaeves = art === "forgaeves";
   const kanSende = grund.trim() && (forgaeves || dato);
 
@@ -1145,14 +1051,14 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
     try {
       // Notatet foerst: det er dét der baerer billederne, og kontoret skal kunne se
       // dokumentationen ved siden af opgaven — ogsaa efter meldingen er lukket.
-      let notatId = null;
       let stier = [];
       if (forgaeves) {
-        notatId = nytId("tn");
-        const { error: insErr } = await supabaseClient.from("task_notes").insert({
+        // upsert og ikke insert: id'et er fast, saa et gentaget forsoeg overskriver
+        // den samme raekke i stedet for at lave en dublet.
+        const { error: insErr } = await supabaseClient.from("task_notes").upsert({
           id: notatId, instance_id: task.id, employee_id: employee?.id || null,
           kind: "forgaeves", text: grund.trim(), photos: [],
-        });
+        }, { onConflict: "id" });
         if (insErr) throw new Error(insErr.message);
         if (filer.length > 0) {
           stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, filer,
@@ -1162,18 +1068,21 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
           if (updErr) throw new Error(updErr.message);
         }
       }
-      const { error } = await supabaseClient.from("reschedule_requests").insert({
-        id: nytId("rr"),
+      const { error } = await supabaseClient.from("reschedule_requests").upsert({
+        id: oenskeId,
         instance_id: task.id,
         employee_id: employee?.id || null,
         kind: forgaeves ? "forgaeves" : "ny_tid",
-        note_id: notatId,
+        // Notatet oprettes kun ved forgaeves besoeg. Id'et findes altid, fordi det
+        // laves naar skaermen aabnes — men det maa kun skrives her hvis raekken
+        // faktisk er oprettet ovenfor.
+        note_id: forgaeves ? notatId : null,
         requested_date: dato || null,
         requested_time: klokken || null,
         reason: grund.trim(),
         old_year: task.year, old_week: task.week, old_day: task.day,
         old_time: task.scheduled_time || null,
-      });
+      }, { onConflict: "id" });
       if (error) throw new Error(error.message);
 
       // Backoffice skal vide det med det samme — de kigger ikke nødvendigvis i appen.
@@ -1200,7 +1109,11 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
         }});
       }
       setSendt(forgaeves ? "forgaeves" : "ny_tid");
-      onSendt(forgaeves ? "forgaeves" : "ny_tid", notatId
+      // Betingelsen er «forgaeves» og ikke «har vi et notat-id». Id'et laves nu naar
+      // skaermen aabnes, saa det er altid sat — men notatet oprettes kun ved forgaeves
+      // besoeg. Uden rettelsen ville et oenske om ny tid melde et notat tilbage der
+      // ikke findes i databasen.
+      onSendt(forgaeves ? "forgaeves" : "ny_tid", forgaeves
         ? { id: notatId, instance_id: task.id, employee_id: employee?.id || null,
             kind: "forgaeves", text: grund.trim(), photos: stier,
             created_at: new Date().toISOString() }
@@ -1319,11 +1232,38 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
 // opgave fungerer praecis som foer.
 function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, onSetStatus, onAfbryd, onFaerdig }) {
   const erNexus = task.contractType === "nexus";
+
+  // Produkter udleveres paa KONTORET af planlaeggeren. Medarbejderen vaelger altsaa
+  // ikke laengere varer her — hun BEKRAEFTER at kunden har faaet det hun fik med.
+  //
+  // null betyder "ikke slaaet op endnu". Trinnene maa ikke bygges foer svaret er
+  // hjemme: aendrede listen sig undervejs, ville trinNr pege paa et andet trin end
+  // det hun stod paa.
+  const [udleveringer, setUdleveringer] = useState(null);
+  const [udleverBekraeftet, setUdleverBekraeftet] = useState(null);
+
+  useEffect(() => {
+    let afbrudt = false;
+    (async () => {
+      const guid = task.dinero_contact_guid;
+      if (!guid) { setUdleveringer([]); return; }
+      // Udleveringen peger ikke paa en bestemt opgave. Den findes paa medarbejder plus
+      // kunde, saa den dukker op uanset hvilken opgave hos kunden hun naar frem til.
+      const { data } = await supabaseClient
+        .from("inventory_transactions")
+        .select("id, quantity, item_id, udleveret_dato, inventory_items(name, unit)")
+        .eq("employee_id", employee.id)
+        .eq("til_kunde_guid", guid)
+        .is("instance_id", null);
+      if (!afbrudt) setUdleveringer(data || []);
+    })();
+    return () => { afbrudt = true; };
+  }, [task.id, task.dinero_contact_guid, employee.id, supabaseClient]);
+
   // Trinnene bygges op efter opgaven, saa taellingen "3 af 4" passer til det man
-  // faktisk faar at se. En erhvervsopgave spoerges ikke om Nexus, og en aftale uden
-  // produktudlevering spoerges ikke om produkter — det trin blev vist paa hver eneste
-  // opgave uden at der nogensinde blev registreret en udlevering.
-  const spoergOmProdukter = !!task.deliversProducts;
+  // faktisk faar at se. En erhvervsopgave spoerges ikke om Nexus, og har hun ingen
+  // varer med til kunden, er der ingen grund til at spoerge om produkter.
+  const spoergOmProdukter = (udleveringer?.length || 0) > 0;
   const trin = [
     "tid",
     ...(spoergOmProdukter ? ["produkter"] : []),
@@ -1367,14 +1307,22 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
   const [begrundelse, setBegrundelse] = useState("");
   const [begrundelseFejl, setBegrundelseFejl] = useState(false);
 
-  const [produkter, setProdukter] = useState([]);
-  const [visProdukter, setVisProdukter] = useState(false);
 
   const [nexusOk, setNexusOk] = useState(false);
 
   const [beskedTekst, setBeskedTekst] = useState("");
   const [beskedFiler, setBeskedFiler] = useState([]);
   const [fotoFremdrift, setFotoFremdrift] = useState(null);
+
+  // Id'et laves naar afslutningsskaermen aabnes og ikke ved hvert forsoeg paa at gemme.
+  // Fejler afslutningen halvvejs og hun proever igen, rammer upsert'en den samme raekke
+  // — og fotostierne, der bygges paa notat-id'et, peger ogsaa samme sted.
+  const [notatId] = useState(() => nytId("tn"));
+
+  // Egen noegle til tidsregistreringen. tidErGemt nedenfor spaerrer inden for DENNE
+  // skaerm, men forsvinder hvis siden genindlaeses eller telefonen genstarter midt i
+  // det hele. Noeglen ligger i databasen og holder ogsaa der.
+  const [tidNoegle] = useState(() => nytId("tl"));
 
   const minutterIAlt = samletMin;
   // Overskridelsen maales paa opgavens samlede tid, ikke paa den enkelte medarbejders.
@@ -1403,6 +1351,13 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
       if (minutterIAlt <= 0 && alleredeLogget <= 0) { setFejl(tr.finishNeedTime); return; }
       if (overskrider && !begrundelse.trim()) { setBegrundelseFejl(true); return; }
     }
+    // Der er ikke noget forvalgt ja. Varer der faktureres til en kunde som aldrig fik
+    // dem, er en regning der skal krediteres — saa hun skal svare, ikke bare trykke
+    // Videre. «Nej» er et fuldgyldigt svar og spaerrer ikke.
+    if (trin[trinNr] === "produkter" && udleverBekraeftet === null) {
+      setFejl(tr.finishHandoverRequired);
+      return;
+    }
     // Fejlmarkeringen nulstilles ved skift af trin. Ellers stod den roede ramme og
     // lyste naar man gik tilbage til tiden igen, uden at man havde trykket paa noget.
     setBegrundelseFejl(false);
@@ -1419,18 +1374,18 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
     setFejl("");
     try {
       if (minutterIAlt > 0 && !tidErGemt.current) {
-        const ok = await onLogMinutes(task.id, minutterIAlt, overskrider ? begrundelse.trim() : null);
+        const ok = await onLogMinutes(task.id, minutterIAlt,
+          overskrider ? begrundelse.trim() : null, tidNoegle);
         if (ok === false) throw new Error(tr.finishSaveFailed);
         tidErGemt.current = true;
       }
       // Kommentar og billeder gemmes som et notat, praecis som fra opgaveskaermen.
       let antalFotos = 0;
       if (beskedTekst.trim() || beskedFiler.length > 0) {
-        const notatId = nytId("tn");
-        const { error: insErr } = await supabaseClient.from("task_notes").insert({
+        const { error: insErr } = await supabaseClient.from("task_notes").upsert({
           id: notatId, instance_id: task.id, employee_id: employee?.id || null,
           kind: "kommentar", text: beskedTekst.trim() || null, photos: [],
-        });
+        }, { onConflict: "id" });
         if (insErr) throw new Error(insErr.message);
         if (beskedFiler.length > 0) {
           const stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, beskedFiler,
@@ -1448,11 +1403,21 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
           .from("instances").update({ nexus_confirmed: nexusOk }).eq("id", task.id);
         if (nxErr) throw new Error(nxErr.message);
       }
+      // Bekraeftelsen binder udleveringen til DENNE opgave, og foerst der kan varerne
+      // faktureres. Siger hun nej, roeres der ingenting: udleveringen bliver staaende
+      // og dukker op igen naeste gang hun er hos kunden.
+      let udleveret = 0;
+      if (spoergOmProdukter && udleverBekraeftet === true) {
+        const { data: antal, error: udErr } = await supabaseClient
+          .rpc("bekraeft_udlevering", { p_instance_id: task.id });
+        if (udErr) throw new Error(udErr.message);
+        udleveret = antal || 0;
+      }
       const statusOk = await onSetStatus(task.id, true);
       if (statusOk === false) throw new Error(tr.finishSaveFailed);
       setKvittering({
         minutter: alleredeLogget + minutterIAlt,
-        produkter: produkter.length,
+        produkter: udleveret,
         fotos: antalFotos,
         nexus: erNexus ? nexusOk : null,
       });
@@ -1465,6 +1430,22 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
 
   const aktuelt = trin[trinNr];
   const sidsteTrin = trinNr === trin.length - 1;
+
+  // Vent til opslaget om udleveringer er hjemme, foer der tegnes noget. Ellers ville
+  // trinlisten faa et trin mere midt i det hele, og trinNr ville pege paa et andet
+  // skridt end det hun stod paa — hun ville se noget skifte under fingeren.
+  if (udleveringer === null) {
+    return (
+      <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+        <div style={s.sheet}>
+          <div style={s.afslutTop}>{task.customerName || task.title}</div>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 15 }}>
+            {tr.loading}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (kvittering) {
     return (
@@ -1590,25 +1571,36 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
 
           {aktuelt === "produkter" && (
             <>
-              <div style={s.trinSpoergsmaal}>{tr.finishProductsQ}</div>
-              <div style={s.trinHjaelp}>{tr.finishProductsHint}</div>
-              {produkter.length > 0 ? (
-                <>
-                  <div style={s.kvitteringKort}>
-                    {produkter.map((p) => (
-                      <div key={p.id} style={s.kvitteringRaekke}><span>{p.name}</span><strong>{p.qty} stk</strong></div>
-                    ))}
+              <div style={s.trinSpoergsmaal}>{tr.finishHandoverQ}</div>
+              <div style={s.trinHjaelp}>{tr.finishHandoverHint}</div>
+              <div style={s.kvitteringKort}>
+                {(udleveringer || []).map((u) => (
+                  <div key={u.id} style={s.kvitteringRaekke}>
+                    <span>{u.inventory_items?.name || u.item_id}</span>
+                    <strong>{Math.abs(u.quantity)} {u.inventory_items?.unit || "stk"}</strong>
                   </div>
-                  {/* Ingen "ret produkter". Produktvalget skriver til lageret med det
-                      samme, saa en anden runde ville traekke de samme varer fra igen.
-                      Skal noget rettes, gør kontoret det — det staar i teksten. */}
-                  <div style={s.trinFod}>{tr.finishProductsSaved}</div>
-                </>
-              ) : (
-                <button style={{ ...s.sekundaerStor, marginTop: 14 }} onClick={() => setVisProdukter(true)}>
-                  📦 {tr.finishPickProducts}
-                </button>
-              )}
+                ))}
+              </div>
+              {/* To lige store knapper og intet forvalgt. Hun skal tage stilling — et
+                  forvalgt "ja" ville betyde at varer blev faktureret til en kunde der
+                  aldrig fik dem, bare fordi hun trykkede Videre. */}
+              <button
+                style={udleverBekraeftet === true ? s.nexusTjekAktiv : s.nexusTjek}
+                onClick={() => setUdleverBekraeftet(true)}>
+                <span style={udleverBekraeftet === true ? s.tjekFirkantAktiv : s.tjekFirkant}>
+                  {udleverBekraeftet === true && <Check size={16} color="#fff" strokeWidth={3} />}
+                </span>
+                <span>{tr.finishHandoverYes}</span>
+              </button>
+              <button
+                style={udleverBekraeftet === false ? s.nexusTjekAktiv : s.nexusTjek}
+                onClick={() => setUdleverBekraeftet(false)}>
+                <span style={udleverBekraeftet === false ? s.tjekFirkantAktiv : s.tjekFirkant}>
+                  {udleverBekraeftet === false && <Check size={16} color="#fff" strokeWidth={3} />}
+                </span>
+                <span>{tr.finishHandoverNo}</span>
+              </button>
+              <div style={s.trinFod}>{tr.finishHandoverFoot}</div>
             </>
           )}
 
@@ -1662,13 +1654,6 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
         </div>
       </div>
 
-      {visProdukter && (
-        <ProductPage
-          task={task} employee={employee} lang={lang} supabaseClient={supabaseClient}
-          onClose={() => setVisProdukter(false)}
-          onSave={(valgte) => { setProdukter(valgte); setVisProdukter(false); }}
-        />
-      )}
     </div>
   );
 }
@@ -1731,11 +1716,14 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   // id indgaar i filnavnet, og et notat uden billeder er stadig brugbart — mens et
   // billede uden et notat ville vaere hjemloest.
   async function gemNotat(art, tekst, filer) {
+    // Her laves id'et pr. kald, for hvert notat ER et nyt notat. Idempotensen kommer
+    // fra at id'et foelger med i skrivekoeen: sendes den samme koelinje igen, rammer
+    // upsert'en den samme raekke i stedet for at lave en dublet.
     const notatId = nytId("tn");
-    const { error: insErr } = await supabaseClient.from("task_notes").insert({
+    const { error: insErr } = await supabaseClient.from("task_notes").upsert({
       id: notatId, instance_id: task.id, employee_id: employee?.id || null,
       kind: art, text: (tekst || "").trim() || null, photos: [],
-    });
+    }, { onConflict: "id" });
     if (insErr) throw new Error(insErr.message);
     let stier = [];
     if (filer && filer.length > 0) {
@@ -2098,6 +2086,37 @@ export default function MedarbejderApp() {
 
   useEffect(() => { localStorage.setItem("wl_lang", lang); }, [lang]);
 
+  // ── Ny version af appen ────────────────────────────────────────────────────
+  // Med en service worker koerer telefonen paa en GEMT kopi af appen. Det er hele
+  // pointen — den skal kunne aabnes uden daekning — men det betyder ogsaa at en
+  // rettelse ikke laengere naar frem af sig selv. Foer sagde vi "hent siden med ?v=
+  // bagpaa"; den vej findes ikke mere.
+  //
+  // Derfor: ny version hentes i baggrunden, og hun faar en besked. Den opdaterer sig
+  // IKKE selv — en app der genindlaeser midt i en tidsregistrering kan smide det
+  // indtastede paa gulvet.
+  const [nyVersion, setNyVersion] = useState(null);
+
+  useEffect(() => {
+    let opdater;
+    (async () => {
+      try {
+        const { registerSW } = await import("virtual:pwa-register");
+        opdater = registerSW({
+          onNeedRefresh() { setNyVersion(() => opdater); },
+          onRegisteredSW(_url, reg) {
+            // Tjek en gang i timen. En telefon der ligger aaben hele dagen ville ellers
+            // foerst opdage en rettelse naeste gang appen blev lukket helt ned.
+            if (reg) setInterval(() => reg.update(), 60 * 60 * 1000);
+          },
+        });
+      } catch {
+        // I udviklingstilstand findes modulet ikke. Det er i orden — saa er der ingen
+        // service worker, og appen henter alt friskt hver gang.
+      }
+    })();
+  }, []);
+
   // Persist lang change to employee row in DB
   async function changeLang(newLang) {
     setLang(newLang);
@@ -2220,22 +2239,23 @@ useEffect(() => {
         // saa de forsvinder fra medarbejderens liste med det samme.
         .from("instances").select("*").eq("week", targetWeek).eq("year", targetYear).is("deleted_at", null);
       if (instErr) console.error("load instances error:", instErr.message);
-      const { data: customersData } = await supabase.from("customers").select("*");
-      const custMap = Object.fromEntries((customersData || []).map((c) => [c.id, c]));
-
+      // customers-tabellen hentes IKKE laengere. Opslaget skete paa i.customer_id, og det
+      // felt er null paa samtlige opgaver — kunden staar som almindelig tekst direkte paa
+      // opgaven. Forespoergslen hentede altsaa hele kundelisten ned paa hver telefon og
+      // brugte den aldrig. Politikken paa customers er samtidig strammet, saa den kun
+      // slipper medarbejdere igennem.
       const myInstances = (instData || [])
         .filter((i) => {
           const arr = typeof i.assignees === "string" ? JSON.parse(i.assignees) : (i.assignees || []);
           return arr.includes(viewEmpId || empData.id);
         })
         .map((i) => {
-          const cust = custMap[i.customer_id];
           return {
             ...i,
             timeLog: i.time_log ?? [],
             requiredSkills: i.required_skills ?? [],
-            customerName: i.customer_name || cust?.name || "",
-            address: i.address_text || cust?.address || "",
+            customerName: i.customer_name || "",
+            address: i.address_text || "",
             // accessInstructions hentes IKKE med her laengere. Kolonnen staar tom, og
             // teksten ligger i en tabel appen ikke kan laese. Den hentes kun naar
             // medarbejderen selv trykker, gennem hent_adgangsinfo, som logger opslaget.
@@ -2245,7 +2265,6 @@ useEffect(() => {
             // indholdet, og saa var vi tilbage ved at afsloere noget. Er der ingenting,
             // siger svaret det — og opslaget staar i loggen, hvilket er helt i orden.
             needsKeyPickup: i.needs_key_pickup ?? false,
-            deliversProducts: i.delivers_products ?? false,
             contractType: i.contract_type || i.contractType || "privat",
           };
         });
@@ -2276,7 +2295,7 @@ useEffect(() => {
   // Returnerer true/false. Afslutningsflowet er nødt til at kunne se om det gik godt:
   // før returnerede funktionen ingenting, og et lydløst afbrud — fx når en planlægger
   // kigger i en kollegas plan — endte i en kvittering på noget der aldrig blev gemt.
-  async function logMinutes(taskId, minutes, note = null) {
+  async function logMinutes(taskId, minutes, note = null, klientId = null) {
     if (viewingOther) return false;
     const m = Number(minutes);
     if (!employee || !m || m <= 0) return false;
@@ -2285,8 +2304,14 @@ useEffect(() => {
     // Atomar tilføjelse i databasen. Tidligere blev hele time_log-arrayet læst,
     // udvidet og skrevet tilbage — loggede to medarbejdere tid på samme opgave
     // samtidig, forsvandt den enes registrering sporløst.
+    //
+    // p_klient_id er noeglen fra telefonen. Funktionen LAEGGER TIL, saa uden den ville
+    // en gentagelse — fordi svaret forsvandt undervejs — give 120 minutter i stedet for
+    // 60, og det tal gaar direkte i loen og paa fakturaen. Med noeglen afvises
+    // gentagelsen i databasen, og kaldet ser vellykket ud for appen.
     const { data: newLog, error } = await supabase.rpc("append_time_log", {
       p_instance_id: taskId, p_minutes: m, p_emp_id: employee.id, p_note: note,
+      p_klient_id: klientId,
     });
     if (error) {
       console.error("append_time_log:", error.message);
@@ -2364,6 +2389,20 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
 
   return (
     <div style={s.app}>
+
+      {/* Ligger OVER hovedet, saa den ikke kan overses. Den lukker sig ikke selv:
+          en rettelse der ikke naar ud er praecis det problem service workeren
+          ellers ville skabe. */}
+      {nyVersion && (
+        <button
+          onClick={() => nyVersion(true)}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                   width: "100%", border: "none", background: "#166534", color: "#fff",
+                   padding: "13px 16px", fontSize: 14.5, fontWeight: 700, cursor: "pointer",
+                   fontFamily: "inherit" }}>
+          <span>{tr.newVersion}</span>
+        </button>
+      )}
 
       {/* Header */}
       <div style={s.header}>
@@ -2859,6 +2898,12 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
   const [saved, setSaved] = useState(false);
   const [view, setView] = useState("shop");
 
+  // Bestillingsnummeret laves naar skaermen aabnes og ikke inde i save(). Fejlede
+  // bestillingen halvvejs — to varer oprettet, den tredje ikke — fik det naeste forsoeg
+  // foer sit eget nummer, og de to foerste varer blev bestilt igen. Nu rammer de samme
+  // raekker, og planlaeggeren ser én bestilling.
+  const [orderGroupId] = useState(() => crypto.randomUUID());
+
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -2891,17 +2936,17 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
     setSaving(true);
     // Bestillingen oprettes som "pending" — lageret nedskrives først når
     // planlæggeren godkender udleveringen (se InventoryView i Rengøringsplan).
-    const orderGroupId = crypto.randomUUID();
     for (const [itemId, qty] of entries) {
       const amount = Number(qty);
       const item = items.find((i) => i.id === itemId);
       if (!item) continue;
-      const { error: insertErr } = await supabaseClient.from("inventory_transactions").insert({
+      const { error: insertErr } = await supabaseClient.from("inventory_transactions").upsert({
+        id: `${orderGroupId}-${itemId}`,
         item_id: itemId, quantity: -amount, type: "out", status: "pending", order_group_id: orderGroupId,
         reason: lang === "da" ? `Bestilt af ${employee.name}` : `Ordered by ${employee.name}`,
         employee_id: employee.id,
-      });
-      if (insertErr) { console.error("order insert:", insertErr.message); alert(`Kunne ikke oprette bestillingen for "${item.name}" — prøv igen.`); setSaving(false); return; }
+      }, { onConflict: "id" });
+      if (insertErr) { console.error("order upsert:", insertErr.message); alert(`Kunne ikke oprette bestillingen for "${item.name}" — prøv igen.`); setSaving(false); return; }
     }
     // Giv planlæggeren besked om at der venter en bestilling til godkendelse.
     try {
@@ -2910,11 +2955,13 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
         const item = items.find((i) => i.id === itemId);
         return `${qty} × ${item ? item.name : itemId}`;
       }).join(", ");
+      // Gik foer gennem en raa fetch uden Authorization-header. Det virkede kun fordi
+      // send-email stod helt aaben, og det var netop hullet: enhver der kendte URL'en
+      // kunne sende mail i Jammerbugt Rengoerings navn. invoke saetter medarbejderens
+      // eget token paa, og det er nu et krav i funktionen.
       await Promise.all((admins || []).filter((a) => a.app_email).map((admin) =>
-        fetch("https://gteowfoahsfpunzgdxum.supabase.co/functions/v1/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        supabaseClient.functions.invoke("send-email", {
+          body: {
             email: admin.app_email,
             name: admin.name,
             subject: `Ny bestilling af medarbejderprodukter - ${employee.name}`,
@@ -2924,7 +2971,7 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
               <p>${itemsList}</p>
               <p>Godkend udleveringen i Rengøringsplan under Lager, så lageret opdateres.</p>
             `,
-          }),
+          },
         }).catch((e) => console.error("notify admin failed", e))
       ));
     } catch (e) { console.error("notify admins failed:", e); }
