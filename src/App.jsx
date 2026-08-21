@@ -100,6 +100,9 @@ const T = {
     finishWhyMore: "Skriv hvorfor der gik længere tid — så kan kontoret forklare det til kunden.",
     finishNeedTime: "Sæt tiden, før du går videre.",
     newVersion: "Ny version klar — tryk for at opdatere",
+    offlineTitle: "Ingen forbindelse lige nu",
+    offlineHint: "Dine opgaver kunne ikke hentes. Prøv igen når du har dækning — der er ikke noget galt med din bruger.",
+    tryAgain: "Prøv igen",
     finishHandoverQ: "Har kunden fået de produkter du hentede på kontoret?",
     finishHandoverHint: "Det her fik du med. Bekræft kun det kunden faktisk har fået.",
     finishHandoverYes: "Ja, kunden har fået dem",
@@ -244,6 +247,9 @@ const T = {
     finishWhyMore: "Write why it took longer — so the office can explain it to the customer.",
     finishNeedTime: "Set the time before you continue.",
     newVersion: "New version ready — tap to update",
+    offlineTitle: "No connection right now",
+    offlineHint: "Your jobs could not be loaded. Try again when you have coverage — there is nothing wrong with your account.",
+    tryAgain: "Try again",
     finishHandoverQ: "Did the customer get the products you picked up at the office?",
     finishHandoverHint: "This is what you were given. Only confirm what the customer actually received.",
     finishHandoverYes: "Yes, the customer got them",
@@ -2127,6 +2133,9 @@ export default function MedarbejderApp() {
 
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  // Saettes naar profilopslaget fejler paa grund af manglende forbindelse — ikke
+  // fordi profilen mangler. De to skal se helt forskellige ud for medarbejderen.
+  const [ingenForbindelse, setIngenForbindelse] = useState(false);
   const [employee, setEmployee] = useState(null);
   const [instances, setInstances] = useState([]);
   const [travelSettings, setTravelSettings] = useState({ defaultMinutes: 20, dayStart: "07:00", overrides: {} });
@@ -2199,11 +2208,31 @@ useEffect(() => {
           else setPasswordRecovery(true);
     }
 
+  // Kommer daekningen tilbage, henter appen selv. Hun skal ikke gaette sig til at
+  // trykke paa noget — hun staar formentlig midt i et arbejde med handsker paa.
+  useEffect(() => {
+    if (!ingenForbindelse) return;
+    function paaIgen() { window.location.reload(); }
+    window.addEventListener("online", paaIgen);
+    return () => window.removeEventListener("online", paaIgen);
+  }, [ingenForbindelse]);
+
   useEffect(() => {
     if (!session) return;
     async function load() {
       setDataLoading(true);
-      const { data: empData } = await supabase.from("employees").select("*").eq("auth_user_id", session.user.id).single();
+      setIngenForbindelse(false);
+      // error maa IKKE smides vaek her. Uden daekning kommer der ingen raekke tilbage,
+      // og saa saa medarbejderen "Din bruger er ikke koblet til en medarbejder-profil"
+      // — altsaa at hendes konto var vaek. Hun ville ringe til kontoret over noget der
+      // bare var et hul i daekningen.
+      const { data: empData, error: empFejl } = await supabase
+        .from("employees").select("*").eq("auth_user_id", session.user.id).maybeSingle();
+      if (empFejl || (!empData && !navigator.onLine)) {
+        setIngenForbindelse(true);
+        setDataLoading(false);
+        return;
+      }
       if (!empData) { setDataLoading(false); return; }
       // Hjemmeadresse og transportordning ligger i sin egen tabel, hvor politikken kun
       // slipper hendes EGEN raekke igennem. Kollegernes privatadresser kan appen altsaa
@@ -2371,6 +2400,25 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
   if (passwordRecovery) return <SetNewPasswordScreen lang={lang} setLang={setLang} onDone={() => { setPasswordRecovery(false); window.history.replaceState(null, "", window.location.pathname); }} />;
         if (!session) return <LoginScreen lang={lang} setLang={setLang} initialError={recoveryError} />;
   if (dataLoading) return <div style={s.loading}>{T[lang].fetchingTasks}</div>;
+
+  // Manglende daekning og manglende profil er to helt forskellige ting, og de skal
+  // ikke ligne hinanden. Den ene loeser sig selv naar hun kommer ud af kaelderen; den
+  // anden kraever et opkald til kontoret.
+  if (ingenForbindelse) return (
+    <div style={s.loginWrap}>
+      <div style={s.loginCard}>
+        <div style={{ fontSize: 40, textAlign: "center", marginBottom: 12 }}>📶</div>
+        <div style={{ ...s.errorBox, background: "#FFFBEB", color: "#92400E", border: "1px solid #FDE68A" }}>
+          {tr.offlineTitle}
+        </div>
+        <div style={{ fontSize: 13.5, color: "#64748B", lineHeight: 1.6, textAlign: "center", margin: "12px 4px 16px" }}>
+          {tr.offlineHint}
+        </div>
+        <button style={s.loginBtn} onClick={() => window.location.reload()}>{tr.tryAgain}</button>
+      </div>
+    </div>
+  );
+
   if (!employee) return (
     <div style={s.loginWrap}>
       <div style={s.loginCard}>

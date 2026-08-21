@@ -29,6 +29,17 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api/, /supabase/],
         // Gamle versioners filer ryddes, saa telefonen ikke fyldes op over tid.
         cleanupOutdatedCaches: true,
+
+        // Tag over med det samme foerste gang. Uden den installerer service workeren
+        // ved foerste besoeg men styrer foerst siden ved NAESTE aabning — og en
+        // medarbejder der installerer appen og straks koerer ud i et hul ville staa
+        // med en blank skaerm alligevel.
+        //
+        // Kombineret med skipWaiting: false, som er standard. Det er den kombination
+        // der er forsvarlig: en NY version venter stadig til appen lukkes, saa den
+        // aldrig overtager midt i en tidsregistrering.
+        clientsClaim: true,
+        skipWaiting: false,
         // Billeder fra kunderne kan vaere store. Uden loftet ville et enkelt stort
         // aktiv kunne sprænge precache-budgettet og faa hele registreringen til at fejle.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
