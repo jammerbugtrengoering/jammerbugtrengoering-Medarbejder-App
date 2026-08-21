@@ -6,6 +6,57 @@ import {
   X, MapPin,
 } from "lucide-react";
 
+// ── Gemt kopi af ugens opgaver ───────────────────────────────────────────────
+// Service workeren gemmer selve appen. Den her gemmer INDHOLDET, saa dagslisten kan
+// tegnes i en kaelder uden daekning.
+//
+// Der ligger med vilje ingen adgangsoplysninger her. Noegleboks- og alarmkoder hentes
+// kun gennem hent_adgangsinfo, som tjekker tilknytning og skriver en linje i access_log.
+// En kopi paa telefonen ville saette hele den konstruktion ud af kraft.
+//
+// localStorage og ikke IndexedDB: en uges opgaver for én medarbejder fylder faa hundrede
+// kilobyte, og localStorage er synkron og kraever ingen opsaetning. Skrivekoeen faar sin
+// egen IndexedDB, for dér er der brug for at kunne rulle tilbage.
+function kopiNoegle(empId, aar, uge) {
+  return `wl_kopi_${empId}_${aar}_${uge}`;
+}
+
+function gemKopi(empId, aar, uge, indhold) {
+  try {
+    localStorage.setItem(kopiNoegle(empId, aar, uge), JSON.stringify({
+      hentet: Date.now(),
+      ...indhold,
+    }));
+  } catch {
+    // Fuldt lager eller privat browsing. Kopien er en hjaelp, ikke et krav — appen
+    // skal ikke gaa i staa fordi den ikke kunne gemmes.
+  }
+}
+
+function laesKopi(empId, aar, uge) {
+  try {
+    const raa = localStorage.getItem(kopiNoegle(empId, aar, uge));
+    if (!raa) return null;
+    const k = JSON.parse(raa);
+    // En kopi der er over en uge gammel er mere vildledende end ingenting. Planen kan
+    // vaere lagt helt om siden da.
+    if (!k.hentet || Date.now() - k.hentet > 7 * 24 * 60 * 60 * 1000) return null;
+    return k;
+  } catch {
+    return null;
+  }
+}
+
+// Ryddes ved log ud. Ellers ville den naeste der loggede ind paa samme telefon kunne
+// se den forriges opgaver med kundenavne og adresser.
+function rydKopier() {
+  try {
+    Object.keys(localStorage)
+      .filter((n) => n.startsWith("wl_kopi_"))
+      .forEach((n) => localStorage.removeItem(n));
+  } catch { /* ingenting at goere */ }
+}
+
 // ── i18n ─────────────────────────────────────────────────────────────────────
 const T = {
   da: {
@@ -100,6 +151,8 @@ const T = {
     finishWhyMore: "Skriv hvorfor der gik længere tid — så kan kontoret forklare det til kunden.",
     finishNeedTime: "Sæt tiden, før du går videre.",
     newVersion: "Ny version klar — tryk for at opdatere",
+    savedCopy: "Gemt kopi — ingen forbindelse",
+    savedCopyFrom: (t) => `Hentet ${t}. Nye ændringer fra kontoret er ikke med.`,
     offlineTitle: "Ingen forbindelse lige nu",
     offlineHint: "Dine opgaver kunne ikke hentes. Prøv igen når du har dækning — der er ikke noget galt med din bruger.",
     tryAgain: "Prøv igen",
@@ -247,6 +300,8 @@ const T = {
     finishWhyMore: "Write why it took longer — so the office can explain it to the customer.",
     finishNeedTime: "Set the time before you continue.",
     newVersion: "New version ready — tap to update",
+    savedCopy: "Saved copy — no connection",
+    savedCopyFrom: (t) => `Fetched ${t}. Changes from the office since then are not included.`,
     offlineTitle: "No connection right now",
     offlineHint: "Your jobs could not be loaded. Try again when you have coverage — there is nothing wrong with your account.",
     tryAgain: "Try again",
@@ -735,6 +790,13 @@ const HELP_DA = [
       "Tryk på trøje-ikonet 👕 øverst.",
       "Sæt antal med + og − og tryk «Vælg produkter».",
       "Din bestilling går til kontoret, som godkender den. Under «Historik» ser du dine tidligere bestillinger." ] },
+  { t: "Når der ikke er dækning", p: [
+      "Appen gemmer ugens opgaver på telefonen, så du kan se dagens liste selv i en kælder eller et sommerhusområde uden signal.",
+      "Er der ikke forbindelse, kommer der et gult bånd øverst: «Gemt kopi — ingen forbindelse», og hvornår den blev hentet. Så ved du at en ændring kontoret har lavet i mellemtiden ikke er med.",
+      "Båndet forsvinder af sig selv når du har dækning igen, og listen bliver hentet forfra.",
+      "Adgangsoplysninger gemmes aldrig på telefonen. Dem skal du hente mens du har dækning — helst inden du kører hjemmefra. Står du ved en låst dør uden signal, så ring til kontoret.",
+      "Du kan endnu ikke registrere tid uden dækning. Det kommer, men indtil da skal du have forbindelse for at afslutte en opgave.",
+      "For at det virker skal appen ligge på hjemmeskærmen. På iPhone: tryk på del-ikonet nederst og vælg «Føj til hjemmeskærm». Gør du det ikke, rydder telefonen det gemte efter en uge." ] },
   { t: "Din kørsel", p: [
       "Tryk på bil-ikonet 🚗 øverst for at se din beregnede kørsel.",
       "Du skal ikke selv taste kilometer — det regnes ud fra dine opgaver, når du har registreret din tid.",
@@ -809,6 +871,13 @@ const HELP_EN = [
       "Tap the shirt icon 👕 at the top.",
       "Set the amount with + and − and tap \"Select products\".",
       "Your order goes to the office for approval. \"History\" shows earlier orders." ] },
+  { t: "When there is no coverage", p: [
+      "The app saves this week's jobs on your phone, so you can see today's list even in a basement or a holiday-home area with no signal.",
+      "With no connection you get a yellow bar at the top: \"Saved copy — no connection\", and when it was fetched. So you know that any change the office made since then is not included.",
+      "The bar disappears by itself once you have coverage again, and the list is fetched afresh.",
+      "Access details are never saved on the phone. Fetch them while you have coverage — ideally before you leave home. If you are at a locked door with no signal, call the office.",
+      "You cannot register time without coverage yet. That is coming, but until then you need a connection to complete a job.",
+      "For this to work the app must be on your home screen. On iPhone: tap the share icon at the bottom and choose \"Add to Home Screen\". Without that, the phone clears the saved copy after a week." ] },
   { t: "Your mileage", p: [
       "If travel is part of your working hours, the day starts with \"Travel from home\" and ends with \"Travel home\". The time at the top is when you leave home, not when you must be at the first customer.",
       "If you do not see those two lines, you are not on that arrangement, and your driving is paid as mileage instead. Ask the office if you are unsure what applies to you.",
@@ -2136,6 +2205,8 @@ export default function MedarbejderApp() {
   // Saettes naar profilopslaget fejler paa grund af manglende forbindelse — ikke
   // fordi profilen mangler. De to skal se helt forskellige ud for medarbejderen.
   const [ingenForbindelse, setIngenForbindelse] = useState(false);
+  // Tidspunktet paa den gemte kopi vi ser paa. null betyder at data er friske.
+  const [kopiHentet, setKopiHentet] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [instances, setInstances] = useState([]);
   const [travelSettings, setTravelSettings] = useState({ defaultMinutes: 20, dayStart: "07:00", overrides: {} });
@@ -2228,12 +2299,30 @@ useEffect(() => {
       // bare var et hul i daekningen.
       const { data: empData, error: empFejl } = await supabase
         .from("employees").select("*").eq("auth_user_id", session.user.id).maybeSingle();
+
       if (empFejl || (!empData && !navigator.onLine)) {
+        // Foer vi giver op: er der en gemt kopi af ugen? Saa er dagslisten stadig
+        // brugbar — hun kan se hvor hun skal hen, hvad der skal laves, og hvornaar.
+        const { week: u, year: a } = weekInfoWithOffset(weekOffset);
+        const gemtEmp = localStorage.getItem("wl_sidste_emp");
+        const kopi = gemtEmp ? laesKopi(gemtEmp, a, u) : null;
+        if (kopi) {
+          setEmployee(kopi.employee);
+          setInstances(kopi.instances || []);
+          if (kopi.travelSettings) setTravelSettings(kopi.travelSettings);
+          setKopiHentet(kopi.hentet);
+          setDataLoading(false);
+          return;
+        }
         setIngenForbindelse(true);
         setDataLoading(false);
         return;
       }
       if (!empData) { setDataLoading(false); return; }
+      setKopiHentet(null);
+      // Hvem der sidst var logget ind. Uden den kan vi ikke finde den rigtige kopi
+      // frem naar opslaget i employees er det foerste der fejler.
+      try { localStorage.setItem("wl_sidste_emp", empData.id); } catch { /* fuldt lager */ }
       // Hjemmeadresse og transportordning ligger i sin egen tabel, hvor politikken kun
       // slipper hendes EGEN raekke igennem. Kollegernes privatadresser kan appen altsaa
       // ikke naa, uanset hvad man spoerger om.
@@ -2267,7 +2356,20 @@ useEffect(() => {
         // Slettemarkerede opgaver (fra en aftale der er sat som udgaaet) hentes ikke,
         // saa de forsvinder fra medarbejderens liste med det samme.
         .from("instances").select("*").eq("week", targetWeek).eq("year", targetYear).is("deleted_at", null);
-      if (instErr) console.error("load instances error:", instErr.message);
+      // Profilen kan sagtens komme igennem paa en doeende forbindelse mens opgaverne
+      // ikke naar frem. Uden det her ville hun se en tom dag og tro at der ingen
+      // opgaver var — vaerre end at se gaarsdagens liste med et tydeligt maerkat.
+      if (instErr) {
+        console.error("load instances error:", instErr.message);
+        const kopi = laesKopi(empData.id, targetYear, targetWeek);
+        if (kopi?.instances?.length) {
+          setInstances(kopi.instances);
+          if (kopi.travelSettings) setTravelSettings(kopi.travelSettings);
+          setKopiHentet(kopi.hentet);
+          setDataLoading(false);
+          return;
+        }
+      }
       // customers-tabellen hentes IKKE laengere. Opslaget skete paa i.customer_id, og det
       // felt er null paa samtlige opgaver — kunden staar som almindelig tekst direkte paa
       // opgaven. Forespoergslen hentede altsaa hele kundelisten ned paa hver telefon og
@@ -2302,11 +2404,28 @@ useEffect(() => {
 
       const { data: travel } = await supabase.from("travel_settings").select("*").eq("id", "default").single();
       const { data: overrides } = await supabase.from("travel_overrides").select("*");
+      let rejse = null;
       if (travel) {
-        setTravelSettings({
+        rejse = {
           defaultMinutes: travel.default_minutes,
           dayStart: travel.day_start,
           overrides: Object.fromEntries((overrides || []).map((o) => [travelKey(o.addr_a, o.addr_b), o.minutes])),
+        };
+        setTravelSettings(rejse);
+      }
+
+      // Gem kopien til sidst, saa den kun indeholder en hel og sammenhaengende uge.
+      // Kigger man paa en kollegas plan (viewEmpId), gemmes der ikke — det er ikke
+      // hendes egen dag, og den skal ikke dukke op naeste gang telefonen er offline.
+      if (!viewEmpId) {
+        gemKopi(empData.id, targetYear, targetWeek, {
+          employee: {
+            ...empData,
+            home_address: homeData?.home_address ?? null,
+            travel_in_worktime: homeData?.travel_in_worktime ?? false,
+          },
+          instances: myInstances,
+          travelSettings: rejse,
         });
       }
       setDataLoading(false);
@@ -2392,7 +2511,11 @@ useEffect(() => {
 
   async function signOut() {
     await supabase.auth.signOut();
-    setEmployee(null); setInstances([]);
+    // Kopien indeholder kundenavne og adresser. Den maa ikke ligge og vente paa den
+    // naeste der logger ind paa samme telefon.
+    rydKopier();
+    try { localStorage.removeItem("wl_sidste_emp"); } catch { /* ingenting at goere */ }
+    setEmployee(null); setInstances([]); setKopiHentet(null);
   }
 
   if (authLoading) return <div style={s.loading}>{T[lang].loading}</div>;
@@ -2450,6 +2573,19 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
                    fontFamily: "inherit" }}>
           <span>{tr.newVersion}</span>
         </button>
+      )}
+
+      {/* Hun skal kunne se at listen ikke er frisk. Uden det ville hun tro at en
+          opgave kontoret har flyttet i morges stadig gaelder — og koere forgaeves. */}
+      {kopiHentet && (
+        <div style={{ background: "#FFFBEB", borderBottom: "1px solid #FDE68A",
+                      padding: "9px 16px", color: "#92400E" }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700 }}>{tr.savedCopy}</div>
+          <div style={{ fontSize: 12, marginTop: 1 }}>
+            {tr.savedCopyFrom(new Date(kopiHentet).toLocaleString(lang === "da" ? "da-DK" : "en-GB",
+              { weekday: "short", hour: "2-digit", minute: "2-digit" }))}
+          </div>
+        </div>
       )}
 
       {/* Header */}
