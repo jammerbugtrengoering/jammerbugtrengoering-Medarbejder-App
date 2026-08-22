@@ -1429,6 +1429,39 @@ function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
     if (ok) onLuk();
   }
 
+  // Lukker uden at gemme. Har hun rettet noget, spoerges der foerst — et referat der
+  // er dikteret hos kunden maa ikke ryge fordi hun ramte tilbage-knappen.
+  function luk() {
+    if (!laast && aendret()) {
+      if (!window.confirm("Du har ændringer der ikke er gemt. Vil du forlade tilbuddet alligevel?")) return;
+    }
+    onLuk();
+  }
+
+  // Sammenligner det hun ser med det der staar i databasen. Fotos taeller ikke med:
+  // de er allerede sendt af sted i det oejeblik de blev valgt.
+  function aendret() {
+    if (!tilbud) return false;
+    const somGemt = {
+      kunde_navn: tilbud.kunde_navn || "", adresse: tilbud.adresse || "",
+      kontaktperson: tilbud.kontaktperson || "", kunde_email: tilbud.kunde_email || "",
+      titel: tilbud.titel || "", contract_type: tilbud.contract_type || "privat",
+      pricing_type: tilbud.pricing_type || "hourly",
+      referat: tilbud.referat || "", bemaerkning: tilbud.bemaerkning || "",
+      plan_interval: tilbud.plan_interval || "uge",
+    };
+    for (const n of Object.keys(somGemt)) {
+      if (String(f[n] ?? "") !== String(somGemt[n])) return true;
+    }
+    if (String(f.timepris ?? "") !== String(tilbud.timepris ?? "")) return true;
+    if (String(f.fast_pris ?? "") !== String(tilbud.fast_pris ?? "")) return true;
+    if (String(f.anslaaet_timer ?? "") !== String(tilbud.anslaaet_timer ?? "")) return true;
+    if ((f.checklist_template_ids || []).join("|")
+        !== (tilbud.checklist_template_ids || []).join("|")) return true;
+    if (!!f.fotos_i_pdf !== !!tilbud.fotos_i_pdf) return true;
+    return false;
+  }
+
   async function tilfoejFotos(filer) {
     setFejl("");
     const plads = TILBUD_MAKS_FOTOS - (f.fotos || []).length;
@@ -1518,7 +1551,15 @@ function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
   return (
     <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
       <div style={s.sheet}>
-        <div style={s.afslutTop}>{f.kunde_navn || task.title}</div>
+        {/* Tilbage-knap som paa de andre skaerme. Uden den var der ingen vej ud af
+            tilbuddet uden at gemme — og et tryk udenfor lukker heller ikke, fordi
+            skaermen ligger inde i opgavens overlay. */}
+        <div style={s.afslutTop}>
+          <button style={s.afslutTilbage} onClick={luk}>
+            <ChevronLeft size={16} /> Tilbage
+          </button>
+          <span style={{ opacity: 0.8 }}>{f.kunde_navn || task.title}</span>
+        </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px 20px" }}>
 
           {laast && (
@@ -1648,8 +1689,10 @@ function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
         </div>
 
         <div style={{ padding: 14, borderTop: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
-          <button style={{ ...s.sekundaerStor, flex: 1 }} onClick={gemOgLuk} disabled={gemmer}>
-            {gemmer ? "Gemmer…" : laast ? "Luk" : "Gem"}
+          {/* Et accepteret tilbud maa ikke gemmes igen — det er dokumentationen for
+              det kunden skrev under paa. Saa er knappen bare en udgang. */}
+          <button style={{ ...s.sekundaerStor, flex: 1 }} onClick={laast ? onLuk : gemOgLuk} disabled={gemmer}>
+            {gemmer ? "Gemmer…" : laast ? "Luk" : "Gem og luk"}
           </button>
           {!laast && (
             <button style={{ ...s.doneLarge, flex: 1, background: "#D6247A", color: "#fff", borderColor: "#D6247A", fontWeight: 700 }}
