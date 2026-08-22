@@ -47,6 +47,143 @@ function laesKopi(empId, aar, uge) {
   }
 }
 
+// ── Skrivekoe ────────────────────────────────────────────────────────────────
+// Skrivninger der ikke kom af sted lægges her og sendes naar der er daekning igen.
+//
+// Det forsvarlige ved konstruktionen ligger IKKE her, men i databasen: hver post
+// baerer et id fra telefonen, og append_time_log og consume_stock afviser et id de
+// har set foer. Uden den vagt ville en post der blev sendt to gange — fordi svaret
+// forsvandt undervejs — give 120 minutter i stedet for 60, direkte i loen og paa
+// fakturaen. Koeen maa gerne sende for meget; databasen sorterer fra.
+//
+// IndexedDB og ikke localStorage: fotos er Blobs, og de kan ikke gemmes som tekst.
+const KOE_DB = "wl_koe";
+const KOE_STORE = "skrivninger";
+
+function aabnKoe() {
+  return new Promise((ok, fejl) => {
+    const anmod = indexedDB.open(KOE_DB, 1);
+    anmod.onupgradeneeded = () => {
+      const db = anmod.result;
+      if (!db.objectStoreNames.contains(KOE_STORE)) {
+        db.createObjectStore(KOE_STORE, { keyPath: "id", autoIncrement: true });
+      }
+    };
+    anmod.onsuccess = () => ok(anmod.result);
+    anmod.onerror = () => fejl(anmod.error);
+  });
+}
+
+function koeKald(tilstand, arbejde) {
+  return new Promise((ok, fejl) => {
+    aabnKoe().then((db) => {
+      const tx = db.transaction(KOE_STORE, tilstand);
+      const anmod = arbejde(tx.objectStore(KOE_STORE));
+      anmod.onsuccess = () => ok(anmod.result);
+      anmod.onerror = () => fejl(anmod.error);
+    }).catch(fejl);
+  });
+}
+
+async function koeTilfoej(post) {
+  try {
+    const id = await koeKald("readwrite", (s) => s.add({ ...post, oprettet: Date.now() }));
+    // Saa taelleren i baandet opdaterer sig, uanset hvilken skaerm der lagde posten
+    // i koeen. Alternativet var at traede et tilbagekald igennem fire komponenter.
+    window.dispatchEvent(new Event("wl-koe-aendret"));
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+async function koeAlle() {
+  try {
+    const alle = await koeKald("readonly", (s) => s.getAll());
+    return (alle || []).sort((a, b) => a.id - b.id);
+  } catch {
+    return [];
+  }
+}
+
+async function koeFjern(id) {
+  try { await koeKald("readwrite", (s) => s.delete(id)); } catch { /* ingenting at goere */ }
+}
+
+// Sand naar fejlen skyldes forbindelsen og ikke indholdet. En afvisning fra databasen
+// — forkerte rettigheder, en raekke der ikke findes — skal IKKE proeves igen i det
+// uendelige; den skal frem i lyset.
+function erNetvaerksfejl(fejl) {
+  if (!navigator.onLine) return true;
+  const m = String(fejl?.message ?? fejl ?? "").toLowerCase();
+  return m.includes("fetch") || m.includes("network") || m.includes("load failed")
+      || m.includes("timeout") || m.includes("failed to fetch");
+}
+
+// Udfoerer én post fra koeen. Rækkefølgen betyder noget: et notat skal findes foer
+// dets billeder kan haenges paa, saa koeen behandles i den orden den blev fyldt.
+async function udfoerKoePost(klient, post) {
+  const a = post.args || {};
+  switch (post.art) {
+    case "tid":
+      return klient.rpc("append_time_log", {
+        p_instance_id: a.opgaveId, p_minutes: a.minutter, p_emp_id: a.empId,
+        p_note: a.note ?? null, p_klient_id: a.noegle,
+      });
+    case "status":
+      return klient.rpc("set_employee_task_status", {
+        p_instance_id: a.opgaveId, p_emp_id: a.empId, p_done: a.faerdig,
+      });
+    case "tjekliste":
+      return klient.from("instances").update({ checklist: a.checklist }).eq("id", a.opgaveId);
+    case "nexus":
+      return klient.from("instances").update({ nexus_confirmed: a.bekraeftet }).eq("id", a.opgaveId);
+    case "notat":
+      return klient.from("task_notes").upsert(a.raekke, { onConflict: "id" });
+    case "foto": {
+      const { error } = await klient.storage.from("opgavefotos")
+        .upload(a.sti, a.blob, { contentType: "image/jpeg", upsert: false });
+      // Stien er fast, saa ligger filen der allerede, ER billedet sendt.
+      const findes = error && (String(error.statusCode) === "409" || /exists/i.test(error.message || ""));
+      return { error: findes ? null : error };
+    }
+    case "fotostier":
+      return klient.from("task_notes").update({ photos: a.stier }).eq("id", a.notatId);
+    case "oenske":
+      return klient.from("reschedule_requests").upsert(a.raekke, { onConflict: "id" });
+    case "udlevering":
+      return klient.rpc("bekraeft_udlevering", { p_instance_id: a.opgaveId });
+    default:
+      // Ukendt art — fjern den hellere end at blokere resten af koeen for evigt.
+      return { error: null };
+  }
+}
+
+// Toemmer koeen. Stopper ved foerste netvaerksfejl, saa raekkefoelgen holder.
+// Returnerer hvor mange der er tilbage.
+async function toemKoe(klient) {
+  const poster = await koeAlle();
+  for (const post of poster) {
+    try {
+      const { error } = await udfoerKoePost(klient, post);
+      if (error) {
+        if (erNetvaerksfejl(error)) return (await koeAlle()).length;
+        // Databasen afviste den. Den kommer aldrig igennem, og en koe der sidder
+        // fast paa en umulig post ville spaerre alt bagved.
+        console.error("koe afvist:", post.art, error.message);
+        await koeFjern(post.id);
+        continue;
+      }
+      await koeFjern(post.id);
+    } catch (e) {
+      if (erNetvaerksfejl(e)) return (await koeAlle()).length;
+      console.error("koe fejl:", post.art, e);
+      await koeFjern(post.id);
+    }
+  }
+  return (await koeAlle()).length;
+}
+
 // ── Adgangsoplysninger hentet paa forhaand ───────────────────────────────────
 // Noegleboks- og alarmkoder gemmes KUN naar hun selv har hentet dem — og saa kun
 // dagen ud. Det er et bevidst valg, truffet af Jonn:
@@ -199,6 +336,11 @@ const T = {
     finishNeedTime: "Sæt tiden, før du går videre.",
     newVersion: "Ny version klar — tryk for at opdatere",
     savedCopy: "Gemt kopi — ingen forbindelse",
+    queueWaiting: (n) => n === 1 ? "1 registrering venter på dækning" : `${n} registreringer venter på dækning`,
+    queueHint: "De sendes af sig selv når du har forbindelse. Luk ikke appen helt før det er sket.",
+    queueSending: "Sender…",
+    queueSendNow: "Send nu",
+    queueOnSignOut: (n) => `Der er ${n} registrering(er) der ikke er sendt endnu. Logger du ud, går de tabt. Vil du logge ud alligevel?`,
     accessOffline: "Ingen forbindelse, og du har ikke hentet adgangen til denne opgave i dag. Ring til kontoret.",
     accessFromCopy: "Hentet tidligere i dag — gemmes kun til i nat",
     fetchAccessAll: "Hent dagens adgangsoplysninger",
@@ -354,6 +496,11 @@ const T = {
     finishNeedTime: "Set the time before you continue.",
     newVersion: "New version ready — tap to update",
     savedCopy: "Saved copy — no connection",
+    queueWaiting: (n) => n === 1 ? "1 entry is waiting for coverage" : `${n} entries are waiting for coverage`,
+    queueHint: "They are sent automatically once you have a connection. Do not close the app completely before that.",
+    queueSending: "Sending…",
+    queueSendNow: "Send now",
+    queueOnSignOut: (n) => `${n} entr(ies) have not been sent yet. If you sign out they will be lost. Sign out anyway?`,
     accessOffline: "No connection, and you have not fetched the access details for this job today. Call the office.",
     accessFromCopy: "Fetched earlier today — kept only until tonight",
     fetchAccessAll: "Fetch today's access details",
@@ -853,9 +1000,20 @@ const HELP_DA = [
       "Appen gemmer ugens opgaver på telefonen, så du kan se dagens liste selv i en kælder eller et sommerhusområde uden signal.",
       "Er der ikke forbindelse, kommer der et gult bånd øverst: «Gemt kopi — ingen forbindelse», og hvornår den blev hentet. Så ved du at en ændring kontoret har lavet i mellemtiden ikke er med.",
       "Båndet forsvinder af sig selv når du har dækning igen, og listen bliver hentet forfra.",
-      "Adgangsoplysninger gemmes aldrig på telefonen. Dem skal du hente mens du har dækning — helst inden du kører hjemmefra. Står du ved en låst dør uden signal, så ring til kontoret.",
-      "Du kan endnu ikke registrere tid uden dækning. Det kommer, men indtil da skal du have forbindelse for at afslutte en opgave.",
+      "Du kan godt afslutte en opgave uden dækning. Tid, flueben, kommentar og billeder bliver lagt i kø og sendt af sig selv når du har forbindelse igen.",
+      "Venter der noget, står der et gult bånd øverst: «2 registreringer venter på dækning». Det forsvinder når alt er sendt.",
+      "Vigtigt: luk ikke appen helt ned mens der står noget i køen. Den kan kun sende mens appen er åben. Kommer du i tvivl, så åbn appen igen når du har dækning — så sender den selv.",
+      "Logger du ud mens der står noget i køen, går det tabt. Appen spørger først.",
+      "Adgangsoplysninger hentes med den blå knap øverst, mens du har dækning — helst inden du kører hjemmefra. De gemmes til i nat og slettes så. Står du ved en låst dør uden signal og uden at have hentet dem, så ring til kontoret.",
       "For at det virker skal appen ligge på hjemmeskærmen. På iPhone: tryk på del-ikonet nederst og vælg «Føj til hjemmeskærm». Gør du det ikke, rydder telefonen det gemte efter en uge." ] },
+  { t: "Kundemøder og tilbud", p: [
+      "Dette afsnit gælder kun planlæggere. Er du ikke planlægger, ser du hverken knappen eller møderne.",
+      "Tryk på kalender-ikonet 📅 øverst for at booke et kundemøde. Kunden behøver ikke findes i Dinero endnu.",
+      "Mødet lægges i din uge, så kontoret kan se at du er ude, og tiden tæller i din kapacitet.",
+      "Åbn mødet når du er derude. Du får tilbudsskærmen i stedet for den almindelige opgave: referat, billeder, pris og hvilke ydelser der er med.",
+      "Referatet er lavet til at blive dikteret. Tryk på mikrofonen på tastaturet og tal — ret det bagefter.",
+      "Du kan lægge op til 10 billeder på. De er interne, medmindre du på tilbuddet vælger at vise dem til kunden.",
+      "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage." ] },
   { t: "Din kørsel", p: [
       "Tryk på bil-ikonet 🚗 øverst for at se din beregnede kørsel.",
       "Du skal ikke selv taste kilometer — det regnes ud fra dine opgaver, når du har registreret din tid.",
@@ -934,9 +1092,20 @@ const HELP_EN = [
       "The app saves this week's jobs on your phone, so you can see today's list even in a basement or a holiday-home area with no signal.",
       "With no connection you get a yellow bar at the top: \"Saved copy — no connection\", and when it was fetched. So you know that any change the office made since then is not included.",
       "The bar disappears by itself once you have coverage again, and the list is fetched afresh.",
-      "Access details are never saved on the phone. Fetch them while you have coverage — ideally before you leave home. If you are at a locked door with no signal, call the office.",
-      "You cannot register time without coverage yet. That is coming, but until then you need a connection to complete a job.",
+      "You can complete a job without coverage. Time, checkmarks, comments and photos go into a queue and are sent automatically once you have a connection again.",
+      "If something is waiting, a yellow bar appears at the top: \"2 entries are waiting for coverage\". It disappears when everything has been sent.",
+      "Important: do not close the app completely while something is in the queue. It can only send while the app is open. If in doubt, open the app again once you have coverage — it sends by itself.",
+      "If you sign out while something is queued, it is lost. The app asks first.",
+      "Access details are fetched with the blue button at the top while you have coverage — ideally before you leave home. They are kept until tonight and then deleted. If you are at a locked door with no signal and have not fetched them, call the office.",
       "For this to work the app must be on your home screen. On iPhone: tap the share icon at the bottom and choose \"Add to Home Screen\". Without that, the phone clears the saved copy after a week." ] },
+  { t: "Customer meetings and quotes", p: [
+      "This section is for planners only. If you are not a planner, you see neither the button nor the meetings.",
+      "Tap the calendar icon 📅 at the top to book a customer meeting. The customer does not have to exist in Dinero yet.",
+      "The meeting goes into your week, so the office can see you are out, and the time counts in your capacity.",
+      "Open the meeting once you are there. You get the quote screen instead of the ordinary job: notes, photos, price and which services are included.",
+      "The notes field is made for dictation. Tap the microphone on the keyboard and speak — edit it afterwards.",
+      "You can add up to 10 photos. They are internal unless you choose to show them to the customer on the quote.",
+      "\"Send to customer\" creates the PDF and mails a link she can accept from. If she accepts, the agreement is created as a draft — you set the start date and weekdays yourself." ] },
   { t: "Your mileage", p: [
       "If travel is part of your working hours, the day starts with \"Travel from home\" and ends with \"Travel home\". The time at the top is when you leave home, not when you must be at the first customer.",
       "If you do not see those two lines, you are not on that arrangement, and your driving is paid as mileage instead. Ask the office if you are unsure what applies to you.",
@@ -1152,6 +1321,396 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
 // medarbejderen BEKRAEFTER blot i afslutningsflowet at kunden har faaet dem. Hun
 // vaelger altsaa ikke laengere varer i appen - hun koerer i privat bil og har
 // aldrig lagervarer med.
+
+// ── Tilbud ude hos kunden ────────────────────────────────────────────────────
+// Moedeopgaven er af typen 'aktivitet' og haenger sammen med en raekke i tilbud.
+// Hun sidder hos kunden med telefonen, saa det er HER tilbuddet bliver til — ikke
+// i planlaegningsappen bagefter, hvor halvdelen af det hun saa er glemt.
+const TILBUD_MAKS_FOTOS = 10;
+
+function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
+  const [tilbud, setTilbud] = useState(null);
+  const [henter, setHenter] = useState(true);
+  const [lister, setLister] = useState([]);
+  const [priser, setPriser] = useState({});
+  const [gemmer, setGemmer] = useState(false);
+  const [fejl, setFejl] = useState("");
+  const [besked, setBesked] = useState("");
+  const [fotoUrls, setFotoUrls] = useState({});
+  const [fotoArbejde, setFotoArbejde] = useState(null);
+
+  // Ét felt pr. ting hun kan rette. Holdes samlet i ét objekt, saa gemningen bliver
+  // ét kald i stedet for tolv.
+  const [f, setF] = useState({});
+  const saet = (n, v) => setF((p) => ({ ...p, [n]: v }));
+
+  useEffect(() => {
+    let afbrudt = false;
+    (async () => {
+      const [{ data: t }, { data: cl }, { data: cli }, { data: pr }] = await Promise.all([
+        supabaseClient.from("tilbud").select("*").eq("instance_id", task.id).maybeSingle(),
+        supabaseClient.from("checklist_templates").select("id, name").order("name"),
+        supabaseClient.from("checklist_template_items").select("checklist_template_id"),
+        supabaseClient.from("pricing").select("contract_type, hourly_rate"),
+      ]);
+      if (afbrudt) return;
+      setLister((cl || []).map((c) => ({
+        ...c, antal: (cli || []).filter((i) => i.checklist_template_id === c.id).length,
+      })));
+      setPriser(Object.fromEntries((pr || []).map((p) => [p.contract_type, Number(p.hourly_rate)])));
+      setTilbud(t || null);
+      if (t) {
+        setF({
+          kunde_navn: t.kunde_navn || "", adresse: t.adresse || "",
+          kontaktperson: t.kontaktperson || "", kunde_email: t.kunde_email || "",
+          titel: t.titel || "", contract_type: t.contract_type || "privat",
+          pricing_type: t.pricing_type || "hourly",
+          timepris: t.timepris ?? "", fast_pris: t.fast_pris ?? "",
+          anslaaet_timer: t.anslaaet_timer ?? "", plan_interval: t.plan_interval || "uge",
+          checklist_template_ids: t.checklist_template_ids || [],
+          referat: t.referat || "", bemaerkning: t.bemaerkning || "",
+          fotos: t.fotos || [], fotos_i_pdf: t.fotos_i_pdf ?? false,
+        });
+      }
+      setHenter(false);
+    })();
+    return () => { afbrudt = true; };
+  }, [task.id, supabaseClient]);
+
+  // Bucket'en er privat. URL'erne signeres og udloeber af sig selv.
+  useEffect(() => {
+    let afbrudt = false;
+    const stier = f.fotos || [];
+    (async () => {
+      if (stier.length === 0) { setFotoUrls({}); return; }
+      const { data } = await supabaseClient.storage.from("tilbud").createSignedUrls(stier, 3600);
+      if (afbrudt || !data) return;
+      const kort = {};
+      stier.forEach((s, i) => { if (data[i]?.signedUrl) kort[s] = data[i].signedUrl; });
+      setFotoUrls(kort);
+    })();
+    return () => { afbrudt = true; };
+  }, [(f.fotos || []).join("|")]);
+
+  async function gem(ekstra = {}) {
+    setFejl("");
+    const raekke = {
+      kunde_navn: (f.kunde_navn || "").trim() || task.customerName || "Kunde",
+      adresse: (f.adresse || "").trim() || null,
+      kontaktperson: (f.kontaktperson || "").trim() || null,
+      kunde_email: (f.kunde_email || "").trim() || null,
+      titel: (f.titel || "").trim() || null,
+      contract_type: f.contract_type, pricing_type: f.pricing_type,
+      timepris: f.pricing_type === "hourly" ? (Number(f.timepris) || null) : null,
+      fast_pris: f.pricing_type === "fixed" ? (Number(f.fast_pris) || null) : null,
+      anslaaet_timer: Number(f.anslaaet_timer) || null,
+      plan_interval: f.plan_interval,
+      checklist_template_ids: f.checklist_template_ids || [],
+      referat: (f.referat || "").trim() || null,
+      bemaerkning: (f.bemaerkning || "").trim() || null,
+      fotos: f.fotos || [], fotos_i_pdf: !!f.fotos_i_pdf,
+      ...ekstra,
+    };
+    const { error } = await supabaseClient.from("tilbud").update(raekke).eq("id", tilbud.id);
+    if (error) { setFejl(error.message); return false; }
+    return true;
+  }
+
+  async function gemOgLuk() {
+    setGemmer(true);
+    const ok = await gem();
+    setGemmer(false);
+    if (ok) onLuk();
+  }
+
+  async function tilfoejFotos(filer) {
+    setFejl("");
+    const plads = TILBUD_MAKS_FOTOS - (f.fotos || []).length;
+    if (plads <= 0) { setFejl(`Der kan højst være ${TILBUD_MAKS_FOTOS} billeder.`); return; }
+    const valgte = Array.from(filer).slice(0, plads);
+    const nye = [];
+    for (let i = 0; i < valgte.length; i++) {
+      setFotoArbejde({ nr: i + 1, iAlt: valgte.length });
+      try {
+        // Genbruger komprimeringen fra opgavefotos. Ti raa kamerabilleder fra en
+        // kundes kontor er 50 MB op gennem mobilnettet.
+        const blob = await komprimerBillede(valgte[i]);
+        const sti = `${tilbud.id}/fotos/${Date.now()}-${i}.jpg`;
+        const { error } = await supabaseClient.storage.from("tilbud")
+          .upload(sti, blob, { contentType: "image/jpeg", upsert: false });
+        if (error) throw new Error(error.message);
+        nye.push(sti);
+      } catch (e) {
+        setFejl("Kunne ikke sende billedet: " + (e?.message || e));
+        break;
+      }
+    }
+    setFotoArbejde(null);
+    if (nye.length) {
+      const alle = [...(f.fotos || []), ...nye];
+      saet("fotos", alle);
+      await supabaseClient.from("tilbud").update({ fotos: alle }).eq("id", tilbud.id);
+    }
+  }
+
+  async function dannOgSend() {
+    setFejl(""); setBesked("");
+    if (!(f.kunde_email || "").trim()) { setFejl("Skriv kundens e-mail først."); return; }
+    setGemmer(true);
+
+    const n = tilbud.offentlig_noegle || Array.from(crypto.getRandomValues(new Uint8Array(24)))
+      .map((b) => b.toString(16).padStart(2, "0")).join("");
+    if (!(await gem({ offentlig_noegle: n, status: "sendt", sendt_at: new Date().toISOString() }))) {
+      setGemmer(false); return;
+    }
+    const { data: pdfSvar, error: pdfFejl } = await supabaseClient.functions
+      .invoke("tilbud-pdf", { body: { tilbudId: tilbud.id } });
+    if (pdfFejl || pdfSvar?.error) { setGemmer(false); setFejl(pdfSvar?.error || pdfFejl.message); return; }
+
+    const link = `https://jammerbugtrengoering-kundeportal.netlify.app/tilbud/${n}`;
+    const { error: mailFejl } = await supabaseClient.functions.invoke("send-email", {
+      body: {
+        email: (f.kunde_email || "").trim(),
+        name: (f.kontaktperson || "").trim() || (f.kunde_navn || "").trim(),
+        subject: "Tilbud fra Jammerbugt Rengøring",
+        html: `<p>Hej ${(f.kontaktperson || "").trim()}</p>`
+          + `<p>Her er vores tilbud på ${(f.titel || "rengøring").trim()}.</p>`
+          + `<p><a href="${link}">Åbn tilbuddet og accepter her</a></p>`
+          + `<p>Med venlig hilsen<br/>Jammerbugt Rengøring</p>`,
+      },
+    });
+    setGemmer(false);
+    setTilbud((t) => ({ ...t, offentlig_noegle: n, status: "sendt" }));
+    setBesked(mailFejl
+      ? "Tilbuddet er gemt og markeret som sendt, men mailen kunne ikke afsendes. Prøv igen fra kontoret."
+      : "Tilbuddet er sendt til kunden.");
+  }
+
+  if (henter) return (
+    <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+      <div style={s.sheet}><div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Indlæser…</div></div>
+    </div>
+  );
+
+  if (!tilbud) return (
+    <div style={s.overlay} onClick={onLuk}>
+      <div style={s.sheet} onClick={(e) => e.stopPropagation()}>
+        <div style={s.afslutTop}>{task.title}</div>
+        <div style={{ padding: 24, textAlign: "center", color: "#64748B", fontSize: 14, lineHeight: 1.5 }}>
+          Der hører ikke noget tilbud til denne aktivitet.
+        </div>
+        <div style={{ padding: 16 }}>
+          <button style={s.sekundaerStor} onClick={onLuk}>Luk</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const laast = tilbud.status === "accepteret";
+  const felt = { ...s.notatInput, marginTop: 6 };
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+      <div style={s.sheet}>
+        <div style={s.afslutTop}>{f.kunde_navn || task.title}</div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px 20px" }}>
+
+          {laast && (
+            <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 9,
+                          padding: 11, fontSize: 13, color: "#166534", marginBottom: 14, lineHeight: 1.5 }}>
+              Kunden har accepteret. Tilbuddet kan ikke længere rettes.
+            </div>
+          )}
+
+          <div style={s.tilbudAfsnit}>Kunden</div>
+          <input style={felt} value={f.kunde_navn} disabled={laast}
+            onChange={(e) => saet("kunde_navn", e.target.value)} placeholder="Virksomhedens navn" />
+          <input style={felt} value={f.adresse} disabled={laast}
+            onChange={(e) => saet("adresse", e.target.value)} placeholder="Adresse" />
+          <input style={felt} value={f.kontaktperson} disabled={laast}
+            onChange={(e) => saet("kontaktperson", e.target.value)} placeholder="Kontaktperson" />
+          <input style={felt} type="email" inputMode="email" value={f.kunde_email} disabled={laast}
+            onChange={(e) => saet("kunde_email", e.target.value)} placeholder="E-mail — tilbuddet sendes hertil" />
+
+          <div style={s.tilbudAfsnit}>Referat</div>
+          {/* Helt almindelig textarea med vilje: bygger man noget smart, holder baade
+              diktering og systemets skriveværktøjer op med at virke. */}
+          <textarea style={{ ...felt, minHeight: 150, resize: "vertical", lineHeight: 1.5 }}
+            value={f.referat} disabled={laast}
+            onChange={(e) => saet("referat", e.target.value)}
+            placeholder="Hvad kunden ønsker, hvad I aftalte, hvad der er taget forbehold for…" />
+          <div style={s.tilbudHint}>
+            Tryk på mikrofonen på tastaturet og tal. Marker teksten bagefter for at få
+            telefonen til at rydde op i den — det sker på telefonen, teksten sendes ingen steder hen.
+          </div>
+
+          <div style={s.tilbudAfsnit}>Billeder — {(f.fotos || []).length} af {TILBUD_MAKS_FOTOS}</div>
+          {(f.fotos || []).length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 6, marginBottom: 8 }}>
+              {(f.fotos || []).map((sti) => (
+                fotoUrls[sti]
+                  ? <img key={sti} src={fotoUrls[sti]} alt="" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 8 }} />
+                  : <div key={sti} style={{ width: "100%", height: 80, borderRadius: 8, background: "#F1F5F9" }} />
+              ))}
+            </div>
+          )}
+          {fotoArbejde && (
+            <div style={{ fontSize: 12.5, color: "#4F46E5", marginBottom: 6 }}>
+              Sender billede {fotoArbejde.nr} af {fotoArbejde.iAlt}…
+            </div>
+          )}
+          {!laast && (f.fotos || []).length < TILBUD_MAKS_FOTOS && (
+            <label style={{ ...s.sekundaerStor, display: "block", textAlign: "center", cursor: "pointer" }}>
+              📷 Tilføj billeder
+              <input type="file" accept="image/*" multiple style={{ display: "none" }}
+                onChange={(e) => { tilfoejFotos(e.target.files); e.target.value = ""; }} />
+            </label>
+          )}
+
+          <div style={s.tilbudAfsnit}>Pris</div>
+          <select style={felt} value={f.contract_type} disabled={laast}
+            onChange={(e) => {
+              saet("contract_type", e.target.value);
+              // Satsen foelger kontrakttypen. Ellers skulle hun huske fire priser udenad
+              // mens hun sidder over for kunden.
+              if (f.pricing_type === "hourly" && priser[e.target.value]) saet("timepris", priser[e.target.value]);
+            }}>
+            <option value="privat">Privat</option>
+            <option value="erhverv">Erhverv</option>
+            <option value="aeldrelov">Ældreloven</option>
+            <option value="nexus">Kommunal (Nexus)</option>
+          </select>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {[["hourly", "Timepris"], ["fixed", "Fast pris"]].map(([k, l]) => (
+              <button key={k} type="button" disabled={laast} onClick={() => saet("pricing_type", k)}
+                style={{ flex: 1, padding: "12px 10px", borderRadius: 10, fontSize: 14, fontWeight: 700,
+                         border: f.pricing_type === k ? "2px solid #D6247A" : "1.5px solid #E2E8F0",
+                         background: f.pricing_type === k ? "#FCE4EF" : "#fff",
+                         color: f.pricing_type === k ? "#9C1B5D" : "#475569" }}>{l}</button>
+            ))}
+          </div>
+
+          {f.pricing_type === "hourly" ? (
+            <input style={felt} type="number" inputMode="decimal" value={f.timepris} disabled={laast}
+              onChange={(e) => saet("timepris", e.target.value)} placeholder="Timepris i kr" />
+          ) : (
+            <input style={felt} type="number" inputMode="decimal" value={f.fast_pris} disabled={laast}
+              onChange={(e) => saet("fast_pris", e.target.value)} placeholder="Fast pris pr. besøg i kr" />
+          )}
+          <input style={felt} type="number" inputMode="decimal" step="0.25" value={f.anslaaet_timer} disabled={laast}
+            onChange={(e) => saet("anslaaet_timer", e.target.value)} placeholder="Anslået tid pr. besøg i timer" />
+          <select style={felt} value={f.plan_interval} disabled={laast}
+            onChange={(e) => saet("plan_interval", e.target.value)}>
+            <option value="uge">Hver uge</option>
+            <option value="14_dage">Hver 14. dag</option>
+            <option value="maaned">Hver måned</option>
+          </select>
+
+          <div style={s.tilbudAfsnit}>Ydelser</div>
+          {lister.map((c) => {
+            const paa = (f.checklist_template_ids || []).includes(c.id);
+            return (
+              <button key={c.id} type="button" disabled={laast}
+                onClick={() => saet("checklist_template_ids", paa
+                  ? f.checklist_template_ids.filter((x) => x !== c.id)
+                  : [...(f.checklist_template_ids || []), c.id])}
+                style={paa ? s.nexusTjekAktiv : s.nexusTjek}>
+                <span style={paa ? s.tjekFirkantAktiv : s.tjekFirkant}>
+                  {paa && <Check size={16} color="#fff" strokeWidth={3} />}
+                </span>
+                <span>{c.name} <span style={{ color: "#94A3B8" }}>· {c.antal} punkter</span></span>
+              </button>
+            );
+          })}
+
+          <div style={s.tilbudAfsnit}>Bemærkninger</div>
+          <textarea style={{ ...felt, minHeight: 80, resize: "vertical", lineHeight: 1.5 }}
+            value={f.bemaerkning} disabled={laast}
+            onChange={(e) => saet("bemaerkning", e.target.value)}
+            placeholder="Forbehold, særlige aftaler…" />
+
+          {fejl && <div style={{ ...s.notatFejl, marginTop: 12 }}>{fejl}</div>}
+          {besked && <div style={{ color: "#166534", fontSize: 13.5, marginTop: 12, lineHeight: 1.5 }}>{besked}</div>}
+        </div>
+
+        <div style={{ padding: 14, borderTop: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
+          <button style={{ ...s.sekundaerStor, flex: 1 }} onClick={gemOgLuk} disabled={gemmer}>
+            {gemmer ? "Gemmer…" : laast ? "Luk" : "Gem"}
+          </button>
+          {!laast && (
+            <button style={{ ...s.doneLarge, flex: 1, background: "#D6247A", color: "#fff", borderColor: "#D6247A", fontWeight: 700 }}
+              onClick={dannOgSend} disabled={gemmer}>
+              {tilbud.status === "sendt" ? "Send igen" : "Send til kunden"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Booker det naeste kundemoede mens hun staar hos kunden. Kun planlaeggere ser den —
+// og databasen afviser kaldet uanset hvad, hvis den der spoerger ikke er administrator.
+function NytMoedeSkaerm({ supabaseClient, employee, onLuk, onOprettet }) {
+  const [kunde, setKunde] = useState("");
+  const [adresse, setAdresse] = useState("");
+  const [dato, setDato] = useState(() => new Date().toISOString().slice(0, 10));
+  const [tid, setTid] = useState("10:00");
+  const [minutter, setMinutter] = useState(60);
+  const [arbejder, setArbejder] = useState(false);
+  const [fejl, setFejl] = useState("");
+
+  async function opret() {
+    setFejl("");
+    if (!kunde.trim()) { setFejl("Skriv hvem mødet er med."); return; }
+    setArbejder(true);
+    const { error } = await supabaseClient.rpc("opret_kundemoede", {
+      p_kunde_navn: kunde.trim(), p_dato: dato, p_tid: tid || null,
+      p_minutter: Number(minutter) || 60,
+      p_adresse: adresse.trim() || null, p_emp_id: employee.id,
+    });
+    setArbejder(false);
+    if (error) { setFejl(error.message); return; }
+    onOprettet();
+  }
+
+  const felt = { ...s.notatInput, marginTop: 6 };
+
+  return (
+    <div style={s.overlay} onClick={onLuk}>
+      <div style={s.sheet} onClick={(e) => e.stopPropagation()}>
+        <div style={s.afslutTop}>Nyt kundemøde</div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px" }}>
+          <div style={s.tilbudHint}>
+            Mødet lægges i din uge, så kontoret kan se at du er ude. Samtidig oprettes
+            et tilbud i kladde, som du kan udfylde når du er derude.
+          </div>
+          <div style={s.tilbudAfsnit}>Hvem er mødet med?</div>
+          <input style={felt} value={kunde} onChange={(e) => setKunde(e.target.value)}
+            placeholder="Også hvis de ikke er kunde endnu" />
+          <input style={felt} value={adresse} onChange={(e) => setAdresse(e.target.value)}
+            placeholder="Adresse" />
+          <div style={s.tilbudAfsnit}>Hvornår</div>
+          <input style={felt} type="date" value={dato} onChange={(e) => setDato(e.target.value)} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <input style={{ ...felt, flex: 1 }} type="time" value={tid} onChange={(e) => setTid(e.target.value)} />
+            <input style={{ ...felt, flex: 1 }} type="number" step="15" min="15" inputMode="numeric"
+              value={minutter} onChange={(e) => setMinutter(e.target.value)} placeholder="Minutter" />
+          </div>
+          {fejl && <div style={s.notatFejl}>{fejl}</div>}
+        </div>
+        <div style={{ padding: 14, borderTop: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
+          <button style={{ ...s.sekundaerStor, flex: 1 }} onClick={onLuk}>Annullér</button>
+          <button style={{ ...s.doneLarge, flex: 1, background: "#D6247A", color: "#fff", borderColor: "#D6247A", fontWeight: 700 }}
+            onClick={opret} disabled={arbejder}>
+            {arbejder ? "Opretter…" : "Opret møde"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Meld et problem ──────────────────────────────────────────────────────────
 // Egen fuldskaerm, ikke et felt der klapper ud nederst paa opgaven. Foer laa de to
@@ -1514,20 +2073,57 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
         tidErGemt.current = true;
       }
       // Kommentar og billeder gemmes som et notat, praecis som fra opgaveskaermen.
+      //
+      // Fra her og ned laegges alt i koeen hvis forbindelsen svigter, i stedet for at
+      // kaste. Tiden er allerede registreret paa dette tidspunkt, og at vaelte hele
+      // afslutningen fordi et billede ikke kunne sendes ville tvinge hende til at
+      // starte forfra — med risiko for at tiden blev talt med to gange.
       let antalFotos = 0;
       if (beskedTekst.trim() || beskedFiler.length > 0) {
-        const { error: insErr } = await supabaseClient.from("task_notes").upsert({
+        const raekke = {
           id: notatId, instance_id: task.id, employee_id: employee?.id || null,
           kind: "kommentar", text: beskedTekst.trim() || null, photos: [],
-        }, { onConflict: "id" });
-        if (insErr) throw new Error(insErr.message);
-        if (beskedFiler.length > 0) {
-          const stier = await uploadOpgavefotos(supabaseClient, task.id, notatId, beskedFiler,
-            (nr, iAlt) => setFotoFremdrift({ nr, iAlt }));
-          const { error: updErr } = await supabaseClient
-            .from("task_notes").update({ photos: stier }).eq("id", notatId);
-          if (updErr) throw new Error(updErr.message);
-          antalFotos = stier.length;
+        };
+        const { error: insErr } = await supabaseClient
+          .from("task_notes").upsert(raekke, { onConflict: "id" });
+        if (insErr && !erNetvaerksfejl(insErr)) throw new Error(insErr.message);
+
+        // Billederne komprimeres UANSET om der er daekning. Det er den tunge del, og
+        // den skal vaere overstaaet inden de gemmes i koeen — ellers laa der raa
+        // billeder fra kameraet og fyldte telefonen.
+        const stier = [];
+        const koeFotos = [];
+        for (let i = 0; i < beskedFiler.length; i++) {
+          setFotoFremdrift({ nr: i + 1, iAlt: beskedFiler.length });
+          const blob = await komprimerBillede(beskedFiler[i]);
+          const sti = `${task.id}/${notatId}-${i}.jpg`;
+          stier.push(sti);
+          koeFotos.push({ sti, blob });
+        }
+        antalFotos = stier.length;
+
+        if (insErr) {
+          await koeTilfoej({ art: "notat", args: { raekke } });
+          for (const f of koeFotos) await koeTilfoej({ art: "foto", args: f });
+          if (stier.length) await koeTilfoej({ art: "fotostier", args: { notatId, stier } });
+        } else if (koeFotos.length > 0) {
+          let fotoFejl = null;
+          for (const f of koeFotos) {
+            const { error } = await supabaseClient.storage.from("opgavefotos")
+              .upload(f.sti, f.blob, { contentType: "image/jpeg", upsert: false });
+            const findes = error && (String(error.statusCode) === "409" || /exists/i.test(error.message || ""));
+            if (error && !findes) { fotoFejl = error; break; }
+          }
+          if (fotoFejl && !erNetvaerksfejl(fotoFejl)) throw new Error(fotoFejl.message);
+          if (fotoFejl) {
+            for (const f of koeFotos) await koeTilfoej({ art: "foto", args: f });
+            await koeTilfoej({ art: "fotostier", args: { notatId, stier } });
+          } else {
+            const { error: updErr } = await supabaseClient
+              .from("task_notes").update({ photos: stier }).eq("id", notatId);
+            if (updErr && !erNetvaerksfejl(updErr)) throw new Error(updErr.message);
+            if (updErr) await koeTilfoej({ art: "fotostier", args: { notatId, stier } });
+          }
         }
       }
       // Nexus-kvitteringen er ikke en spaerring, men den skal registreres — ogsaa
@@ -1535,7 +2131,8 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
       if (erNexus) {
         const { error: nxErr } = await supabaseClient
           .from("instances").update({ nexus_confirmed: nexusOk }).eq("id", task.id);
-        if (nxErr) throw new Error(nxErr.message);
+        if (nxErr && !erNetvaerksfejl(nxErr)) throw new Error(nxErr.message);
+        if (nxErr) await koeTilfoej({ art: "nexus", args: { opgaveId: task.id, bekraeftet: nexusOk } });
       }
       // Bekraeftelsen binder udleveringen til DENNE opgave, og foerst der kan varerne
       // faktureres. Siger hun nej, roeres der ingenting: udleveringen bliver staaende
@@ -1544,8 +2141,15 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
       if (spoergOmProdukter && udleverBekraeftet === true) {
         const { data: antal, error: udErr } = await supabaseClient
           .rpc("bekraeft_udlevering", { p_instance_id: task.id });
-        if (udErr) throw new Error(udErr.message);
-        udleveret = antal || 0;
+        if (udErr && !erNetvaerksfejl(udErr)) throw new Error(udErr.message);
+        if (udErr) {
+          // Gratis at gentage: den saetter instance_id paa linjer der ikke har et.
+          // Anden gang rammer den nul raekker.
+          await koeTilfoej({ art: "udlevering", args: { opgaveId: task.id } });
+          udleveret = udleveringer.length;
+        } else {
+          udleveret = antal || 0;
+        }
       }
       const statusOk = await onSetStatus(task.id, true);
       if (statusOk === false) throw new Error(tr.finishSaveFailed);
@@ -2284,6 +2888,12 @@ export default function MedarbejderApp() {
   const [ingenForbindelse, setIngenForbindelse] = useState(false);
   // Tidspunktet paa den gemte kopi vi ser paa. null betyder at data er friske.
   const [kopiHentet, setKopiHentet] = useState(null);
+  // Antal skrivninger der venter paa daekning. 0 = alt er sendt.
+  const [koeAntal, setKoeAntal] = useState(0);
+  const [koeSender, setKoeSender] = useState(false);
+  const senderRef = useRef(false);
+  // Taelles op naar koeen er toemt, saa dagen hentes forfra fra databasen.
+  const [genhent, setGenhent] = useState(0);
   const [henterAdgang, setHenterAdgang] = useState(false);
   const [adgangHentetNu, setAdgangHentetNu] = useState(false);
   const [employee, setEmployee] = useState(null);
@@ -2303,6 +2913,9 @@ export default function MedarbejderApp() {
   // åbne på den rigtige dag — ellers viste appen fredag til en der møder om lørdagen.
   const weekendJumpDone = useRef(false);
   const [openTask, setOpenTask] = useState(null);
+  // Kun planlaeggere ser knappen. Databasen afviser kaldet uanset hvad, hvis den
+  // der spoerger ikke er administrator — reglen ligger ikke i en skjult knap.
+  const [nytMoede, setNytMoede] = useState(false);
 
   useEffect(() => {
     if (weekendJumpDone.current || weekOffset !== 0 || !instances.length) return;
@@ -2357,6 +2970,52 @@ useEffect(() => {
           if (error) setRecoveryError("Nulstillingslinket er udløbet eller allerede brugt. Bed om et nyt.");
           else setPasswordRecovery(true);
     }
+
+  async function opdaterKoeAntal() {
+    setKoeAntal((await koeAlle()).length);
+  }
+
+  async function sendKoe() {
+    // En ref og ikke tilstanden. sendKoe fanges i en lukning naar effekten nedenfor
+    // saettes op, og dér er koeSender altid falsk — vagten ville aldrig udloese, og
+    // to afsendelser kunne koere oven i hinanden. Databasens gentagelsesvagt ville
+    // fange det, men vi skal ikke laene os op ad den for noget vi selv kan undgaa.
+    if (senderRef.current) return;
+    senderRef.current = true;
+    setKoeSender(true);
+    const tilbage = await toemKoe(supabase);
+    setKoeAntal(tilbage);
+    senderRef.current = false;
+    setKoeSender(false);
+    // Er alt kommet af sted, hentes dagen forfra. Ellers ville hun se sine egne
+    // lokale tal i stedet for det databasen faktisk endte med.
+    if (tilbage === 0) setGenhent((n) => n + 1);
+  }
+
+  // Der findes INGEN baggrundssynkronisering paa iOS. Koeen kan kun toemmes mens appen
+  // er aaben, og derfor proeves der tre steder: ved opstart, naar telefonen melder
+  // forbindelse, og en gang i minuttet mens appen er fremme. Lukker hun appen i en
+  // kaelder, sendes der foerst naeste gang hun aabner den — det staar i hjaelpen.
+  useEffect(() => {
+    if (!session) return;
+    opdaterKoeAntal();
+    function paaNet() { sendKoe(); }
+    function paaKoe() { opdaterKoeAntal(); }
+    window.addEventListener("wl-koe-aendret", paaKoe);
+    window.addEventListener("online", paaNet);
+    const ur = setInterval(() => { if (navigator.onLine) sendKoe(); }, 60 * 1000);
+    // Naar appen kommer frem igen efter at have ligget i baggrunden — det er dét der
+    // sker naar hun tager telefonen op af lommen ude hos naeste kunde.
+    function paaSynlig() { if (document.visibilityState === "visible" && navigator.onLine) sendKoe(); }
+    document.addEventListener("visibilitychange", paaSynlig);
+    sendKoe();
+    return () => {
+      window.removeEventListener("wl-koe-aendret", paaKoe);
+      window.removeEventListener("online", paaNet);
+      document.removeEventListener("visibilitychange", paaSynlig);
+      clearInterval(ur);
+    };
+  }, [session]);
 
   // Kommer daekningen tilbage, henter appen selv. Hun skal ikke gaette sig til at
   // trykke paa noget — hun staar formentlig midt i et arbejde med handsker paa.
@@ -2510,7 +3169,7 @@ useEffect(() => {
       setDataLoading(false);
     }
     load();
-  }, [session, weekOffset, viewEmpId]);
+  }, [session, weekOffset, viewEmpId, genhent]);
 
   useEffect(() => {
     if (openTask) {
@@ -2542,6 +3201,23 @@ useEffect(() => {
     });
     if (error) {
       console.error("append_time_log:", error.message);
+      // Uden daekning laegges registreringen i koeen i stedet for at gaa tabt. Noeglen
+      // foelger med, saa databasen afviser den hvis den alligevel naaede frem foerste
+      // gang — funktionen LAEGGER TIL, og to gange 60 minutter er 120 paa loensedlen.
+      //
+      // Uden en noegle koeer vi ikke: saa kan vi ikke garantere at den kun taeller én
+      // gang, og en fordoblet loen er vaerre end en registrering der maa laves om.
+      if (erNetvaerksfejl(error) && klientId) {
+        await koeTilfoej({ art: "tid", args: {
+          opgaveId: taskId, minutter: m, empId: employee.id, note, noegle: klientId,
+        } });
+        // Vis tiden med det samme, saa hun kan komme videre. Den staar i koeen.
+        setInstances((prev) => prev.map((t) => t.id === taskId
+          ? { ...t, timeLog: [...(t.timeLog || []), { minutes: m, empId: employee.id, ts: Date.now(), kid: klientId }] }
+          : t));
+        opdaterKoeAntal();
+        return true;
+      }
       return false;
     }
     setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, timeLog: newLog, time_log: newLog } : t));
@@ -2562,6 +3238,20 @@ useEffect(() => {
     });
     if (error) {
       console.error("setStatus:", error.message);
+      // Afslutningen saettes pr. medarbejder til en fast vaerdi — sender koeen den
+      // to gange, staar der det samme bagefter. Den er derfor gratis at koee.
+      if (erNetvaerksfejl(error)) {
+        await koeTilfoej({ art: "status", args: {
+          opgaveId: taskId, empId: employee.id, faerdig: done,
+        } });
+        setInstances((prev) => prev.map((t) => t.id === taskId
+          ? { ...t,
+              completed_by_employee: { ...(t.completed_by_employee || {}),
+                ...(done ? { [employee.id]: new Date().toISOString() } : {}) } }
+          : t));
+        opdaterKoeAntal();
+        return true;
+      }
       return false;
     }
     setInstances((prev) => prev.map((t) => t.id === taskId
@@ -2584,15 +3274,28 @@ useEffect(() => {
     const task = instances.find((t) => t.id === taskId);
     if (!task) return;
     const newChecklist = (task.checklist || []).map((i) => i.id === itemId ? { ...i, done: !i.done } : i);
-    await supabase.from("instances").update({ checklist: newChecklist }).eq("id", taskId);
+    // Fluebenet saettes med det samme. Den gamle kode ventede paa databasen, saa uden
+    // daekning skete der ingenting naar hun trykkede — og hun trykkede igen.
     setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, checklist: newChecklist } : t));
+    const { error } = await supabase.from("instances").update({ checklist: newChecklist }).eq("id", taskId);
+    if (error && erNetvaerksfejl(error)) {
+      // Hele listen sendes, ikke det enkelte flueben. Sidste skriver vinder — er de
+      // to paa opgaven og begge offline, forsvinder den enes flueben. Det er kendt og
+      // accepteret; alternativet ville kraeve en samlefunktion i databasen.
+      await koeTilfoej({ art: "tjekliste", args: { opgaveId: taskId, checklist: newChecklist } });
+      opdaterKoeAntal();
+    }
   }
 
   async function signOut() {
+    // Er der noget i koeen, gaar det tabt ved log ud. Hun skal vide det foerst.
+    const venter = (await koeAlle()).length;
+    if (venter > 0 && !window.confirm(tr.queueOnSignOut(venter))) return;
     await supabase.auth.signOut();
     // Kopien indeholder kundenavne og adresser. Den maa ikke ligge og vente paa den
     // naeste der logger ind paa samme telefon.
     rydKopier();
+    rydAdgang();
     try { localStorage.removeItem("wl_sidste_emp"); } catch { /* ingenting at goere */ }
     setEmployee(null); setInstances([]); setKopiHentet(null);
   }
@@ -2678,6 +3381,30 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
         </button>
       )}
 
+      {/* Koeen skal vaere synlig. Det vaerste ville vaere at hun troede alt var sendt,
+          lukkede appen, og foerst opdagede dagen efter at tiden manglede. */}
+      {koeAntal > 0 && (
+        <div style={{ background: "#FFFBEB", borderBottom: "1px solid #FDE68A", padding: "10px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#92400E" }}>
+                ↑ {tr.queueWaiting(koeAntal)}
+              </div>
+              <div style={{ fontSize: 12, color: "#B45309", marginTop: 1, lineHeight: 1.4 }}>
+                {tr.queueHint}
+              </div>
+            </div>
+            <button
+              onClick={sendKoe} disabled={koeSender || !navigator.onLine}
+              style={{ flexShrink: 0, border: "none", borderRadius: 8, background: "#B45309", color: "#fff",
+                       padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                       fontFamily: "inherit", opacity: (koeSender || !navigator.onLine) ? 0.5 : 1 }}>
+              {koeSender ? tr.queueSending : tr.queueSendNow}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mindelsen om at hente adgangsoplysninger, mens der stadig er daekning.
           Staar over dagslisten, for den skal ses INDEN hun koerer — ikke naar hun
           staar ved doeren. */}
@@ -2726,6 +3453,16 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
         </div>
         <div style={s.headerRight}>
           <LangToggle lang={lang} setLang={changeLang} />
+          {/* Kun planlaeggere. Rengoeringsdamerne skal ikke have en knap de aldrig
+              skal bruge — og databasen afviser kaldet uanset hvad. */}
+          {employee?.is_admin && (
+            <button
+              style={{ border:"none", background:"#F0FDFA", color:"#0F766E", borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:700, cursor:"pointer" }}
+              onClick={() => setNytMoede(true)}
+              title={lang === "da" ? "Nyt kundemøde" : "New customer meeting"}>
+              📅
+            </button>
+          )}
           <button
             style={{ border:"none", background:"#FCE4EF", color:"#D6247A", borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:700, cursor:"pointer" }}
             onClick={() => setShowShop(true)}
@@ -2964,7 +3701,20 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
       {/* Task modal. key paa opgavens id tvinger en frisk komponent pr. opgave — uden
           den genbruger React samme instans, og tilstande som "melding sendt" eller et
           halvt udfyldt afslutningsflow ville følge med over på næste opgave. */}
-      {openTask && (
+      {/* Et kundemoede er en aktivitet med et tilbud paa. Den skal aabne tilbuddet og
+          ikke den almindelige opgaveskaerm — der er ingen tjekliste at hakke af, og
+          det hun skal, er at skrive ned hvad kunden sagde. */}
+      {openTask && openTask.type === "aktivitet" && (
+        <TilbudSkaerm
+          key={openTask.id}
+          task={instances.find((t) => t.id === openTask.id) || openTask}
+          employee={employee}
+          supabaseClient={supabase}
+          onLuk={() => setOpenTask(null)}
+        />
+      )}
+
+      {openTask && openTask.type !== "aktivitet" && (
         <TaskModal
           key={openTask.id}
           task={instances.find((t) => t.id === openTask.id) || openTask}
@@ -2975,6 +3725,14 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           onSetStatus={setStatus}
           onToggleChecklist={toggleChecklistItem}
           supabaseClient={supabase}
+        />
+      )}
+
+      {nytMoede && (
+        <NytMoedeSkaerm
+          supabaseClient={supabase} employee={employee}
+          onLuk={() => setNytMoede(false)}
+          onOprettet={() => { setNytMoede(false); setGenhent((n) => n + 1); }}
         />
       )}
     </div>
@@ -3193,6 +3951,9 @@ const s = {
   notatInput: { width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:"1.5px solid #E2E8F0",
     fontSize:15, fontFamily:"inherit", resize:"vertical", outline:"none", background:"#fff", color:"#111111" },
   notatFejl: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:8 },
+  tilbudAfsnit: { fontSize:11.5, fontWeight:800, letterSpacing:".05em", textTransform:"uppercase",
+    color:"#9C1B5D", marginTop:20, marginBottom:2 },
+  tilbudHint: { fontSize:12, color:"#64748B", marginTop:6, lineHeight:1.45 },
   notatFotoBtn: { flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff",
     fontSize:15, fontWeight:600, color:"#111111", cursor:"pointer", fontFamily:"inherit" },
   doneLarge: { width:"100%", padding:"16px 0", borderRadius:14, border:"2px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:700, fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
