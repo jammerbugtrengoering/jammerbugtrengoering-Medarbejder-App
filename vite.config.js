@@ -8,7 +8,13 @@ import { VitePWA } from "vite-plugin-pwa";
 // Der er med vilje ingen react()-plugin her. Appen bygger i dag helt uden config, fordi
 // Vite 8 selv oversaetter JSX. At tilfoeje pluginnet nu ville aendre oversaettelsen paa
 // en dag hvor vi i forvejen aendrer meget — det kan tages separat.
+// Tidspunktet for buildet bages ind, saa appen kan vise HVILKEN udgave der koerer.
+// Med en service worker imellem er det ikke laengere til at se udefra om en rettelse
+// er naaet frem — og saa bruger man en time paa at teste gammel kode.
+const BYGGET = new Date().toISOString().slice(0, 16).replace("T", " ");
+
 export default defineConfig({
+  define: { __BYGGET__: JSON.stringify(BYGGET) },
   plugins: [
     VitePWA({
       // "prompt" og ikke "autoUpdate". En app der opdaterer sig selv midt i en

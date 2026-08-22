@@ -3478,7 +3478,13 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           <img src="/app-icon.png" alt="Worklist" style={s.headerIcon} />
           <div>
             <div style={s.headerTitle}>{tr.appName}</div>
-            <div style={s.headerSub}>{tr.week} {currentWeek}</div>
+            <div style={s.headerSub}>
+              {tr.week} {currentWeek}
+              {/* Hvilken udgave koerer der? Med en service worker imellem kan man
+                  ikke se udefra om en rettelse er naaet frem, og saa tester man
+                  gammel kode uden at vide det. */}
+              <span style={{ opacity: 0.55, marginLeft: 8 }}>v{typeof __BYGGET__ === "string" ? __BYGGET__ : "?"}</span>
+            </div>
           </div>
         </div>
         <div style={s.headerRight}>
