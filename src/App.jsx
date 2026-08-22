@@ -2892,6 +2892,8 @@ export default function MedarbejderApp() {
   const [koeAntal, setKoeAntal] = useState(0);
   const [koeSender, setKoeSender] = useState(false);
   const senderRef = useRef(false);
+  // Sand naar den naeste genhentning skal ske uden at bytte skaermen ud.
+  const stilleGenhentRef = useRef(false);
   // Taelles op naar koeen er toemt, saa dagen hentes forfra fra databasen.
   const [genhent, setGenhent] = useState(0);
   const [henterAdgang, setHenterAdgang] = useState(false);
@@ -2981,6 +2983,13 @@ useEffect(() => {
     // to afsendelser kunne koere oven i hinanden. Databasens gentagelsesvagt ville
     // fange det, men vi skal ikke laene os op ad den for noget vi selv kan undgaa.
     if (senderRef.current) return;
+
+    // Er koeen tom, er der ingenting at goere. Uden det her tjek koerte funktionen
+    // hvert minut, fandt nul poster, konkluderede "alt er sendt" og hentede dagen
+    // forfra — midt i at hun sad og dikterede et referat, som saa forsvandt.
+    const foer = (await koeAlle()).length;
+    if (foer === 0) { setKoeAntal(0); return; }
+
     senderRef.current = true;
     setKoeSender(true);
     const tilbage = await toemKoe(supabase);
@@ -2989,7 +2998,10 @@ useEffect(() => {
     setKoeSender(false);
     // Er alt kommet af sted, hentes dagen forfra. Ellers ville hun se sine egne
     // lokale tal i stedet for det databasen faktisk endte med.
-    if (tilbage === 0) setGenhent((n) => n + 1);
+    if (tilbage === 0) {
+      stilleGenhentRef.current = true;
+      setGenhent((n) => n + 1);
+    }
   }
 
   // Der findes INGEN baggrundssynkronisering paa iOS. Koeen kan kun toemmes mens appen
@@ -3029,7 +3041,12 @@ useEffect(() => {
   useEffect(() => {
     if (!session) return;
     async function load() {
-      setDataLoading(true);
+      // En genhentning efter at koeen er toemt skal ske STILLE. Saetter vi dataLoading,
+      // bytter appen hele skaermen ud med "Henter opgaver…", og alt hvad der stod i en
+      // aaben tilbudsskaerm eller et halvt udfyldt afslutningsflow er vaek.
+      const stille = stilleGenhentRef.current;
+      stilleGenhentRef.current = false;
+      if (!stille) setDataLoading(true);
       setIngenForbindelse(false);
       // error maa IKKE smides vaek her. Uden daekning kommer der ingen raekke tilbage,
       // og saa saa medarbejderen "Din bruger er ikke koblet til en medarbejder-profil"
