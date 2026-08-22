@@ -2950,7 +2950,20 @@ export default function MedarbejderApp() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setAuthLoading(false); });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => { setSession(session); setAuthLoading(false); });
+    // Supabase fornyer tokenet med jaevne mellemrum og melder tilbage her — og paa iOS
+    // sker det ogsaa hver gang appen kort mister fokus, hvilket diktering goer.
+    //
+    // Hver melding kom med et NYT session-objekt. Satte vi det i tilstanden hver gang,
+    // fik indlaesningen nedenfor en ny afhaengighed og hentede dagen forfra midt i at
+    // hun sad og skrev — og alt uddgemt indhold forsvandt. Vi skifter derfor kun naar
+    // det faktisk er en anden bruger, eller naar hun logger ud.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, ny) => {
+      setSession((gammel) => {
+        if (gammel?.user?.id && ny?.user?.id && gammel.user.id === ny.user.id) return gammel;
+        return ny;
+      });
+      setAuthLoading(false);
+    });
     return () => subscription.unsubscribe();
   }, []);
 
@@ -3027,7 +3040,7 @@ useEffect(() => {
       document.removeEventListener("visibilitychange", paaSynlig);
       clearInterval(ur);
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   // Kommer daekningen tilbage, henter appen selv. Hun skal ikke gaette sig til at
   // trykke paa noget — hun staar formentlig midt i et arbejde med handsker paa.
@@ -3186,7 +3199,7 @@ useEffect(() => {
       setDataLoading(false);
     }
     load();
-  }, [session, weekOffset, viewEmpId, genhent]);
+  }, [session?.user?.id, weekOffset, viewEmpId, genhent]);
 
   useEffect(() => {
     if (openTask) {
