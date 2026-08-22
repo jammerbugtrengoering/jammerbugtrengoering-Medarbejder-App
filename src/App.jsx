@@ -161,7 +161,7 @@ async function udfoerKoePost(klient, post) {
 
 // Toemmer koeen. Stopper ved foerste netvaerksfejl, saa raekkefoelgen holder.
 // Returnerer hvor mange der er tilbage.
-async function toemKoe(klient) {
+async function toemKoe(klient, empId) {
   const poster = await koeAlle();
   for (const post of poster) {
     try {
@@ -175,6 +175,17 @@ async function toemKoe(klient) {
         continue;
       }
       await koeFjern(post.id);
+      // Maaling: hvor laenge maatte den vente? Formaalet er at kunne se efter en
+      // maaned om koeen bruges to gange eller to hundrede — og dermed om der er
+      // grund til at bygge mere. Fejler maalingen, er det ligegyldigt; den maa
+      // aldrig staa i vejen for at selve skrivningen kom af sted.
+      try {
+        await klient.from("koe_maaling").insert({
+          employee_id: empId ?? null,
+          art: post.art,
+          ventede_sek: Math.max(0, Math.round((Date.now() - (post.oprettet || Date.now())) / 1000)),
+        });
+      } catch { /* maalingen maa ikke forstyrre driften */ }
     } catch (e) {
       if (erNetvaerksfejl(e)) return (await koeAlle()).length;
       console.error("koe fejl:", post.art, e);
@@ -1321,6 +1332,71 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
 // medarbejderen BEKRAEFTER blot i afslutningsflowet at kunden har faaet dem. Hun
 // vaelger altsaa ikke laengere varer i appen - hun koerer i privat bil og har
 // aldrig lagervarer med.
+
+// ── Læg appen på hjemmeskærmen ───────────────────────────────────────────────
+// iOS rydder lokale data for websteder der ikke er brugt i syv dage. Installerede
+// web-apps er undtaget. Uden installation forsvinder baade den gemte dagsliste og
+// skrivekoeen for en medarbejder der har haft fri en uge — og saa virker offline slet
+// ikke, uden at nogen forstaar hvorfor.
+//
+// Derfor er det en bjaelke i appen og ikke en linje i hjaelpen. Hjaelpen laeser de
+// faerreste; en bjaelke over dagslisten er svaer at komme udenom.
+function erInstalleret() {
+  return window.matchMedia?.("(display-mode: standalone)")?.matches
+    || window.navigator?.standalone === true;
+}
+
+function InstallerBjaelke({ lang }) {
+  const da = lang === "da";
+  const [skjult, setSkjult] = useState(() => {
+    try {
+      const til = Number(localStorage.getItem("wl_installer_skjult") || 0);
+      return til > Date.now();
+    } catch { return false; }
+  });
+
+  if (erInstalleret() || skjult) return null;
+
+  // iOS har ingen installationsknap — brugeren SKAL gennem delemenuen. Android
+  // spoerger som regel selv, men ikke altid, saa begge vejledninger staar der.
+  const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  function skjulEnUge() {
+    // Ikke for evigt. Uden appen paa hjemmeskaermen virker offline ikke, saa
+    // paamindelsen skal komme igen.
+    try { localStorage.setItem("wl_installer_skjult", String(Date.now() + 7 * 864e5)); } catch { /* fuldt lager */ }
+    setSkjult(true);
+  }
+
+  return (
+    <div style={{ background: "#EEF2FF", borderBottom: "1px solid #C7D2FE", padding: "11px 16px" }}>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#3730A3" }}>
+        {da ? "Læg appen på hjemmeskærmen" : "Add the app to your home screen"}
+      </div>
+      <div style={{ fontSize: 12.5, color: "#4338CA", marginTop: 3, lineHeight: 1.5 }}>
+        {da
+          ? "Ellers kan du ikke se dine opgaver uden dækning — telefonen sletter det gemte efter en uge."
+          : "Otherwise you cannot see your jobs without coverage — the phone deletes the saved copy after a week."}
+      </div>
+      <div style={{ fontSize: 12.5, color: "#4338CA", marginTop: 8, lineHeight: 1.6 }}>
+        {iOS
+          ? (da
+              ? "Tryk på del-ikonet nederst på skærmen (firkanten med pilen op), rul ned og vælg «Føj til hjemmeskærm». Tryk så «Tilføj»."
+              : "Tap the share icon at the bottom (the square with an arrow), scroll down and choose \"Add to Home Screen\". Then tap \"Add\".")
+          : (da
+              ? "Tryk på de tre prikker øverst til højre og vælg «Installer app» eller «Føj til startskærm»."
+              : "Tap the three dots at the top right and choose \"Install app\" or \"Add to Home screen\".")}
+      </div>
+      <button onClick={skjulEnUge}
+        style={{ marginTop: 10, border: "none", background: "#C7D2FE", color: "#3730A3",
+                 borderRadius: 8, padding: "7px 12px", fontSize: 12.5, fontWeight: 700,
+                 cursor: "pointer", fontFamily: "inherit" }}>
+        {da ? "Ikke nu" : "Not now"}
+      </button>
+    </div>
+  );
+}
 
 // ── Tilbud ude hos kunden ────────────────────────────────────────────────────
 // Moedeopgaven er af typen 'aktivitet' og haenger sammen med en raekke i tilbud.
@@ -3087,7 +3163,7 @@ useEffect(() => {
 
     senderRef.current = true;
     setKoeSender(true);
-    const tilbage = await toemKoe(supabase);
+    const tilbage = await toemKoe(supabase, employee?.id);
     setKoeAntal(tilbage);
     senderRef.current = false;
     setKoeSender(false);
@@ -3492,6 +3568,8 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           <span>{tr.newVersion}</span>
         </button>
       )}
+
+      <InstallerBjaelke lang={lang} />
 
       {/* Koeen skal vaere synlig. Det vaerste ville vaere at hun troede alt var sendt,
           lukkede appen, og foerst opdagede dagen efter at tiden manglede. */}
