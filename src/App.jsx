@@ -1357,15 +1357,21 @@ function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
       setLister((cl || []).map((c) => ({
         ...c, antal: (cli || []).filter((i) => i.checklist_template_id === c.id).length,
       })));
-      setPriser(Object.fromEntries((pr || []).map((p) => [p.contract_type, Number(p.hourly_rate)])));
+      const satser = Object.fromEntries((pr || []).map((p) => [p.contract_type, Number(p.hourly_rate)]));
+      setPriser(satser);
       setTilbud(t || null);
       if (t) {
+        // Vi VED hvad prisen er, saa snart kontrakttypen er kendt. Stod feltet tomt,
+        // skulle hun huske satsen udenad mens kunden sad og kiggede.
+        const startTimepris = t.timepris ?? (t.pricing_type !== "fixed"
+          ? (satser[t.contract_type || "privat"] ?? "")
+          : "");
         setF({
           kunde_navn: t.kunde_navn || "", adresse: t.adresse || "",
           kontaktperson: t.kontaktperson || "", kunde_email: t.kunde_email || "",
           titel: t.titel || "", contract_type: t.contract_type || "privat",
           pricing_type: t.pricing_type || "hourly",
-          timepris: t.timepris ?? "", fast_pris: t.fast_pris ?? "",
+          timepris: startTimepris, fast_pris: t.fast_pris ?? "",
           anslaaet_timer: t.anslaaet_timer ?? "", plan_interval: t.plan_interval || "uge",
           checklist_template_ids: t.checklist_template_ids || [],
           referat: t.referat || "", bemaerkning: t.bemaerkning || "",
@@ -1583,7 +1589,14 @@ function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
 
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             {[["hourly", "Timepris"], ["fixed", "Fast pris"]].map(([k, l]) => (
-              <button key={k} type="button" disabled={laast} onClick={() => saet("pricing_type", k)}
+              <button key={k} type="button" disabled={laast} onClick={() => {
+                saet("pricing_type", k);
+                // Skifter hun tilbage til timepris efter at have prøvet fast pris,
+                // skal satsen være der igen — ikke et tomt felt.
+                if (k === "hourly" && !f.timepris && priser[f.contract_type]) {
+                  saet("timepris", priser[f.contract_type]);
+                }
+              }}
                 style={{ flex: 1, padding: "12px 10px", borderRadius: 10, fontSize: 14, fontWeight: 700,
                          border: f.pricing_type === k ? "2px solid #D6247A" : "1.5px solid #E2E8F0",
                          background: f.pricing_type === k ? "#FCE4EF" : "#fff",
