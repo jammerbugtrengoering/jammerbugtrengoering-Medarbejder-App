@@ -1328,7 +1328,7 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
 // i planlaegningsappen bagefter, hvor halvdelen af det hun saa er glemt.
 const TILBUD_MAKS_FOTOS = 10;
 
-function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
+function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
   const [tilbud, setTilbud] = useState(null);
   const [henter, setHenter] = useState(true);
   const [lister, setLister] = useState([]);
@@ -1338,6 +1338,11 @@ function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
   const [besked, setBesked] = useState("");
   const [fotoUrls, setFotoUrls] = useState({});
   const [fotoArbejde, setFotoArbejde] = useState(null);
+  // Er moedet hakket af? Laeses af opgaven, ikke af tilbuddet — det er opgaven der
+  // staar i ugeplanen og som kontoret kigger paa.
+  const [moedeHoldt, setMoedeHoldt] = useState(
+    () => !!((task.completed_by_employee || {})[employee.id]),
+  );
 
   // Ét felt pr. ting hun kan rette. Holdes samlet i ét objekt, saa gemningen bliver
   // ét kald i stedet for tolv.
@@ -1683,6 +1688,27 @@ function TilbudSkaerm({ task, employee, supabaseClient, onLuk }) {
             value={f.bemaerkning} disabled={laast}
             onChange={(e) => saet("bemaerkning", e.target.value)}
             placeholder="Forbehold, særlige aftaler…" />
+
+          {/* Moedet skal kunne hakkes af, saa kontoret kan se at det er holdt. Der
+              registreres IKKE tid: et kundemoede faktureres ikke, og der er ingen
+              kunde der betaler for timerne. Derfor er aktiviteter ogsaa undtaget fra
+              den daglige paamindelse om manglende registrering. */}
+          <div style={s.tilbudAfsnit}>Mødet</div>
+          <button type="button"
+            style={moedeHoldt ? s.nexusTjekAktiv : s.nexusTjek}
+            onClick={async () => {
+              const ok = await onSetStatus(task.id, !moedeHoldt);
+              if (ok !== false) setMoedeHoldt((v) => !v);
+            }}>
+            <span style={moedeHoldt ? s.tjekFirkantAktiv : s.tjekFirkant}>
+              {moedeHoldt && <Check size={16} color="#fff" strokeWidth={3} />}
+            </span>
+            <span>Mødet er holdt</span>
+          </button>
+          <div style={s.tilbudHint}>
+            Der skal ikke registreres tid på et kundemøde. Fluebenet er kun så kontoret
+            kan se at du har været der.
+          </div>
 
           {fejl && <div style={{ ...s.notatFejl, marginTop: 12 }}>{fejl}</div>}
           {besked && <div style={{ color: "#166534", fontSize: 13.5, marginTop: 12, lineHeight: 1.5 }}>{besked}</div>}
@@ -3802,6 +3828,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           task={instances.find((t) => t.id === openTask.id) || openTask}
           employee={employee}
           supabaseClient={supabase}
+          onSetStatus={setStatus}
           onLuk={() => setOpenTask(null)}
         />
       )}
