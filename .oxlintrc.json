@@ -11,7 +11,8 @@
   "ignorePatterns": [
     "dist/**",
     "supabase/**",
-    "netlify/**"
+    "netlify/**",
+    "tjek-tdz.mjs"
   ],
   "rules": {
     "no-undef": "error",
