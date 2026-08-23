@@ -1333,6 +1333,81 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
 // vaelger altsaa ikke laengere varer i appen - hun koerer i privat bil og har
 // aldrig lagervarer med.
 
+// ── Adressefelt med opslag i Danmarks adresseregister ────────────────────────
+// Rengoeringsdamerne kan ikke rette en adresse nogen steder — men planlaeggeren kan,
+// fra telefonen, naar hun booker et moede eller udfylder et tilbud. Og tilbuddets
+// adresse bliver til aftalens adresse ved accept, og derfra til alle kommende opgaver
+// og koeretider. Samme fejl som i planlaegningsappen, bare ad den anden vej — og ad
+// den vej har hun travlt, fordi hun staar hos kunden.
+//
+// Registret er dataforsyningen.dk, samme kilde som geokodningen i travel-distance.
+// Fri indtastning er stadig tilladt: flere adresser i drift har etage og doer skrevet
+// ind, og en spaerring ville bare faa hende til at lade feltet staa tomt.
+function AdresseFelt({ vaerdi, onChange, disabled, placeholder, felt }) {
+  const [forslag, setForslag] = useState([]);
+  const [kendt, setKendt] = useState(null);   // null = ikke slaaet op endnu
+  const [valgt, setValgt] = useState(false);
+  const ur = useRef(null);
+
+  const ens = (a, b) => (a || "").toLowerCase().replace(/[\s,.]/g, "")
+                     === (b || "").toLowerCase().replace(/[\s,.]/g, "");
+
+  useEffect(() => {
+    if (disabled) return;
+    const q = (vaerdi || "").trim();
+    setValgt(false);
+    if (q.length < 3) { setForslag([]); setKendt(null); return; }
+    clearTimeout(ur.current);
+    // Ventetid foer opslaget. Uden den kaldes registret ved hvert tastetryk — og hun
+    // sidder formentlig paa mobildata.
+    ur.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          "https://api.dataforsyningen.dk/adresser/autocomplete?per_side=5&q=" + encodeURIComponent(q));
+        const data = res.ok ? await res.json() : [];
+        const liste = Array.isArray(data) ? data : [];
+        setForslag(liste);
+        setKendt(liste.some((f) => ens(f.tekst, q)));
+      } catch {
+        // Ingen daekning eller registret nede. Saa siger vi ingenting frem for at
+        // paastaa at adressen er forkert.
+        setForslag([]); setKendt(null);
+      }
+    }, 400);
+    return () => clearTimeout(ur.current);
+  }, [vaerdi, disabled]);
+
+  return (
+    <>
+      <input style={felt} value={vaerdi || ""} disabled={disabled}
+        onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+
+      {!disabled && !valgt && forslag.length > 0 && !kendt && (
+        <div style={{ border: "1.5px solid #E2E8F0", borderRadius: 10, marginTop: 6, overflow: "hidden" }}>
+          {forslag.map((f) => (
+            <div key={f.adresse?.id || f.tekst}
+              onClick={() => { onChange(f.tekst); setForslag([]); setValgt(true); setKendt(true); }}
+              style={{ padding: "12px 12px", fontSize: 14, borderBottom: "1px solid #F1F5F9" }}>
+              {f.tekst}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {kendt === false && (vaerdi || "").trim().length >= 3 && (
+        <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 9,
+                      padding: "9px 11px", marginTop: 6, fontSize: 12.5, color: "#92400E", lineHeight: 1.5 }}>
+          Adressen findes ikke i adresseregistret. Kørsel kan ikke beregnes. Vælg et
+          forslag, eller tjek stavemåden.
+        </div>
+      )}
+      {kendt === true && (
+        <div style={{ fontSize: 12, color: "#166534", marginTop: 5 }}>✓ Fundet i adresseregistret</div>
+      )}
+    </>
+  );
+}
+
 // ── Læg appen på hjemmeskærmen ───────────────────────────────────────────────
 // iOS rydder lokale data for websteder der ikke er brugt i syv dage. Installerede
 // web-apps er undtaget. Uden installation forsvinder baade den gemte dagsliste og
@@ -1653,8 +1728,8 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
           <div style={s.tilbudAfsnit}>Kunden</div>
           <input style={felt} value={f.kunde_navn} disabled={laast}
             onChange={(e) => saet("kunde_navn", e.target.value)} placeholder="Virksomhedens navn" />
-          <input style={felt} value={f.adresse} disabled={laast}
-            onChange={(e) => saet("adresse", e.target.value)} placeholder="Adresse" />
+          <AdresseFelt felt={felt} vaerdi={f.adresse} disabled={laast}
+            onChange={(v) => saet("adresse", v)} placeholder="Adresse" />
           <input style={felt} value={f.kontaktperson} disabled={laast}
             onChange={(e) => saet("kontaktperson", e.target.value)} placeholder="Kontaktperson" />
           <input style={felt} type="email" inputMode="email" value={f.kunde_email} disabled={laast}
@@ -1847,7 +1922,7 @@ function NytMoedeSkaerm({ supabaseClient, employee, onLuk, onOprettet }) {
           <div style={s.tilbudAfsnit}>Hvem er mødet med?</div>
           <input style={felt} value={kunde} onChange={(e) => setKunde(e.target.value)}
             placeholder="Også hvis de ikke er kunde endnu" />
-          <input style={felt} value={adresse} onChange={(e) => setAdresse(e.target.value)}
+          <AdresseFelt felt={felt} vaerdi={adresse} onChange={setAdresse}
             placeholder="Adresse" />
           <div style={s.tilbudAfsnit}>Hvornår</div>
           <input style={felt} type="date" value={dato} onChange={(e) => setDato(e.target.value)} />
