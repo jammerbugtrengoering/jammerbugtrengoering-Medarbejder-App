@@ -1780,7 +1780,7 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
             }}>
             <option value="privat">Privat</option>
             <option value="erhverv">Erhverv</option>
-            <option value="aeldrelov">Ældreloven</option>
+            <option value="aeldrelov">Ældrelov</option>
             <option value="nexus">Kommunal (Nexus)</option>
           </select>
 
