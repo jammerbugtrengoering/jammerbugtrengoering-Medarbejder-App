@@ -3066,6 +3066,60 @@ function weekMeta(weekNo, year) {
   return `${fmt(monday)} – ${fmt(friday)}`;
 }
 
+// Loginnet findes, men det hoerer ikke til en medarbejder. Skaermen var foer en
+// blindgyde: én linje om at kontakte planlaeggeren, og en Log ud-knap.
+//
+// Det sker i praksis for en KUNDE. Bruger hun samme mailadresse til kundeportalen —
+// eller har hun engang vaeret medarbejder — lander hun her og tror hun er lukket ude.
+// Derfor slaas det op om hun er portalbruger, og saa peges der derhen.
+const PORTAL_URL = "https://jammerbugtrengoering-kundeportal.netlify.app";
+
+function IngenProfil({ s, tr, onSignOut }) {
+  const [portal, setPortal] = useState(undefined);   // undefined = ved det ikke endnu
+
+  useEffect(() => {
+    let afbrudt = false;
+    (async () => {
+      const { data } = await supabase.rpc("hent_portal_mig");
+      if (!afbrudt) setPortal(data?.[0] ?? null);
+    })();
+    return () => { afbrudt = true; };
+  }, []);
+
+  if (portal === undefined) return (
+    <div style={s.loginWrap}><div style={s.loginCard}>
+      <div style={{ textAlign: "center", color: "#94A3B8", fontSize: 14 }}>Et øjeblik…</div>
+    </div></div>
+  );
+
+  if (portal) return (
+    <div style={s.loginWrap}>
+      <div style={s.loginCard}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Du skal et andet sted hen</div>
+        <div style={{ fontSize: 14, color: "#475569", lineHeight: 1.6, marginBottom: 16 }}>
+          Det her er appen for vores medarbejdere. Din adgang hører til kundeportalen
+          for <strong>{portal.visningsnavn}</strong>, hvor du kan se jeres opgaver og fakturaer.
+        </div>
+        <a href={PORTAL_URL} style={{ ...s.loginBtn, display: "block", textAlign: "center",
+                                      textDecoration: "none", boxSizing: "border-box" }}>
+          Åbn kundeportalen
+        </a>
+        <button style={{ ...s.loginBtn, background: "transparent", color: "#64748B", marginTop: 8 }}
+          onClick={onSignOut}>{tr.signOut}</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={s.loginWrap}>
+      <div style={s.loginCard}>
+        <div style={s.errorBox}>{tr.noProfileError}</div>
+        <button style={s.loginBtn} onClick={onSignOut}>{tr.signOut}</button>
+      </div>
+    </div>
+  );
+}
+
 export default function MedarbejderApp() {
   // Dansk som udgangspunkt. Alle 20 medarbejdere staar med dansk i databasen, men
   // profilen hentes foerst efter foerste render — med "en" som standard blinkede
@@ -3587,14 +3641,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
     </div>
   );
 
-  if (!employee) return (
-    <div style={s.loginWrap}>
-      <div style={s.loginCard}>
-        <div style={s.errorBox}>{tr.noProfileError}</div>
-        <button style={s.loginBtn} onClick={signOut}>{tr.signOut}</button>
-      </div>
-    </div>
-  );
+  if (!employee) return <IngenProfil s={s} tr={tr} onSignOut={signOut} />;
 
   const { week: currentWeek, year: currentWeekYear } = weekInfoWithOffset(weekOffset);
   const ALL_DAYS = tr.days;
