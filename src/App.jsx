@@ -4518,7 +4518,10 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
       const { error: insertErr } = await supabaseClient.from("inventory_transactions").upsert({
         id: `${orderGroupId}-${itemId}`,
         item_id: itemId, quantity: -amount, type: "out", status: "pending", order_group_id: orderGroupId,
-        reason: lang === "da" ? `Bestilt af ${employee.name}` : `Ordered by ${employee.name}`,
+        // Navnet staar IKKE her. Det ligger i employee_id lige nedenunder, og
+        // planlaegningen viser det derfra. Stod det begge steder, kom det ud som
+        // "Bestilt af Nadine Bremholm · Nadine Bremholm".
+        reason: lang === "da" ? "Bestilt" : "Ordered",
         employee_id: employee.id,
       }, { onConflict: "id" });
       if (insertErr) { console.error("order upsert:", insertErr.message); alert(`Kunne ikke oprette bestillingen for "${item.name}" — prøv igen.`); setSaving(false); return; }
