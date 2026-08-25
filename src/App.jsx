@@ -945,6 +945,14 @@ function computeDaySchedule(dayTasks, settings, employee) {
 // Samme indhold som den trykte brugervejledning, men bygget til telefon:
 // fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
 const HELP_DA = [
+  { t: "Beskeder på telefonen", p: [
+    "Appen kan give dig besked, når du mangler at registrere tid, når din plan bliver ændret, og når kontoret har svaret på et ønske om ny tid.",
+    "Du slår dem til under din profil — tryk på dit navn øverst og find «Beskeder på telefonen».",
+    "Har du en iPhone, skal appen først ligge på hjemmeskærmen. Tryk på Del-knappen nederst i Safari, vælg «Føj til hjemmeskærm», og åbn Worklist derfra. Uden det kan iPhone ikke give dig beskeder — det er Apple der bestemmer det, ikke os.",
+    "Beskeder om ændringer i planen samles og kommer højst hvert kvarter. Retter kontoret flere ting på én gang, får du én besked og ikke ti.",
+    "Om aftenen får du en besked om, hvad der venter i morgen.",
+    "Du får stadig de samme mails som før. Slår du beskeder fra igen, sker det samme sted.",
+  ], warn: "Skifter du telefon, skal du slå beskeder til igen på den nye. Den gamle holder op af sig selv." },
   { t: "Hvis der er et problem", p: [
     "Nederst på opgaven står «Der er et problem». Tryk på den, så får du en skærm med to muligheder — du skal ikke scrolle efter noget.",
     "«Foreslå ny tid» bruger du, når du har aftalt et nyt tidspunkt med kunden. Opgaven bliver stående hos dig, indtil kontoret har flyttet den — den forsvinder ikke, fordi du har sendt ønsket. Kan det ikke lade sig gøre, får du en mail med begrundelsen, og så skal du ringe til kunden igen.",
@@ -1037,6 +1045,14 @@ const HELP_DA = [
       "Hænger appen? Luk siden og åbn den igen." ] },
 ];
 const HELP_EN = [
+  { t: "Notifications on your phone", p: [
+    "The app can notify you when time entries are missing, when your schedule changes, and when the office has replied to a request for a new time.",
+    "Turn them on under your profile — tap your name at the top and find “Notifications”.",
+    "On iPhone the app must be on your home screen first. Tap Share in Safari, choose “Add to Home Screen”, and open Worklist from there. Without this iPhone cannot deliver notifications — that is Apple's rule, not ours.",
+    "Notifications about schedule changes are grouped and arrive at most every 15 minutes, so several changes give you one message, not ten.",
+    "In the evening you get a message about what is waiting tomorrow.",
+    "You still get the same emails as before. You can turn notifications off again in the same place.",
+  ], warn: "If you change phone, turn notifications on again on the new one. The old one stops by itself." },
   { t: "If there is a problem", p: [
     "At the bottom of the job you will find «There is a problem». Tap it and you get a screen with two options — nothing to scroll for.",
     "«Suggest a new time» is for when you have agreed a new time with the customer. The job stays with you until the office has moved it — sending the request does not remove it. If it is not possible, you get an email explaining why, and you need to call the customer again.",
@@ -3074,6 +3090,172 @@ function weekMeta(weekNo, year) {
 // Derfor slaas det op om hun er portalbruger, og saa peges der derhen.
 const PORTAL_URL = "https://jammerbugtrengoering-kundeportal.netlify.app";
 
+// ── Beskeder paa telefonen ──────────────────────────────────────────────────
+//
+// Web push. Ingen Firebase og ingen tredjepart: beskeden krypteres hos os og kan
+// kun laeses af telefonen.
+//
+// PAA IPHONE VIRKER DET KUN, HVIS APPEN LIGGER PAA HJEMMESKAERMEN. En fane i Safari
+// faar ingenting — Apple tillader det ikke. Derfor spoerger vi ikke om lov, foer vi
+// har set at appen koerer installeret; ellers bruger medarbejderen sit ene "nej"
+// paa en dialog der alligevel ikke kunne virke, og saa er den svaer at faa frem igen.
+const VAPID_OFFENTLIG = "BPhgmi5n1jTwEiLyFJDPBSaVA2WgXpW3fmFM8m_r6Uy4sYCCDYImC-W0pzcEKQFfTm-c0eU-6WhWUdHnotJB1Yc";
+
+function base64TilBytes(b64) {
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+  const rent = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const raa = atob(rent);
+  return Uint8Array.from([...raa].map((c) => c.charCodeAt(0)));
+}
+
+// Staar appen paa hjemmeskaermen? Safari svarer paa sin egen maade, derfor to tjek.
+function koererInstalleret() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
+
+function erIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function Beskeder({ s, lang, employee }) {
+  const [status, setStatus] = useState("henter");   // henter | fra | til | ikke_muligt | skal_installeres
+  const [arbejder, setArbejder] = useState(false);
+  const [fejl, setFejl] = useState("");
+
+  const da = lang === "da";
+
+  useEffect(() => {
+    (async () => {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setStatus("ikke_muligt"); return;
+      }
+      // iPhone uden hjemmeskaerm: dialogen ville fejle, saa vi viser vejledningen
+      // i stedet for en knap der ikke kan holde hvad den lover.
+      if (erIOS() && !koererInstalleret()) { setStatus("skal_installeres"); return; }
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const abon = await reg.pushManager.getSubscription();
+        setStatus(abon && Notification.permission === "granted" ? "til" : "fra");
+      } catch {
+        setStatus("ikke_muligt");
+      }
+    })();
+  }, []);
+
+  async function slaaTil() {
+    setArbejder(true); setFejl("");
+    try {
+      // Tilladelsen SKAL bedes om inde i et klik. Beder man ved sideindlaesning,
+      // afviser browseren det uden at vise noget som helst.
+      const lov = await Notification.requestPermission();
+      if (lov !== "granted") {
+        setFejl(da ? "Du sagde nej til beskeder. Slå dem til i telefonens indstillinger for Worklist."
+                   : "Notifications were declined. Enable them in your phone settings for Worklist.");
+        setArbejder(false); return;
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      const abon = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64TilBytes(VAPID_OFFENTLIG),
+      });
+
+      const j = abon.toJSON();
+      // Endpoint er noeglen. Tilmelder hun sig igen paa samme telefon, opdateres
+      // raekken i stedet for at der laegges en ny — ellers ville hun faa dobbelt op.
+      const { error } = await supabase.from("push_abonnementer").upsert({
+        endpoint: abon.endpoint,
+        employee_id: employee.id,
+        p256dh: j.keys.p256dh,
+        auth: j.keys.auth,
+        enhed: navigator.userAgent.slice(0, 200),
+      }, { onConflict: "endpoint" });
+      if (error) throw error;
+
+      setStatus("til");
+    } catch (e) {
+      setFejl(String(e?.message || e));
+    }
+    setArbejder(false);
+  }
+
+  async function slaaFra() {
+    setArbejder(true); setFejl("");
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const abon = await reg.pushManager.getSubscription();
+      if (abon) {
+        await supabase.from("push_abonnementer").delete().eq("endpoint", abon.endpoint);
+        await abon.unsubscribe();
+      }
+      setStatus("fra");
+    } catch (e) {
+      setFejl(String(e?.message || e));
+    }
+    setArbejder(false);
+  }
+
+  const knap = {
+    width: "100%", padding: "11px 0", borderRadius: 10, border: "1.5px solid #E2E8F0",
+    background: "#fff", color: "#475569", fontWeight: 600, fontSize: 14, cursor: "pointer",
+  };
+
+  return (
+    <div style={s.profileSection}>
+      <div style={s.profileLabel}>🔔 {da ? "Beskeder på telefonen" : "Notifications"}</div>
+
+      {status === "henter" && (
+        <div style={{ fontSize: 13, color: "#94A3B8" }}>{da ? "Et øjeblik…" : "One moment…"}</div>
+      )}
+
+      {status === "skal_installeres" && (
+        <div style={{ fontSize: 12.5, color: "#B45309", background: "#FFFBEB",
+                      padding: "10px 12px", borderRadius: 10, lineHeight: 1.55 }}>
+          {da
+            ? "På iPhone skal appen ligge på hjemmeskærmen, før den kan give beskeder. Tryk på Del-knappen nederst i Safari og vælg «Føj til hjemmeskærm». Åbn Worklist derfra, så står valget her."
+            : "On iPhone the app must be on your home screen to send notifications. Tap Share in Safari and choose “Add to Home Screen”, then open Worklist from there."}
+        </div>
+      )}
+
+      {status === "ikke_muligt" && (
+        <div style={{ fontSize: 12.5, color: "#94A3B8", lineHeight: 1.55 }}>
+          {da ? "Denne telefon understøtter ikke beskeder fra appen. Du får dem stadig på mail."
+              : "This device does not support notifications. You will still get emails."}
+        </div>
+      )}
+
+      {status === "til" && (
+        <>
+          <div style={{ fontSize: 13, color: "#16A34A", background: "#ECFDF5",
+                        padding: "10px 12px", borderRadius: 10, marginBottom: 8 }}>
+            ✓ {da ? "Beskeder er slået til på denne telefon" : "Notifications are on for this phone"}
+          </div>
+          <button style={knap} onClick={slaaFra} disabled={arbejder}>
+            {arbejder ? "…" : (da ? "Slå beskeder fra" : "Turn notifications off")}
+          </button>
+        </>
+      )}
+
+      {status === "fra" && (
+        <>
+          <button style={{ ...knap, borderColor: "#D6247A", color: "#D6247A", fontWeight: 700 }}
+            onClick={slaaTil} disabled={arbejder}>
+            {arbejder ? "…" : (da ? "Slå beskeder til" : "Turn notifications on")}
+          </button>
+          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>
+            {da ? "Manglende timeregistrering, ændringer i din plan og svar fra kontoret."
+                : "Missing time entries, changes to your plan and replies from the office."}
+          </div>
+        </>
+      )}
+
+      {fejl && <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 6 }}>{fejl}</div>}
+    </div>
+  );
+}
+
 function IngenProfil({ s, tr, onSignOut }) {
   const [portal, setPortal] = useState(undefined);   // undefined = ved det ikke endnu
 
@@ -3837,6 +4019,8 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
               {lang === "da" ? "Dit sprogvalg gemmes til næste gang" : "Your language preference is saved"}
             </div>
           </div>
+
+          <Beskeder s={s} lang={lang} employee={employee} />
 
           {/* Password reset */}
           <div style={s.profileSection}>

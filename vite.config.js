@@ -27,25 +27,24 @@ export default defineConfig({
       manifest: false,
       injectRegister: null,
 
-      workbox: {
+      // injectManifest og ikke generateSW.
+      //
+      // Foer skrev pluginnet hele service workeren selv ud fra opsaetningen herunder.
+      // Den vej kan man ikke tage imod push-beskeder ad: filen laves fra bunden ved
+      // hvert build, og der er ingen steder at laegge en push-haandtering ind.
+      //
+      // Nu ligger den i src/sw.js som almindelig kode vi selv ejer. ALT hvad der stod
+      // i workbox-blokken foer, staar nu derinde — clientsClaim, oprydning i gamle
+      // caches, og at nye versioner venter til appen lukkes. Laes kommentarerne i
+      // filen foer du roerer den.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.js",
+
+      injectManifest: {
         // Kun appens egne filer. Alt fra Supabase holdes udenfor: opgavedata haandteres
         // i appen med sin egen kopi, og adgangsoplysninger maa ALDRIG ligge i en cache.
         globPatterns: ["**/*.{js,css,html,svg,png,webmanifest}"],
-        navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api/, /supabase/],
-        // Gamle versioners filer ryddes, saa telefonen ikke fyldes op over tid.
-        cleanupOutdatedCaches: true,
-
-        // Tag over med det samme foerste gang. Uden den installerer service workeren
-        // ved foerste besoeg men styrer foerst siden ved NAESTE aabning — og en
-        // medarbejder der installerer appen og straks koerer ud i et hul ville staa
-        // med en blank skaerm alligevel.
-        //
-        // Kombineret med skipWaiting: false, som er standard. Det er den kombination
-        // der er forsvarlig: en NY version venter stadig til appen lukkes, saa den
-        // aldrig overtager midt i en tidsregistrering.
-        clientsClaim: true,
-        skipWaiting: false,
         // Billeder fra kunderne kan vaere store. Uden loftet ville et enkelt stort
         // aktiv kunne sprænge precache-budgettet og faa hele registreringen til at fejle.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
