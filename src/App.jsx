@@ -1084,8 +1084,15 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
 // Samme indhold som den trykte brugervejledning, men bygget til telefon:
 // fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
 const HELP_DA = [
+  { t: "Dine indstillinger", p: [
+    "Tryk på dit navn øverst for at åbne dine indstillinger. De fylder hele skærmen, og du lukker dem med krydset i hjørnet.",
+    "Under hvert punkt står, hvad der er valgt lige nu — du behøver ikke åbne noget for at se det.",
+    "Her vælger du, om dagen skal vises som tidslinje eller liste, hvilket sprog appen taler, og om du vil have beskeder på telefonen.",
+    "Du kan også bede om et link til at skifte adgangskode. Det bliver sendt til din mail.",
+    "Log ud står nederst for sig selv. Du behøver ikke logge ud, når du er færdig for dagen — appen husker dig.",
+  ] },
   { t: "Liste eller tidslinje", p: [
-    "Dagen vises som en tidslinje med klokkeslæt ned ad siden. Vil du hellere have opgaverne som en almindelig liste, kan du skifte under din profil — tryk på dit navn øverst.",
+    "Dagen vises som en tidslinje med klokkeslæt ned ad siden. Vil du hellere have opgaverne som en almindelig liste, kan du skifte i dine indstillinger — tryk på dit navn øverst.",
     "Tidslinjen viser dagen som en kalender: hvor længe hver opgave tager, og hvor meget kørsel der er imellem. En rød streg viser, hvad klokken er nu.",
     "Er kanten om en opgave fuldt optrukket, er tidspunktet aftalt med kunden. Er den stiplet, og står der «ca.», er tidspunktet regnet ud fra hvornår din dag begynder — skrider dagen, skrider det med.",
     "Lov aldrig en kunde et «ca.»-tidspunkt. Ring til kontoret, hvis kunden skal have en fast tid.",
@@ -1095,7 +1102,7 @@ const HELP_DA = [
     "Appen kan give dig besked, når du mangler at registrere tid, når din plan bliver ændret, og når kontoret har svaret på et ønske om ny tid.",
     "Første gang står der et banner øverst på dagen med en knap. Trykker du på den, er de slået til, og banneret forsvinder.",
     "Har du allerede sagt ja på en anden telefon, tilmeldes den nye af sig selv, når du logger ind.",
-    "Du kan altid slå dem til eller fra under din profil — tryk på dit navn øverst.",
+    "Du kan altid slå dem til eller fra i dine indstillinger — tryk på dit navn øverst.",
     "Har du en iPhone, skal appen først ligge på hjemmeskærmen. Tryk på Del-knappen nederst i Safari, vælg «Føj til hjemmeskærm», og åbn Worklist derfra. Uden det kan iPhone ikke give dig beskeder — det er Apple der bestemmer det, ikke os.",
     "Beskeder om ændringer i planen samles og kommer højst hvert kvarter. Retter kontoret flere ting på én gang, får du én besked og ikke ti.",
     "Om aftenen får du en besked om, hvad der venter i morgen.",
@@ -1193,8 +1200,15 @@ const HELP_DA = [
       "Hænger appen? Luk siden og åbn den igen." ] },
 ];
 const HELP_EN = [
+  { t: "Your settings", p: [
+    "Tap your name at the top to open your settings. They fill the screen, and you close them with the cross in the corner.",
+    "Under each item you can see what is currently selected — you do not have to open anything to check.",
+    "Here you choose whether the day is shown as a timeline or a list, which language the app speaks, and whether you want notifications on your phone.",
+    "You can also request a link to change your password. It is sent to your email.",
+    "Sign out is at the bottom on its own. You do not need to sign out at the end of the day — the app remembers you.",
+  ] },
   { t: "List or timeline", p: [
-    "The day is shown as a timeline with the clock running down the page. If you prefer a plain list, you can switch under your profile — tap your name at the top.",
+    "The day is shown as a timeline with the clock running down the page. If you prefer a plain list, you can switch in your settings — tap your name at the top.",
     "The timeline shows the day like a calendar: how long each job takes and how much travel there is in between. A red line shows the current time.",
     "A solid border means the time is agreed with the customer. A dashed border with “ca.” means the time is calculated from when your day starts — if the day slips, so does it.",
     "Never promise a customer a “ca.” time. Call the office if the customer needs a fixed time.",
@@ -1204,7 +1218,7 @@ const HELP_EN = [
     "The app can notify you when time entries are missing, when your schedule changes, and when the office has replied to a request for a new time.",
     "The first time, a banner appears at the top of the day with a button. Tap it and notifications are on, and the banner is gone.",
     "If you already said yes on another phone, the new one is registered automatically when you sign in.",
-    "You can always turn them on or off under your profile — tap your name at the top.",
+    "You can always turn them on or off in your settings — tap your name at the top.",
     "On iPhone the app must be on your home screen first. Tap Share in Safari, choose “Add to Home Screen”, and open Worklist from there. Without this iPhone cannot deliver notifications — that is Apple's rule, not ours.",
     "Notifications about schedule changes are grouped and arrive at most every 15 minutes, so several changes give you one message, not ten.",
     "In the evening you get a message about what is waiting tomorrow.",
@@ -3291,6 +3305,162 @@ function erIOS() {
 //      daekker ny telefon, ryddet browser, og alle der sagde ja engang.
 //   2. Har hun aldrig taget stilling, staar der et banner paa dagen. Det forsvinder
 //      for altid, saa snart hun har svaret.
+// ── Indstillinger ────────────────────────────────────────────────────────────
+//
+// Fuld skaerm med et sort hoved og et kryds - samme form som hjaelpesiden, saa der
+// er ét moenster i appen og ikke to.
+//
+// Den laa foer som et panel der foldede sig ud under navnet og skubbede dagen ned.
+// Med sprog, dagsvisning, beskeder, adgangskode, oversaettelse og log ud i samme
+// flade blev det en vaeg af knapper, hvor intet var vigtigere end noget andet.
+//
+// Tre ting styrer opbygningen:
+//   - Én ting pr. raekke, med det valgte skrevet UNDER. Saa kan man se sin
+//     indstilling uden at aabne noget og uden at tyde hvilken knap der er fremhaevet.
+//   - Valg med flere muligheder aabner en underside. Alt fremme paa én gang er
+//     praecis det der goer en skaerm rodet.
+//   - Log ud staar alene nederst med roed kant. Det er den eneste handling med en
+//     konsekvens, og den skal ikke ligge mellem sprog og adgangskode.
+function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsVisning,
+                         onSignOut, onPasswordReset, resetSent, resetLoading, onLuk }) {
+  const da = lang === "da";
+  const [underside, setUnderside] = useState(null);   // null | "sprog" | "dag"
+
+  const initialer = employee.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+
+  const raekke = {
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+    width: "100%", textAlign: "left", background: "#fff", cursor: "pointer",
+    border: "1px solid #E2E8F0", borderRadius: 12, padding: "13px 14px", minHeight: 56,
+  };
+  const overskrift = { fontSize: 12, color: "#94A3B8", margin: "0 0 8px 2px" };
+  const titel = { fontSize: 14.5, fontWeight: 600, color: "#111111" };
+  const svar = { fontSize: 12.5, color: "#64748B", marginTop: 2 };
+
+  function Valgside({ navn, punkter, valgt, vaelg }) {
+    return (
+      <div style={{ padding: "14px 16px 24px" }}>
+        <button onClick={() => setUnderside(null)}
+          style={{ border: "none", background: "transparent", color: "#D6247A",
+                   fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 0 12px",
+                   minHeight: 40 }}>
+          ‹ {da ? "Tilbage" : "Back"}
+        </button>
+        <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 12 }}>{navn}</div>
+        {punkter.map(([k, l, forklaring]) => (
+          <button key={k} onClick={() => { vaelg(k); setUnderside(null); }}
+            style={{ ...raekke, marginBottom: 8,
+                     border: valgt === k ? "2px solid #D6247A" : "1px solid #E2E8F0",
+                     background: valgt === k ? "#FCE4EF" : "#fff" }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ ...titel, display: "block", color: valgt === k ? "#9C1B5D" : "#111111" }}>{l}</span>
+              {forklaring && <span style={{ ...svar, display: "block",
+                                            color: valgt === k ? "#9C1B5D" : "#64748B" }}>{forklaring}</span>}
+            </span>
+            {valgt === k && <Check size={19} color="#D6247A" style={{ flexShrink: 0 }} />}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#F8FAFC", zIndex: 130,
+                  display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                    gap: 10, padding: "12px 14px", background: "#111", color: "#fff" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#D6247A",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{initialer}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap",
+                          overflow: "hidden", textOverflow: "ellipsis" }}>{employee.name}</div>
+            <div style={{ fontSize: 12, opacity: 0.65 }}>
+              {da ? "Indstillinger" : "Settings"}
+            </div>
+          </div>
+        </div>
+        <button onClick={onLuk} aria-label={da ? "Luk" : "Close"}
+          style={{ border: "none", background: "#333", color: "#fff", borderRadius: 10,
+                   width: 38, height: 38, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>✕</button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        {underside === "sprog" ? (
+          <Valgside navn={da ? "Sprog" : "Language"} valgt={lang} vaelg={setLang}
+            punkter={[["da", "Dansk", null], ["en", "English", null]]} />
+        ) : underside === "dag" ? (
+          <Valgside navn={da ? "Vis dagen som" : "Show the day as"} valgt={dagsVisning} vaelg={setDagsVisning}
+            punkter={[
+              ["tid", da ? "Tidslinje" : "Timeline",
+               da ? "Klokkeslæt ned ad siden, med kørsel imellem" : "Times down the page, with travel in between"],
+              ["liste", da ? "Liste" : "List",
+               da ? "Opgaverne under hinanden" : "The jobs one after another"],
+            ]} />
+        ) : (
+          <div style={{ padding: "14px 16px 28px" }}>
+            <div style={overskrift}>{da ? "Sådan ser dagen ud" : "How the day looks"}</div>
+            <button style={{ ...raekke, marginBottom: 8 }} onClick={() => setUnderside("dag")}>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ ...titel, display: "block" }}>{da ? "Vis dagen som" : "Show the day as"}</span>
+                <span style={{ ...svar, display: "block" }}>
+                  {dagsVisning === "tid"
+                    ? (da ? "Tidslinje med klokkeslæt" : "Timeline with times")
+                    : (da ? "Liste" : "List")}
+                </span>
+              </span>
+              <ChevronRight size={19} color="#CBD5E1" style={{ flexShrink: 0 }} />
+            </button>
+            <button style={{ ...raekke, marginBottom: 18 }} onClick={() => setUnderside("sprog")}>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ ...titel, display: "block" }}>{da ? "Sprog" : "Language"}</span>
+                <span style={{ ...svar, display: "block" }}>{da ? "Dansk" : "English"}</span>
+              </span>
+              <ChevronRight size={19} color="#CBD5E1" style={{ flexShrink: 0 }} />
+            </button>
+
+            <div style={overskrift}>{da ? "Beskeder" : "Notifications"}</div>
+            <div style={{ marginBottom: 18 }}>
+              <BeskedIndstilling lang={lang} employee={employee} />
+            </div>
+
+            <div style={overskrift}>{da ? "Din adgang" : "Your access"}</div>
+            {resetSent ? (
+              <div style={{ background: "#ECFDF5", border: "1px solid #A7F3D0", borderRadius: 12,
+                            padding: "13px 14px", fontSize: 13, color: "#166534", lineHeight: 1.55,
+                            marginBottom: 18 }}>
+                ✓ {da ? "Vi har sendt et link til" : "We sent a link to"} {session?.user?.email}
+              </div>
+            ) : (
+              <button style={{ ...raekke, marginBottom: 18, display: "block" }}
+                onClick={onPasswordReset} disabled={resetLoading}>
+                <span style={{ ...titel, display: "block" }}>
+                  {resetLoading ? (da ? "Sender…" : "Sending…") : (da ? "Skift adgangskode" : "Change password")}
+                </span>
+                <span style={{ ...svar, display: "block" }}>
+                  {da ? "Vi sender et link til " : "We send a link to "}{session?.user?.email}
+                </span>
+              </button>
+            )}
+
+            <button onClick={onSignOut}
+              style={{ width: "100%", padding: "14px 0", borderRadius: 12, minHeight: 52,
+                       border: "1px solid #FCA5A5", background: "#fff", color: "#DC2626",
+                       fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
+              {da ? "Log ud" : "Sign out"}
+            </button>
+
+            <div style={{ textAlign: "center", fontSize: 11, color: "#CBD5E1", marginTop: 16 }}>
+              Worklist · {typeof __BYGGET__ === "string" ? __BYGGET__ : "?"}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function useBeskeder(employee) {
   const [status, setStatus] = useState("henter");   // henter | fra | til | ikke_muligt | skal_installeres
   const [arbejder, setArbejder] = useState(false);
@@ -3416,70 +3586,88 @@ function BeskedBanner({ lang, employee }) {
   );
 }
 
-function Beskeder({ s, lang, employee }) {
+// Beskeder som en raekke med kontakt. En knap der skiftevis siger "Slå til" og
+// "Slå fra" kraever at man laeser knappen for at vide hvad tilstanden ER. En kontakt
+// viser tilstanden, og teksten under siger hvad man faar ud af den.
+function BeskedIndstilling({ lang, employee }) {
   const { status, arbejder, fejl, slaaTil, slaaFra } = useBeskeder(employee);
   const da = lang === "da";
+  const til = status === "til";
 
-  const knap = {
-    width: "100%", padding: "11px 0", borderRadius: 10, border: "1.5px solid #E2E8F0",
-    background: "#fff", color: "#475569", fontWeight: 600, fontSize: 14, cursor: "pointer",
+  const kort = {
+    background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "13px 14px",
   };
 
-  return (
-    <div style={s.profileSection}>
-      <div style={s.profileLabel}>🔔 {da ? "Beskeder på telefonen" : "Notifications"}</div>
+  if (status === "henter") {
+    return <div style={{ ...kort, fontSize: 13, color: "#94A3B8" }}>{da ? "Et øjeblik…" : "One moment…"}</div>;
+  }
 
-      {status === "henter" && (
-        <div style={{ fontSize: 13, color: "#94A3B8" }}>{da ? "Et øjeblik…" : "One moment…"}</div>
-      )}
-
-      {status === "skal_installeres" && (
-        <div style={{ fontSize: 12.5, color: "#B45309", background: "#FFFBEB",
-                      padding: "10px 12px", borderRadius: 10, lineHeight: 1.55 }}>
+  // Paa iPhone uden hjemmeskaerm ville en kontakt love noget den ikke kan holde.
+  // Der staar vejledningen i stedet.
+  if (status === "skal_installeres") {
+    return (
+      <div style={{ ...kort, borderColor: "#FDE68A", background: "#FFFBEB" }}>
+        <div style={{ fontSize: 14.5, fontWeight: 600, color: "#92400E", marginBottom: 4 }}>
+          {da ? "Beskeder på telefonen" : "Notifications"}
+        </div>
+        <div style={{ fontSize: 12.5, color: "#92400E", lineHeight: 1.55 }}>
           {da
-            ? "På iPhone skal appen ligge på hjemmeskærmen, før den kan give beskeder. Tryk på Del-knappen nederst i Safari og vælg «Føj til hjemmeskærm». Åbn Worklist derfra, så står valget her."
-            : "On iPhone the app must be on your home screen to send notifications. Tap Share in Safari and choose “Add to Home Screen”, then open Worklist from there."}
+            ? "På iPhone skal appen ligge på hjemmeskærmen først. Tryk på Del-knappen nederst i Safari, vælg «Føj til hjemmeskærm», og åbn Worklist derfra."
+            : "On iPhone the app must be on your home screen first. Tap Share in Safari, choose “Add to Home Screen”, and open Worklist from there."}
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {status === "ikke_muligt" && (
+  if (status === "ikke_muligt") {
+    return (
+      <div style={kort}>
+        <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 4 }}>
+          {da ? "Beskeder på telefonen" : "Notifications"}
+        </div>
         <div style={{ fontSize: 12.5, color: "#94A3B8", lineHeight: 1.55 }}>
-          {da ? "Denne telefon understøtter ikke beskeder fra appen. Du får dem stadig på mail."
-              : "This device does not support notifications. You will still get emails."}
+          {da ? "Denne telefon kan ikke give beskeder fra appen. Du får dem stadig på mail."
+              : "This phone cannot show notifications. You will still get emails."}
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {status === "til" && (
-        <>
-          <div style={{ fontSize: 13, color: "#16A34A", background: "#ECFDF5",
-                        padding: "10px 12px", borderRadius: 10, marginBottom: 8 }}>
-            ✓ {da ? "Beskeder er slået til på denne telefon" : "Notifications are on for this phone"}
+  return (
+    <div style={kort}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 600, color: "#111111" }}>
+            {da ? "Beskeder på telefonen" : "Notifications"}
           </div>
-          <button style={knap} onClick={slaaFra} disabled={arbejder}>
-            {arbejder ? "…" : (da ? "Slå beskeder fra" : "Turn notifications off")}
-          </button>
-        </>
-      )}
-
-      {status === "fra" && (
-        <>
-          <button style={{ ...knap, borderColor: "#D6247A", color: "#D6247A", fontWeight: 700 }}
-            onClick={slaaTil} disabled={arbejder}>
-            {arbejder ? "…" : (da ? "Slå beskeder til" : "Turn notifications on")}
-          </button>
-          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>
-            {da ? "Manglende timeregistrering, ændringer i din plan og svar fra kontoret."
-                : "Missing time entries, changes to your plan and replies from the office."}
+          <div style={{ fontSize: 12.5, marginTop: 2, color: til ? "#16A34A" : "#94A3B8" }}>
+            {til ? (da ? "Slået til på denne telefon" : "On for this phone")
+                 : (da ? "Slået fra" : "Off")}
           </div>
-        </>
-      )}
-
-      {fejl && fejl !== "nej" && <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 6 }}>{fejl}</div>}
+        </div>
+        <button role="switch" aria-checked={til} disabled={arbejder}
+          aria-label={da ? "Beskeder på telefonen" : "Notifications"}
+          onClick={() => (til ? slaaFra() : slaaTil())}
+          style={{ width: 50, height: 30, borderRadius: 999, border: "none", flexShrink: 0,
+                   background: til ? "#16A34A" : "#CBD5E1", position: "relative",
+                   cursor: "pointer", opacity: arbejder ? 0.6 : 1, padding: 0 }}>
+          <span style={{ position: "absolute", top: 3, left: til ? 23 : 3, width: 24, height: 24,
+                         borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+        </button>
+      </div>
+      <div style={{ fontSize: 12.5, color: "#64748B", lineHeight: 1.55, marginTop: 9,
+                    paddingTop: 9, borderTop: "1px solid #F1F5F9" }}>
+        {da ? "Du får besked, når din plan ændres, når kontoret svarer dig, og hvis du mangler at registrere tid."
+            : "You are notified when your schedule changes, when the office replies, and if time entries are missing."}
+      </div>
       {fejl === "nej" && (
-        <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 6, lineHeight: 1.5 }}>
-          {da ? "Du sagde nej til beskeder. Slå dem til i telefonens indstillinger for Worklist."
-              : "Notifications were declined. Enable them in your phone settings for Worklist."}
+        <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 8, lineHeight: 1.5 }}>
+          {da ? "Du sagde nej. Vil du fortryde, skal det ske i telefonens indstillinger for Worklist."
+              : "You declined. To change it, use your phone settings for Worklist."}
         </div>
+      )}
+      {fejl && fejl !== "nej" && (
+        <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 8 }}>{fejl}</div>
       )}
     </div>
   );
@@ -4228,86 +4416,12 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
 
       {/* Profile panel */}
       {showProfile && (
-        <div style={s.profilePanel}>
-          <div style={s.profileHeader}>
-            <div style={{ width:44, height:44, borderRadius:"50%", background:"#D6247A", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:700, color:"#fff" }}>
-              {employee.name.split(" ").map((n) => n[0]).join("").slice(0,2).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontWeight:700, fontSize:16, color:"#111111" }}>{employee.name}</div>
-              <div style={{ fontSize:13, color:"#64748B" }}>{session?.user?.email}</div>
-            </div>
-          </div>
-
-          {/* Language */}
-          <div style={s.profileSection}>
-            <div style={s.profileLabel}>🌐 {lang === "da" ? "Sprog / Language" : "Language / Sprog"}</div>
-            <div style={{ display:"flex", gap:8 }}>
-              <button
-                style={{ flex:1, padding:"10px 0", borderRadius:10, border: lang==="da" ? "2px solid #D6247A" : "1.5px solid #E2E8F0", background: lang==="da" ? "#FCE4EF" : "#fff", color: lang==="da" ? "#D6247A" : "#475569", fontWeight:700, fontSize:14, cursor:"pointer" }}
-                onClick={() => changeLang("da")}>🇩🇰 Dansk</button>
-              <button
-                style={{ flex:1, padding:"10px 0", borderRadius:10, border: lang==="en" ? "2px solid #D6247A" : "1.5px solid #E2E8F0", background: lang==="en" ? "#FCE4EF" : "#fff", color: lang==="en" ? "#D6247A" : "#475569", fontWeight:700, fontSize:14, cursor:"pointer" }}
-                onClick={() => changeLang("en")}>🇬🇧 English</button>
-            </div>
-            <div style={{ fontSize:11, color:"#94A3B8", marginTop:4 }}>
-              {lang === "da" ? "Dit sprogvalg gemmes til næste gang" : "Your language preference is saved"}
-            </div>
-          </div>
-
-          {/* Dagens udseende. Hoerer hjemme her og ikke paa dagen selv: det er noget
-              man vaelger én gang, ikke noget man skifter mellem hver morgen. */}
-          <div style={s.profileSection}>
-            <div style={s.profileLabel}>📅 {lang === "da" ? "Sådan vises dagen" : "How the day is shown"}</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[["tid", lang === "da" ? "Tidslinje" : "Timeline"],
-                ["liste", lang === "da" ? "Liste" : "List"]].map(([k, navn]) => (
-                <button key={k} onClick={() => setDagsVisning(k)}
-                  style={{ flex: 1, padding: "10px 0", borderRadius: 10,
-                           border: dagsVisning === k ? "2px solid #D6247A" : "1.5px solid #E2E8F0",
-                           background: dagsVisning === k ? "#FCE4EF" : "#fff",
-                           color: dagsVisning === k ? "#D6247A" : "#475569",
-                           fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{navn}</button>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
-              {lang === "da"
-                ? "Tidslinjen viser klokkeslæt og kørsel imellem. Listen viser opgaverne under hinanden."
-                : "The timeline shows times and travel in between. The list shows the jobs one after another."}
-            </div>
-          </div>
-
-          <Beskeder s={s} lang={lang} employee={employee} />
-
-          {/* Password reset */}
-          <div style={s.profileSection}>
-            <div style={s.profileLabel}>🔑 {lang === "da" ? "Adgangskode" : "Password"}</div>
-            {resetSent ? (
-              <div style={{ fontSize:13, color:"#16A34A", background:"#ECFDF5", padding:"10px 12px", borderRadius:10 }}>
-                ✓ {lang === "da" ? "Link til nulstilling sendt til" : "Reset link sent to"} {session?.user?.email}
-              </div>
-            ) : (
-              <button
-                style={{ width:"100%", padding:"11px 0", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:600, fontSize:14, cursor:"pointer" }}
-                onClick={sendPasswordReset} disabled={resetLoading}>
-                {resetLoading ? "Sender…" : (lang === "da" ? "Send nulstillingslink til min mail" : "Send password reset to my email")}
-              </button>
-            )}
-          </div>
-
-          {/* Sign out */}
-          <a
-            href={`https://translate.google.com/translate?sl=da&tl=en&u=${encodeURIComponent(window.location.href)}`}
-            target="_blank" rel="noreferrer"
-            style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", padding:"11px 0", borderRadius:12, border:"1.5px solid #E2E8F0", background:"#fff", color:"#475569", fontWeight:600, fontSize:14, textDecoration:"none" }}>
-            🌐 {lang === "da" ? "Oversæt siden til engelsk" : "Translate page to Danish"}
-          </a>
-          <button
-            style={{ width:"100%", padding:"13px 0", borderRadius:12, border:"none", background:"#FEF2F2", color:"#DC2626", fontWeight:700, fontSize:15, cursor:"pointer" }}
-            onClick={signOut}>
-            {tr.signOut}
-          </button>
-        </div>
+        <Indstillinger
+          employee={employee} session={session} lang={lang} setLang={changeLang}
+          dagsVisning={dagsVisning} setDagsVisning={setDagsVisning}
+          onSignOut={signOut} onPasswordReset={sendPasswordReset}
+          resetSent={resetSent} resetLoading={resetLoading}
+          onLuk={() => setShowProfile(false)} />
       )}
 
       {/* Medarbejdervælger — kun for administratorer, og kun på computer.
@@ -4533,10 +4647,6 @@ const s = {
   headerSub: { fontSize:11, color:"#94A3B8" },
   signOutBtn: { border:"none", background:"transparent", color:"#64748B", cursor:"pointer", padding:4, display:"flex", alignItems:"center" },
 
-  profilePanel: { background:"#fff", borderBottom:"1px solid #F1F5F9", padding:"20px 16px 16px", display:"flex", flexDirection:"column", gap:16, boxShadow:"0 4px 16px rgba(0,0,0,0.08)" },
-  profileHeader: { display:"flex", alignItems:"center", gap:12 },
-  profileSection: { display:"flex", flexDirection:"column", gap:8 },
-  profileLabel: { fontSize:12, fontWeight:700, color:"#475569", textTransform:"uppercase", letterSpacing:"0.05em" },
 
   weekBar: { display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"10px 16px", background:"#fff", borderBottom:"1px solid #F1F5F9" },
   weekBtn: { border:"none", background:"#F1F5F9", borderRadius:8, padding:"6px 8px", cursor:"pointer", display:"flex", color:"#475569" },
