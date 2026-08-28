@@ -4,6 +4,11 @@ import {
   Clock, CheckCircle2, Video, Lock, ListChecks, Check,
   Navigation, Building2, Car, LogOut, ChevronLeft, ChevronRight,
   X, MapPin,
+  // Ikoner og ikke emoji i topbjaelken. Emoji tegnes af telefonens eget saet, og
+  // Androids Noto er bredere end Apples — bjaelken kan altsaa passe paa en iPhone
+  // og loebe over paa en Android uden at nogen har roert koden. Et ikon er lige
+  // bredt overalt.
+  CalendarPlus, Shirt, HelpCircle,
 } from "lucide-react";
 
 // ── Gemt kopi af ugens opgaver ───────────────────────────────────────────────
@@ -1088,6 +1093,7 @@ const HELP_DA = [
     "Tryk på dit navn øverst for at åbne dine indstillinger. De fylder hele skærmen, og du lukker dem med krydset i hjørnet.",
     "Under hvert punkt står, hvad der er valgt lige nu — du behøver ikke åbne noget for at se det.",
     "Her vælger du, om dagen skal vises som tidslinje eller liste, hvilket sprog appen taler, og om du vil have beskeder på telefonen.",
+    "Appen taler dansk og engelsk. Første gang følger den din telefon: er telefonen på dansk, får du dansk — ellers engelsk. Vælger du selv, følger valget dig, også hvis du skifter telefon.",
     "Du kan også bede om et link til at skifte adgangskode. Det bliver sendt til din mail.",
     "Log ud står nederst for sig selv. Du behøver ikke logge ud, når du er færdig for dagen — appen husker dig.",
   ] },
@@ -1167,7 +1173,7 @@ const HELP_DA = [
       "Når du afslutter, kommer der et ekstra trin hvor du bliver mindet om at kvittere i Nexus. Kommunen betaler efter det der står i Nexus — ikke efter det du skriver her.",
       "Har du kvitteret, sætter du fluebenet. Kunne du ikke komme i Nexus, så lad det stå tomt — du kan afslutte alligevel, og kontoret følger op." ] },
   { t: "Bestil arbejdstøj", p: [
-      "Tryk på trøje-ikonet 👕 øverst.",
+      "Tryk på trøje-ikonet øverst.",
       "Sæt antal med + og − og tryk «Vælg produkter».",
       "Din bestilling går til kontoret, som godkender den. Under «Historik» ser du dine tidligere bestillinger." ] },
   { t: "Når der ikke er dækning", p: [
@@ -1182,14 +1188,14 @@ const HELP_DA = [
       "For at det virker skal appen ligge på hjemmeskærmen. På iPhone: tryk på del-ikonet nederst og vælg «Føj til hjemmeskærm». Gør du det ikke, rydder telefonen det gemte efter en uge." ] },
   { t: "Kundemøder og tilbud", p: [
       "Dette afsnit gælder kun planlæggere. Er du ikke planlægger, ser du hverken knappen eller møderne.",
-      "Tryk på kalender-ikonet 📅 øverst for at booke et kundemøde. Kunden behøver ikke findes i Dinero endnu.",
+      "Tryk på kalender-ikonet øverst for at booke et kundemøde. Kunden behøver ikke findes i Dinero endnu.",
       "Mødet lægges i din uge, så kontoret kan se at du er ude, og tiden tæller i din kapacitet.",
       "Åbn mødet når du er derude. Du får tilbudsskærmen i stedet for den almindelige opgave: referat, billeder, pris og hvilke ydelser der er med.",
       "Referatet er lavet til at blive dikteret. Tryk på mikrofonen på tastaturet og tal — ret det bagefter.",
       "Du kan lægge op til 10 billeder på. De er interne, medmindre du på tilbuddet vælger at vise dem til kunden.",
       "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage." ] },
   { t: "Din kørsel", p: [
-      "Tryk på bil-ikonet 🚗 øverst for at se din beregnede kørsel.",
+      "Tryk på bil-ikonet øverst for at se din beregnede kørsel.",
       "Du skal ikke selv taste kilometer — det regnes ud fra dine opgaver, når du har registreret din tid.",
       "Har du kørsel med i din arbejdstid, står der «Kørsel hjemmefra» øverst på dagen og «Kørsel hjem» nederst. Klokkeslættet øverst er altså hvornår du tager hjemmefra, ikke hvornår du skal være hos den første kunde.",
       "Ser du ikke de to linjer, er du ikke på den ordning, og din kørsel afregnes med kilometerpenge i stedet. Spørg kontoret hvis du er i tvivl om hvad der gælder for dig." ] },
@@ -1204,6 +1210,7 @@ const HELP_EN = [
     "Tap your name at the top to open your settings. They fill the screen, and you close them with the cross in the corner.",
     "Under each item you can see what is currently selected — you do not have to open anything to check.",
     "Here you choose whether the day is shown as a timeline or a list, which language the app speaks, and whether you want notifications on your phone.",
+    "The app speaks Danish and English. The first time it follows your phone: if your phone is in Danish you get Danish, otherwise English. If you choose yourself, the choice follows you, also on a new phone.",
     "You can also request a link to change your password. It is sent to your email.",
     "Sign out is at the bottom on its own. You do not need to sign out at the end of the day — the app remembers you.",
   ] },
@@ -1283,7 +1290,7 @@ const HELP_EN = [
       "When you complete the job there is an extra step reminding you to sign off in Nexus. The municipality pays according to Nexus — not according to what you write here.",
       "If you have signed off, tick the box. If you could not get into Nexus, leave it empty — you can still finish, and the office will follow up." ] },
   { t: "Order workwear", p: [
-      "Tap the shirt icon 👕 at the top.",
+      "Tap the shirt icon at the top.",
       "Set the amount with + and − and tap \"Select products\".",
       "Your order goes to the office for approval. \"History\" shows earlier orders." ] },
   { t: "When there is no coverage", p: [
@@ -1298,7 +1305,7 @@ const HELP_EN = [
       "For this to work the app must be on your home screen. On iPhone: tap the share icon at the bottom and choose \"Add to Home Screen\". Without that, the phone clears the saved copy after a week." ] },
   { t: "Customer meetings and quotes", p: [
       "This section is for planners only. If you are not a planner, you see neither the button nor the meetings.",
-      "Tap the calendar icon 📅 at the top to book a customer meeting. The customer does not have to exist in Dinero yet.",
+      "Tap the calendar icon at the top to book a customer meeting. The customer does not have to exist in Dinero yet.",
       "The meeting goes into your week, so the office can see you are out, and the time counts in your capacity.",
       "Open the meeting once you are there. You get the quote screen instead of the ordinary job: notes, photos, price and which services are included.",
       "The notes field is made for dictation. Tap the microphone on the keyboard and speak — edit it afterwards.",
@@ -1307,7 +1314,7 @@ const HELP_EN = [
   { t: "Your mileage", p: [
       "If travel is part of your working hours, the day starts with \"Travel from home\" and ends with \"Travel home\". The time at the top is when you leave home, not when you must be at the first customer.",
       "If you do not see those two lines, you are not on that arrangement, and your driving is paid as mileage instead. Ask the office if you are unsure what applies to you.",
-      "Tap the car icon 🚗 at the top to see your calculated mileage.",
+      "Tap the car icon at the top to see your calculated mileage.",
       "You do not enter kilometres yourself — it is calculated from your jobs once you register your time." ] },
   { t: "If something goes wrong", p: [
       "Cannot log in? Check your email and use \"Forgot password?\".",
@@ -3738,10 +3745,28 @@ function IngenProfil({ s, tr, onSignOut }) {
 }
 
 export default function MedarbejderApp() {
-  // Dansk som udgangspunkt. Alle 20 medarbejdere staar med dansk i databasen, men
-  // profilen hentes foerst efter foerste render — med "en" som standard blinkede
-  // appen paa engelsk hver gang den blev aabnet.
-  const [lang, setLang] = useState(() => localStorage.getItem("wl_lang") || "da");
+  // Sproget foelger TELEFONEN, indtil hun selv vaelger noget andet.
+  //
+  // Appen taler dansk og engelsk. Er telefonen sat til dansk, faar hun dansk; er den
+  // sat til hvad som helst andet — engelsk, russisk, ukrainsk — faar hun engelsk. Vi
+  // oversaetter ikke til de sprog, og engelsk er naermere end dansk for den der ikke
+  // kan nogen af delene.
+  //
+  // Raekkefoelgen er vigtig:
+  //   1. localStorage — hun har valgt paa DENNE telefon
+  //   2. telefonens sprog
+  // Databasens default_lang laeses foerst naar profilen er hentet, og KUN hvis hun
+  // faktisk har valgt (lang_valgt). Alle tyve staar med 'da' uden at have valgt det,
+  // saa uden det forbehold ville feltet overtrumfe telefonen for alle.
+  //
+  // Beregnes synkront ved foerste render. Gjorde vi det bagefter, ville appen naa at
+  // blinke paa det forkerte sprog.
+  const [lang, setLang] = useState(() => {
+    const gemt = localStorage.getItem("wl_lang");
+    if (gemt === "da" || gemt === "en") return gemt;
+    const fraTelefon = (navigator.languages?.[0] || navigator.language || "").toLowerCase();
+    return fraTelefon.startsWith("da") ? "da" : "en";
+  });
   const tr = T[lang];
 
   useEffect(() => { localStorage.setItem("wl_lang", lang); }, [lang]);
@@ -3777,11 +3802,13 @@ export default function MedarbejderApp() {
     })();
   }, []);
 
-  // Persist lang change to employee row in DB
+  // Gemmer sprogvalget paa medarbejderen. lang_valgt saettes samtidig: derefter
+  // foelger valget hende til en ny telefon i stedet for at telefonens sprog vinder.
   async function changeLang(newLang) {
     setLang(newLang);
     if (employee) {
-      await supabase.from("employees").update({ default_lang: newLang }).eq("id", employee.id);
+      await supabase.from("employees")
+        .update({ default_lang: newLang, lang_valgt: true }).eq("id", employee.id);
     }
   }
 
@@ -4023,8 +4050,10 @@ useEffect(() => {
         setViewEmpId(null);
       }
 
-      // Apply saved language preference
-      if (empData.default_lang && empData.default_lang !== lang) {
+      // Hendes eget valg, hvis hun har taget stilling. Har hun ikke, bliver
+      // telefonens sprog staaende — feltet siger 'da' paa alle, ogsaa dem der aldrig
+      // har aabnet appen, og det maa ikke laeses som et valg.
+      if (empData.lang_valgt && empData.default_lang && empData.default_lang !== lang) {
         setLang(empData.default_lang);
         localStorage.setItem("wl_lang", empData.default_lang);
       }
@@ -4398,29 +4427,33 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
               skal bruge — og databasen afviser kaldet uanset hvad. */}
           {employee?.is_admin && (
             <button
-              style={{ border:"none", background:"#F0FDFA", color:"#0F766E", borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:700, cursor:"pointer" }}
+              style={{ border:"none", background:"#F0FDFA", color:"#0F766E", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
               onClick={() => setNytMoede(true)}
+              aria-label={lang === "da" ? "Nyt kundemøde" : "New customer meeting"}
               title={lang === "da" ? "Nyt kundemøde" : "New customer meeting"}>
-              📅
+              <CalendarPlus size={17} />
             </button>
           )}
           <button
-            style={{ border:"none", background:"#FCE4EF", color:"#D6247A", borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:700, cursor:"pointer" }}
+            style={{ border:"none", background:"#FCE4EF", color:"#D6247A", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
             onClick={() => setShowShop(true)}
+            aria-label={lang === "da" ? "Bestil medarbejderprodukter" : "Order staff products"}
             title={lang === "da" ? "Bestil medarbejderprodukter" : "Order staff products"}>
-            👕
+            <Shirt size={17} />
           </button>
           <button
-            style={{ border:"none", background:"#EEF2FF", color:"#4F46E5", borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:700, cursor:"pointer" }}
+            style={{ border:"none", background:"#EEF2FF", color:"#4F46E5", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
             onClick={() => setShowKm(true)}
+            aria-label={lang === "da" ? "Min kørsel" : "My driving"}
             title={lang === "da" ? "Min kørsel" : "My driving"}>
-            🚗
+            <Car size={17} />
           </button>
           <button
-            style={{ border:"none", background:"#F1F5F9", color:"#334155", borderRadius:8, padding:"6px 11px", fontSize:13, fontWeight:800, cursor:"pointer" }}
+            style={{ border:"none", background:"#F1F5F9", color:"#334155", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
             onClick={() => setShowHelp(true)}
+            aria-label={lang === "da" ? "Hjælp" : "Help"}
             title={lang === "da" ? "Hjælp - sådan bruger du appen" : "Help - how to use the app"}>
-            ?
+            <HelpCircle size={17} />
           </button>
           <button
             style={{ ...s.signOutBtn, display:"flex", alignItems:"center", gap:6, color:"#E2E8F0", fontSize:13, fontWeight:600 }}
