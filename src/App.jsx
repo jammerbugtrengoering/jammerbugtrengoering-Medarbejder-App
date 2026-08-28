@@ -663,6 +663,14 @@ function medSolsikke(navn) {
   return SOLSIKKE_SEERE.includes(solsikkeSeer) ? navn + " \u{1F33B}" : navn;
 }
 
+// Initialerne i den runde knap. Er det Charlotte selv der er logget ind, staar der
+// en solsikke i stedet for "CT" — det er hendes app, og hun ved godt hvem hun er.
+// Alle andre faar deres egne initialer som foer.
+function avatarTegn(navn) {
+  if (navn === SOLSIKKE_NAVN && solsikkeSeer === SOLSIKKE_NAVN) return "\u{1F33B}";
+  return (navn || "").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
 function fmtMin(min) {
   if (!min || min <= 0) return "0m";
   const h = Math.floor(min / 60), m = Math.round(min % 60);
@@ -3448,7 +3456,7 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
   const da = lang === "da";
   const [underside, setUnderside] = useState(null);   // null | "sprog" | "dag"
 
-  const initialer = employee.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const initialer = avatarTegn(employee.name);
 
   const raekke = {
     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
@@ -4578,7 +4586,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             style={{ ...s.signOutBtn, display:"flex", alignItems:"center", gap:6, color:"#E2E8F0", fontSize:13, fontWeight:600 }}
             onClick={() => setShowProfile((v) => !v)}>
             <span style={{ width:28, height:28, borderRadius:"50%", background:"#D6247A", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>
-              {employee.name.split(" ").map((n) => n[0]).join("").slice(0,2).toUpperCase()}
+              {avatarTegn(employee.name)}
             </span>
           </button>
         </div>
