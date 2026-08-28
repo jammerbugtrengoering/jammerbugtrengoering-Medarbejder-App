@@ -1046,24 +1046,47 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
           const h = Math.max((t.duration || 0) * PX_PR_MIN, 34);
           const st = STATUS_FARVER[t.status] || STATUS_FARVER.planlagt;
           return (
-            <button key={t.id} onClick={() => onVaelg(t)}
-              style={{ position: "absolute", left: 6, right: 8, top, height: h,
+            <div key={t.id} style={{ position: "absolute", left: 6, right: 8, top, height: h }}>
+            <button onClick={() => onVaelg(t)}
+              style={{ position: "absolute", inset: 0,
                        textAlign: "left", padding: "5px 9px", cursor: "pointer",
                        background: st.bag, color: st.tekst,
                        borderRadius: 7, overflow: "hidden",
                        border: aftalt ? `1px solid ${st.kant}` : `1px dashed ${st.kant}`,
-                       borderLeft: `4px solid ${st.kant}` }}>
+                       borderLeft: `4px solid ${st.kant}`,
+                       // Plads i hoejre side til navigationsikonet, saa teksten ikke
+                       // loeber ind under det.
+                       paddingRight: t.address ? 34 : 9 }}>
+              {/* Samme prioritering som paa kortet: hvem og hvor, ikke hvem der
+                  betaler. Med kundenavnet foerst stod der "Jammerbugt Kommune" paa
+                  hver eneste blok, og dagen kunne ikke laeses. */}
               <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap",
                             overflow: "hidden", textOverflow: "ellipsis" }}>
-                {aftalt ? fmtClock(seg.start) : `ca. ${fmtClock(seg.start)}`} · {t.customer_name || t.title}
+                {aftalt ? fmtClock(seg.start) : `ca. ${fmtClock(seg.start)}`} ·{" "}
+                {t.reference || t.address || t.customer_name || t.title}
               </div>
               {h > 46 && (
                 <div style={{ fontSize: 11, opacity: 0.85, whiteSpace: "nowrap",
                               overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {t.title} · {fmtMin(t.duration || 0)}
+                  {t.reference && t.address ? `${t.address} · ` : ""}{fmtMin(t.duration || 0)}
                 </div>
               )}
             </button>
+            {/* Naviger direkte fra tidslinjen. Blokken er for smal til en knap med
+                tekst, saa det er et ikon — men trykfladen er 30x30, saa den kan
+                rammes med en finger uden at aabne opgaven ved et uheld. */}
+            {t.address && (
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.address)}`}
+                target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                aria-label={da ? "Kør derhen" : "Navigate"} title={da ? "Kør derhen" : "Navigate"}
+                style={{ position: "absolute", right: 3, top: 3, width: 30, height: 30,
+                         display: "flex", alignItems: "center", justifyContent: "center",
+                         borderRadius: 7, background: "rgba(255,255,255,0.75)",
+                         color: st.kant, textDecoration: "none" }}>
+                <Navigation size={14} />
+              </a>
+            )}
+            </div>
           );
         })}
 
@@ -1089,6 +1112,12 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
 // Samme indhold som den trykte brugervejledning, men bygget til telefon:
 // fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
 const HELP_DA = [
+  { t: "Sådan finder du derhen", p: [
+    "På hver opgave står adressen med det samme — du behøver ikke åbne opgaven for at se, hvor du skal hen.",
+    "Er det en kommunal opgave, står borgerens navn øverst og adressen under. Firmanavnet nederst er den, der får regningen — ikke den du skal besøge.",
+    "Tryk «Kør derhen», så åbner kortet med ruten. På tidslinjen er det pilen i hjørnet af opgaven.",
+    "Det åbner dit almindelige kortprogram. Du kommer tilbage til Worklist ved at skifte tilbage — du bliver ikke logget ud.",
+  ] },
   { t: "Dine indstillinger", p: [
     "Tryk på dit navn øverst for at åbne dine indstillinger. De fylder hele skærmen, og du lukker dem med krydset i hjørnet.",
     "Under hvert punkt står, hvad der er valgt lige nu — du behøver ikke åbne noget for at se det.",
@@ -1206,6 +1235,12 @@ const HELP_DA = [
       "Hænger appen? Luk siden og åbn den igen." ] },
 ];
 const HELP_EN = [
+  { t: "Finding your way there", p: [
+    "The address is shown on every job — you do not have to open the job to see where to go.",
+    "On municipal jobs the resident's name is at the top and the address below. The company name at the bottom is the one being invoiced, not the one you visit.",
+    "Tap “Navigate” to open the map with the route. On the timeline it is the arrow in the corner of the job.",
+    "It opens your usual map app. Switch back to return to Worklist — you are not signed out.",
+  ] },
   { t: "Your settings", p: [
     "Tap your name at the top to open your settings. They fill the screen, and you close them with the cross in the corner.",
     "Under each item you can see what is currently selected — you do not have to open anything to check.",
@@ -3217,19 +3252,45 @@ function TaskCard({ seg, employee, lang, onClick }) {
       <div style={s.taskBody}>
         <div style={s.taskTime}>{fmtClock(seg.start)}</div>
         <div style={s.taskTitle}>{translatedTitle}</div>
-        {t.customerName && (
-          <div style={s.taskCustomer}>
-            <Building2 size={12} color="#9C1B5D" />
-            <span>{t.customerName}</span>
-            {t.contractType === "nexus" && <span style={{ fontSize:10, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Nexus</span>}
-            {t.contractType === "privat" && <span style={{ fontSize:10, fontWeight:700, color:"#9C1B5D", background:"#FFF6FA", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>{lang === "da" ? "Privat" : "Private"}</span>}
-            {t.contractType === "aeldrelov" && <span style={{ fontSize:10, fontWeight:700, color:"#C2410C", background:"#FFF7ED", borderRadius:6, padding:"1px 6px", marginLeft:4 }}>Ældrelov</span>}
+
+        {/* ADRESSEN ER DET VIGTIGSTE PAA KORTET, ikke kundenavnet.
+            Paa de kommunale opgaver staar der "Jammerbugt Kommune" paa alle 548 —
+            kommunen er den der faar regningen, men arbejdet foregaar hjemme hos en
+            borger. Stod kommunen stort, ville hvert kort se ens ud, og det ene
+            felt hun faktisk skal bruge for at finde derhen stod med graat i
+            elleve punkt.
+            Derfor: hvem hun skal hen til og hvor, foerst. Kunden bagefter, daempet. */}
+        {(t.reference || t.address) && (
+          <div style={s.taskHvor}>
+            <MapPin size={14} color="#D6247A" style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ minWidth: 0 }}>
+              {/* Referencen er borgerens navn paa kommunale opgaver. Paa private er
+                  den som regel tom, og saa staar adressen alene. */}
+              {t.reference && <div style={s.taskReference}>{t.reference}</div>}
+              {t.address && <div style={s.taskAdresseTekst}>{t.address}</div>}
+            </div>
           </div>
         )}
+
+        {/* Naviger. Ét tryk fra kortet — hun skal ikke aabne opgaven og lede foerst.
+            stopPropagation, ellers aabner kortet sig bagved kortet der aabner. */}
         {t.address && (
-          <div style={s.taskAddress}>
-            <MapPin size={11} color="#94A3B8" />
-            <span>{t.address}</span>
+          <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.address)}`}
+            target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+            style={s.taskNavKnap}>
+            <Navigation size={12} /> {lang === "da" ? "Kør derhen" : "Navigate"}
+          </a>
+        )}
+
+        {t.customerName && (
+          <div style={s.taskCustomer}>
+            <Building2 size={11} color="#94A3B8" />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {t.customerName}
+            </span>
+            {t.contractType === "nexus" && <span style={{ fontSize:9.5, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>Nexus</span>}
+            {t.contractType === "privat" && <span style={{ fontSize:9.5, fontWeight:700, color:"#9C1B5D", background:"#FFF6FA", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>{lang === "da" ? "Privat" : "Private"}</span>}
+            {t.contractType === "aeldrelov" && <span style={{ fontSize:9.5, fontWeight:700, color:"#C2410C", background:"#FFF7ED", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>Ældrelov</span>}
           </div>
         )}
         {/* Noeglen skal hentes paa kontoret. Staar paa selve kortet i dagslisten, ikke
@@ -4094,6 +4155,10 @@ useEffect(() => {
             requiredSkills: i.required_skills ?? [],
             customerName: i.customer_name || "",
             address: i.address_text || "",
+            // Referencen. Paa kommunale opgaver staar BORGERENS navn her, mens
+            // customer_name er kommunen der faar regningen. Det er borgeren og
+            // adressen medarbejderen skal bruge — kommunen er kun bogholderi.
+            reference: i.po_number || "",
             // accessInstructions hentes IKKE med her laengere. Kolonnen staar tom, og
             // teksten ligger i en tabel appen ikke kan laese. Den hentes kun naar
             // medarbejderen selv trykker, gennem hent_adgangsinfo, som logger opslaget.
@@ -4733,7 +4798,15 @@ const s = {
   taskRight: { display:"flex", alignItems:"center", paddingRight:12 },
   taskTime: { fontSize:11.5, fontWeight:700, color:"#D6247A", marginBottom:3 },
   taskTitle: { fontWeight:700, fontSize:15.5, color:"#111111", lineHeight:1.25, marginBottom:5 },
-  taskCustomer: { display:"flex", alignItems:"center", gap:5, fontSize:13, color:"#475569", fontWeight:500, marginBottom:6 },
+  // Kunden er nedtonet med vilje — se kommentaren i TaskCard. Den er bogholderi,
+  // ikke navigation.
+  taskCustomer: { display:"flex", alignItems:"center", gap:4, fontSize:11.5, color:"#94A3B8", fontWeight:500, marginBottom:6 },
+  taskHvor: { display:"flex", alignItems:"flex-start", gap:6, marginBottom:6 },
+  taskReference: { fontSize:14, fontWeight:700, color:"#111111", lineHeight:1.3 },
+  taskAdresseTekst: { fontSize:13.5, fontWeight:600, color:"#334155", lineHeight:1.35 },
+  taskNavKnap: { display:"inline-flex", alignItems:"center", gap:5, fontSize:12, fontWeight:700,
+                 color:"#D6247A", background:"#FFF6FA", border:"1px solid #F5C8DC", borderRadius:8,
+                 padding:"7px 11px", textDecoration:"none", marginBottom:7, minHeight:34 },
   taskAddress: { display:"flex", alignItems:"center", gap:5, fontSize:11.5, color:"#94A3B8", fontWeight:500, marginBottom:6, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
   taskMeta: { display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" },
   taskDuration: { fontSize:12, color:"#64748B", fontWeight:500 },
