@@ -1085,11 +1085,11 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
 // fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
 const HELP_DA = [
   { t: "Liste eller tidslinje", p: [
-    "Øverst på dagen kan du vælge, om opgaverne skal stå som en liste eller som en tidslinje med klokkeslæt ned ad siden.",
+    "Dagen vises som en tidslinje med klokkeslæt ned ad siden. Vil du hellere have opgaverne som en almindelig liste, kan du skifte under din profil — tryk på dit navn øverst.",
     "Tidslinjen viser dagen som en kalender: hvor længe hver opgave tager, og hvor meget kørsel der er imellem. En rød streg viser, hvad klokken er nu.",
     "Er kanten om en opgave fuldt optrukket, er tidspunktet aftalt med kunden. Er den stiplet, og står der «ca.», er tidspunktet regnet ud fra hvornår din dag begynder — skrider dagen, skrider det med.",
     "Lov aldrig en kunde et «ca.»-tidspunkt. Ring til kontoret, hvis kunden skal have en fast tid.",
-    "Dit valg huskes til næste gang du åbner appen.",
+    "Dit valg huskes til næste gang du åbner appen. Skifter du telefon, står den på tidslinje igen.",
   ] },
   { t: "Beskeder på telefonen", p: [
     "Appen kan give dig besked, når du mangler at registrere tid, når din plan bliver ændret, og når kontoret har svaret på et ønske om ny tid.",
@@ -1192,11 +1192,11 @@ const HELP_DA = [
 ];
 const HELP_EN = [
   { t: "List or timeline", p: [
-    "At the top of the day you can choose whether the tasks are shown as a list or as a timeline with the clock running down the page.",
+    "The day is shown as a timeline with the clock running down the page. If you prefer a plain list, you can switch under your profile — tap your name at the top.",
     "The timeline shows the day like a calendar: how long each job takes and how much travel there is in between. A red line shows the current time.",
     "A solid border means the time is agreed with the customer. A dashed border with “ca.” means the time is calculated from when your day starts — if the day slips, so does it.",
     "Never promise a customer a “ca.” time. Call the office if the customer needs a fixed time.",
-    "Your choice is remembered for next time.",
+    "Your choice is remembered for next time. On a new phone it starts on timeline again.",
   ] },
   { t: "Notifications on your phone", p: [
     "The app can notify you when time entries are missing, when your schedule changes, and when the office has replied to a request for a new time.",
@@ -3537,7 +3537,11 @@ export default function MedarbejderApp() {
   // åbne på den rigtige dag — ellers viste appen fredag til en der møder om lørdagen.
   const weekendJumpDone = useRef(false);
   const [openTask, setOpenTask] = useState(null);
-  const [dagsVisning, setDagsVisning] = useState(() => localStorage.getItem("wl_dagsvisning") || "liste");
+  // Tidslinje som udgangspunkt. Det er den visning der ligner en arbejdsdag, og den
+  // fortaeller baade raekkefoelge og hvor lang tid der er imellem. Listen er for dem
+  // der hellere vil have det som en huskeseddel — valget staar under profilen og
+  // ikke paa selve dagen, hvor to knapper aad plads fra det man er kommet for.
+  const [dagsVisning, setDagsVisning] = useState(() => localStorage.getItem("wl_dagsvisning") || "tid");
   useEffect(() => { localStorage.setItem("wl_dagsvisning", dagsVisning); }, [dagsVisning]);
   // Kun planlaeggere ser knappen. Databasen afviser kaldet uanset hvad, hvis den
   // der spoerger ikke er administrator — reglen ligger ikke i en skjult knap.
@@ -4175,6 +4179,28 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             </div>
           </div>
 
+          {/* Dagens udseende. Hoerer hjemme her og ikke paa dagen selv: det er noget
+              man vaelger én gang, ikke noget man skifter mellem hver morgen. */}
+          <div style={s.profileSection}>
+            <div style={s.profileLabel}>📅 {lang === "da" ? "Sådan vises dagen" : "How the day is shown"}</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[["tid", lang === "da" ? "Tidslinje" : "Timeline"],
+                ["liste", lang === "da" ? "Liste" : "List"]].map(([k, navn]) => (
+                <button key={k} onClick={() => setDagsVisning(k)}
+                  style={{ flex: 1, padding: "10px 0", borderRadius: 10,
+                           border: dagsVisning === k ? "2px solid #D6247A" : "1.5px solid #E2E8F0",
+                           background: dagsVisning === k ? "#FCE4EF" : "#fff",
+                           color: dagsVisning === k ? "#D6247A" : "#475569",
+                           fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{navn}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+              {lang === "da"
+                ? "Tidslinjen viser klokkeslæt og kørsel imellem. Listen viser opgaverne under hinanden."
+                : "The timeline shows times and travel in between. The list shows the jobs one after another."}
+            </div>
+          </div>
+
           <Beskeder s={s} lang={lang} employee={employee} />
 
           {/* Password reset */}
@@ -4303,20 +4329,6 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
               {tr.noTasks(DAYS.find((d) => d.key === day)?.label.toLowerCase() || "")}
             </div>
             <div style={{ fontSize: 13, color: "#94A3B8" }}>{tr.freeDayNote}</div>
-          </div>
-        )}
-
-        {schedule.length > 0 && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-            {[["liste", lang === "da" ? "Liste" : "List"],
-              ["tid", lang === "da" ? "Tidslinje" : "Timeline"]].map(([k, navn]) => (
-              <button key={k} onClick={() => setDagsVisning(k)}
-                style={{ flex: 1, padding: "9px 0", borderRadius: 10, minHeight: 40,
-                         border: dagsVisning === k ? "2px solid #D6247A" : "1.5px solid #E2E8F0",
-                         background: dagsVisning === k ? "#FCE4EF" : "#fff",
-                         color: dagsVisning === k ? "#D6247A" : "#475569",
-                         fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>{navn}</button>
-            ))}
           </div>
         )}
 
