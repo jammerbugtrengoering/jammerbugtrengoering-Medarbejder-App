@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import {
   Clock, CheckCircle2, Video, Lock, ListChecks, Check,
@@ -1093,7 +1093,9 @@ const HELP_DA = [
   ] },
   { t: "Beskeder på telefonen", p: [
     "Appen kan give dig besked, når du mangler at registrere tid, når din plan bliver ændret, og når kontoret har svaret på et ønske om ny tid.",
-    "Du slår dem til under din profil — tryk på dit navn øverst og find «Beskeder på telefonen».",
+    "Første gang står der et banner øverst på dagen med en knap. Trykker du på den, er de slået til, og banneret forsvinder.",
+    "Har du allerede sagt ja på en anden telefon, tilmeldes den nye af sig selv, når du logger ind.",
+    "Du kan altid slå dem til eller fra under din profil — tryk på dit navn øverst.",
     "Har du en iPhone, skal appen først ligge på hjemmeskærmen. Tryk på Del-knappen nederst i Safari, vælg «Føj til hjemmeskærm», og åbn Worklist derfra. Uden det kan iPhone ikke give dig beskeder — det er Apple der bestemmer det, ikke os.",
     "Beskeder om ændringer i planen samles og kommer højst hvert kvarter. Retter kontoret flere ting på én gang, får du én besked og ikke ti.",
     "Om aftenen får du en besked om, hvad der venter i morgen.",
@@ -1200,7 +1202,9 @@ const HELP_EN = [
   ] },
   { t: "Notifications on your phone", p: [
     "The app can notify you when time entries are missing, when your schedule changes, and when the office has replied to a request for a new time.",
-    "Turn them on under your profile — tap your name at the top and find “Notifications”.",
+    "The first time, a banner appears at the top of the day with a button. Tap it and notifications are on, and the banner is gone.",
+    "If you already said yes on another phone, the new one is registered automatically when you sign in.",
+    "You can always turn them on or off under your profile — tap your name at the top.",
     "On iPhone the app must be on your home screen first. Tap Share in Safari, choose “Add to Home Screen”, and open Worklist from there. Without this iPhone cannot deliver notifications — that is Apple's rule, not ours.",
     "Notifications about schedule changes are grouped and arrive at most every 15 minutes, so several changes give you one message, not ten.",
     "In the evening you get a message about what is waiting tomorrow.",
@@ -3272,61 +3276,87 @@ function erIOS() {
     || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
-function Beskeder({ s, lang, employee }) {
+// Al logik om tilladelser og abonnementer ét sted. Bruges baade af banneret paa
+// dagen og af valget under profilen, saa de to aldrig kan komme til at vise
+// forskellige tilstande for det samme.
+//
+// BESKEDER KAN IKKE VAERE SLAAET TIL SOM STANDARD. Browseren kraever et rigtigt klik
+// fra brugeren, og tilladelsen skal bedes om INDE i det klik. Beder man ved
+// sideindlaesning, afviser browseren det uden at vise noget - og har hun én gang
+// sagt nej, skal hun ind i telefonens indstillinger for at fortryde. Den ene chance
+// maa ikke braendes af paa en dialog hun ikke forventede.
+//
+// Det naermeste vi kommer "som standard" er de to ting nedenfor:
+//   1. Har hun ALLEREDE givet tilladelse, tilmeldes telefonen af sig selv. Det
+//      daekker ny telefon, ryddet browser, og alle der sagde ja engang.
+//   2. Har hun aldrig taget stilling, staar der et banner paa dagen. Det forsvinder
+//      for altid, saa snart hun har svaret.
+function useBeskeder(employee) {
   const [status, setStatus] = useState("henter");   // henter | fra | til | ikke_muligt | skal_installeres
   const [arbejder, setArbejder] = useState(false);
   const [fejl, setFejl] = useState("");
 
-  const da = lang === "da";
+  const tilmeld = useCallback(async (reg) => {
+    const abon = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64TilBytes(VAPID_OFFENTLIG),
+    });
+    const j = abon.toJSON();
+    // Endpoint er noeglen. Tilmelder hun sig igen paa samme telefon, opdateres
+    // raekken i stedet for at der laegges en ny - ellers ville hun faa dobbelt op.
+    const { error } = await supabase.from("push_abonnementer").upsert({
+      endpoint: abon.endpoint,
+      employee_id: employee.id,
+      p256dh: j.keys.p256dh,
+      auth: j.keys.auth,
+      enhed: navigator.userAgent.slice(0, 200),
+    }, { onConflict: "endpoint" });
+    if (error) throw error;
+  }, [employee?.id]);
 
   useEffect(() => {
+    let afbrudt = false;
     (async () => {
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        setStatus("ikke_muligt"); return;
+        if (!afbrudt) setStatus("ikke_muligt");
+        return;
       }
       // iPhone uden hjemmeskaerm: dialogen ville fejle, saa vi viser vejledningen
       // i stedet for en knap der ikke kan holde hvad den lover.
-      if (erIOS() && !koererInstalleret()) { setStatus("skal_installeres"); return; }
+      if (erIOS() && !koererInstalleret()) {
+        if (!afbrudt) setStatus("skal_installeres");
+        return;
+      }
       try {
         const reg = await navigator.serviceWorker.ready;
         const abon = await reg.pushManager.getSubscription();
-        setStatus(abon && Notification.permission === "granted" ? "til" : "fra");
+        if (Notification.permission === "granted") {
+          // Tilladelsen er der. Mangler abonnementet - ny telefon, ryddet browser -
+          // oprettes det uden at spoerge. Der er ikke noget at spoerge om; hun har
+          // allerede sagt ja.
+          if (!abon) { try { await tilmeld(reg); } catch { /* proeves igen naeste gang */ } }
+          if (!afbrudt) setStatus("til");
+          return;
+        }
+        if (!afbrudt) setStatus(abon ? "til" : "fra");
       } catch {
-        setStatus("ikke_muligt");
+        if (!afbrudt) setStatus("ikke_muligt");
       }
     })();
-  }, []);
+    return () => { afbrudt = true; };
+  }, [tilmeld]);
 
   async function slaaTil() {
     setArbejder(true); setFejl("");
     try {
-      // Tilladelsen SKAL bedes om inde i et klik. Beder man ved sideindlaesning,
-      // afviser browseren det uden at vise noget som helst.
+      // Tilladelsen SKAL bedes om inde i et klik.
       const lov = await Notification.requestPermission();
       if (lov !== "granted") {
-        setFejl(da ? "Du sagde nej til beskeder. Slå dem til i telefonens indstillinger for Worklist."
-                   : "Notifications were declined. Enable them in your phone settings for Worklist.");
-        setArbejder(false); return;
+        setFejl("nej");
+        setArbejder(false);
+        return;
       }
-
-      const reg = await navigator.serviceWorker.ready;
-      const abon = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64TilBytes(VAPID_OFFENTLIG),
-      });
-
-      const j = abon.toJSON();
-      // Endpoint er noeglen. Tilmelder hun sig igen paa samme telefon, opdateres
-      // raekken i stedet for at der laegges en ny — ellers ville hun faa dobbelt op.
-      const { error } = await supabase.from("push_abonnementer").upsert({
-        endpoint: abon.endpoint,
-        employee_id: employee.id,
-        p256dh: j.keys.p256dh,
-        auth: j.keys.auth,
-        enhed: navigator.userAgent.slice(0, 200),
-      }, { onConflict: "endpoint" });
-      if (error) throw error;
-
+      await tilmeld(await navigator.serviceWorker.ready);
       setStatus("til");
     } catch (e) {
       setFejl(String(e?.message || e));
@@ -3349,6 +3379,46 @@ function Beskeder({ s, lang, employee }) {
     }
     setArbejder(false);
   }
+
+  return { status, arbejder, fejl, slaaTil, slaaFra };
+}
+
+// Banneret paa dagen. Staar KUN saa laenge hun aldrig har taget stilling, og
+// forsvinder for altid naar hun har svaret - ogsaa hvis svaret er nej.
+function BeskedBanner({ lang, employee }) {
+  const { status, arbejder, fejl, slaaTil } = useBeskeder(employee);
+  const da = lang === "da";
+  if (status !== "fra") return null;
+
+  return (
+    <div style={{ background: "#FCE4EF", border: "1.5px solid #F0A9C8", borderRadius: 12,
+                  padding: "12px 14px", marginBottom: 12 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#9C1B5D", marginBottom: 2 }}>
+        🔔 {da ? "Få besked på telefonen" : "Get notified on your phone"}
+      </div>
+      <div style={{ fontSize: 12.5, color: "#9C1B5D", lineHeight: 1.5, marginBottom: 10 }}>
+        {da ? "Når din plan ændres, når kontoret svarer, og hvis du mangler at registrere tid."
+            : "When your schedule changes, when the office replies, and if time entries are missing."}
+      </div>
+      <button onClick={slaaTil} disabled={arbejder}
+        style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
+                 background: "#D6247A", color: "#fff", fontWeight: 700, fontSize: 14,
+                 cursor: "pointer", minHeight: 44 }}>
+        {arbejder ? "…" : (da ? "Slå beskeder til" : "Turn on notifications")}
+      </button>
+      {fejl === "nej" && (
+        <div style={{ fontSize: 11.5, color: "#B91C1C", marginTop: 8, lineHeight: 1.5 }}>
+          {da ? "Du sagde nej. Vil du fortryde, skal det ske i telefonens indstillinger for Worklist."
+              : "You declined. To change it, use your phone settings for Worklist."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Beskeder({ s, lang, employee }) {
+  const { status, arbejder, fejl, slaaTil, slaaFra } = useBeskeder(employee);
+  const da = lang === "da";
 
   const knap = {
     width: "100%", padding: "11px 0", borderRadius: 10, border: "1.5px solid #E2E8F0",
@@ -3404,7 +3474,13 @@ function Beskeder({ s, lang, employee }) {
         </>
       )}
 
-      {fejl && <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 6 }}>{fejl}</div>}
+      {fejl && fejl !== "nej" && <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 6 }}>{fejl}</div>}
+      {fejl === "nej" && (
+        <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 6, lineHeight: 1.5 }}>
+          {da ? "Du sagde nej til beskeder. Slå dem til i telefonens indstillinger for Worklist."
+              : "Notifications were declined. Enable them in your phone settings for Worklist."}
+        </div>
+      )}
     </div>
   );
 }
@@ -4331,6 +4407,8 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             <div style={{ fontSize: 13, color: "#94A3B8" }}>{tr.freeDayNote}</div>
           </div>
         )}
+
+        <BeskedBanner lang={lang} employee={employee} />
 
         {dagsVisning === "tid" && schedule.length > 0 && (
           <Tidslinje schedule={schedule} employee={employee} lang={lang}
