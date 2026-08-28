@@ -1340,7 +1340,8 @@ function HelpPage({ lang, onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, background:"#fff", zIndex:120, display:"flex", flexDirection:"column" }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-                    padding:"14px 16px", borderBottom:"1px solid #E2E8F0", background:"#111", color:"#fff" }}>
+                    padding:"calc(14px + env(safe-area-inset-top)) 16px 14px",
+                    borderBottom:"1px solid #E2E8F0", background:"#111", color:"#fff" }}>
         <div>
           <div style={{ fontWeight:800, fontSize:16 }}>{da ? "Sådan bruger du appen" : "How to use the app"}</div>
           <button onClick={() => udskrivVejledning(sections, da)}
@@ -1351,7 +1352,8 @@ function HelpPage({ lang, onClose }) {
         <button onClick={onClose}
           style={{ border:"none", background:"#333", color:"#fff", borderRadius:8, width:36, height:36, fontSize:18, cursor:"pointer" }}>✕</button>
       </div>
-      <div style={{ flex:1, overflowY:"auto", padding:"14px 16px 32px", WebkitOverflowScrolling:"touch",
+      <div style={{ flex:1, overflowY:"auto", WebkitOverflowScrolling:"touch",
+                    padding:"14px 16px calc(32px + env(safe-area-inset-bottom))",
                     textAlign:"left", maxWidth:640, margin:"0 auto", width:"100%", boxSizing:"border-box" }}>
         <div style={{ background:"#FCE4EF", borderRadius:10, padding:"12px 14px", marginBottom:16,
                       fontSize:14.5, lineHeight:1.5, color:"#9C1B5D", fontWeight:700 }}>
@@ -3339,12 +3341,15 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
 
   function Valgside({ navn, punkter, valgt, vaelg }) {
     return (
-      <div style={{ padding: "14px 16px 24px" }}>
+      <div style={{ padding: "14px 16px calc(24px + env(safe-area-inset-bottom))" }}>
+        {/* En bar tekstlink var for spinkel til at vaere vejen tilbage. Her er den
+            eneste udvej fra undersiden, og saa skal den se ud som en knap. */}
         <button onClick={() => setUnderside(null)}
-          style={{ border: "none", background: "transparent", color: "#D6247A",
-                   fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "6px 0 12px",
-                   minHeight: 40 }}>
-          ‹ {da ? "Tilbage" : "Back"}
+          style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14,
+                   border: "1px solid #E2E8F0", background: "#fff", color: "#111111",
+                   borderRadius: 12, padding: "12px 16px", minHeight: 48,
+                   fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+          <ChevronLeft size={19} color="#D6247A" /> {da ? "Tilbage" : "Back"}
         </button>
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 12 }}>{navn}</div>
         {punkter.map(([k, l, forklaring]) => (
@@ -3367,8 +3372,12 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
   return (
     <div style={{ position: "fixed", inset: 0, background: "#F8FAFC", zIndex: 130,
                   display: "flex", flexDirection: "column" }}>
+      {/* Appen koerer med viewport-fit=cover for at fylde skaermen helt ud. Uden
+          det her lagde hovedet sig ind UNDER statuslinjen paa en iPhone, saa
+          klokkeslaet og batteri stod oven i navnet. */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-                    gap: 10, padding: "12px 14px", background: "#111", color: "#fff" }}>
+                    gap: 10, background: "#111", color: "#fff",
+                    padding: "calc(12px + env(safe-area-inset-top)) 14px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#D6247A",
                         display: "flex", alignItems: "center", justifyContent: "center",
@@ -3399,7 +3408,7 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
                da ? "Opgaverne under hinanden" : "The jobs one after another"],
             ]} />
         ) : (
-          <div style={{ padding: "14px 16px 28px" }}>
+          <div style={{ padding: "14px 16px calc(28px + env(safe-area-inset-bottom))" }}>
             <div style={overskrift}>{da ? "Sådan ser dagen ud" : "How the day looks"}</div>
             <button style={{ ...raekke, marginBottom: 8 }} onClick={() => setUnderside("dag")}>
               <span style={{ minWidth: 0 }}>
@@ -3449,6 +3458,15 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
                        border: "1px solid #FCA5A5", background: "#fff", color: "#DC2626",
                        fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
               {da ? "Log ud" : "Sign out"}
+            </button>
+
+            {/* Krydset i hjoernet er lille og sidder oppe i et hjoerne. Den her er
+                for dem der scroller til bunden og leder efter vejen ud. */}
+            <button onClick={onLuk}
+              style={{ width: "100%", padding: "14px 0", borderRadius: 12, minHeight: 52,
+                       marginTop: 10, border: "none", background: "#111", color: "#fff",
+                       fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
+              {da ? "Luk indstillinger" : "Close settings"}
             </button>
 
             <div style={{ textAlign: "center", fontSize: 11, color: "#CBD5E1", marginTop: 16 }}>
@@ -4363,19 +4381,19 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
       <div style={s.header}>
         <div style={s.headerLeft}>
           <img src="/app-icon.png" alt="Worklist" style={s.headerIcon} />
-          <div>
-            <div style={s.headerTitle}>{tr.appName}</div>
-            <div style={s.headerSub}>
-              {tr.week} {currentWeek}
-              {/* Hvilken udgave koerer der? Med en service worker imellem kan man
-                  ikke se udefra om en rettelse er naaet frem, og saa tester man
-                  gammel kode uden at vide det. */}
-              <span style={{ opacity: 0.55, marginLeft: 8 }}>v{typeof __BYGGET__ === "string" ? __BYGGET__ : "?"}</span>
-            </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ ...s.headerTitle, whiteSpace: "nowrap" }}>{tr.appName}</div>
+            {/* Versionen stod her foer. Den er flyttet til Indstillinger, fordi
+                datostrengen er lang nok til at braekke hele bjaelken paa en
+                telefonskaerm — titlen ombroed til tre linjer, og avataren i hoejre
+                side blev skaaret af. Den bruges én gang imellem af os, ikke dagligt
+                af medarbejderen. */}
+            <div style={{ ...s.headerSub, whiteSpace: "nowrap" }}>{tr.week} {currentWeek}</div>
           </div>
         </div>
         <div style={s.headerRight}>
-          <LangToggle lang={lang} setLang={changeLang} />
+          {/* Flagene er vaek. Sproget vaelges i Indstillinger, og to flag der gjorde
+              det samme tog plads fra de knapper man rent faktisk bruger i marken. */}
           {/* Kun planlaeggere. Rengoeringsdamerne skal ikke have en knap de aldrig
               skal bruge — og databasen afviser kaldet uanset hvad. */}
           {employee?.is_admin && (
@@ -4639,10 +4657,13 @@ const s = {
   langRow: { display:"flex", gap:8, marginBottom:16 },
   flagBtn: { fontSize:24, background:"none", border:"none", cursor:"pointer", padding:4, borderRadius:8, transition:"opacity 0.15s" },
 
-  header: { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", background:"#111111" },
-  headerLeft: { display:"flex", alignItems:"center", gap:10 },
-  headerRight: { display:"flex", alignItems:"center", gap:8 },
-  headerIcon: { width:34, height:34, borderRadius:8, objectFit:"cover" },
+  header: { display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"10px 12px", background:"#111111" },
+  headerLeft: { display:"flex", alignItems:"center", gap:10, minWidth:0, flexShrink:1, overflow:"hidden" },
+  // flexShrink:0 og nowrap: knapperne maa hellere skubbe titlen sammen end
+  // selv blive klippet. Avataren er indgangen til indstillingerne — er den
+  // uden for skaermen, findes de ikke.
+  headerRight: { display:"flex", alignItems:"center", gap:6, flexShrink:0, flexWrap:"nowrap" },
+  headerIcon: { width:34, height:34, borderRadius:8, objectFit:"cover", flexShrink:0 },
   headerTitle: { fontWeight:700, fontSize:15, color:"#fff" },
   headerSub: { fontSize:11, color:"#94A3B8" },
   signOutBtn: { border:"none", background:"transparent", color:"#64748B", cursor:"pointer", padding:4, display:"flex", alignItems:"center" },
