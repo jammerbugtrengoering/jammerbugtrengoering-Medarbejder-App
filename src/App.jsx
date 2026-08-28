@@ -944,6 +944,39 @@ function computeDaySchedule(dayTasks, settings, employee) {
   return segments;
 }
 
+// Hvem staar oeverst paa opgaven — kunden eller borgeren?
+//
+// Det afhaenger af kontrakttypen, fordi "kunde" betyder to forskellige ting:
+//
+//   privat, erhverv   Kunden ER den hun besoeger. Fru Jensen eller Davidsen A/S
+//                     staar paa doeren. Navnet oeverst, adressen under.
+//
+//   nexus, aeldrelov  Kunden er den der faar REGNINGEN. Arbejdet foregaar hjemme
+//                     hos en borger, hvis navn staar i referencen, mens kundenavnet
+//                     er "Jammerbugt Kommune" paa alle 548 opgaver. Stod kommunen
+//                     oeverst, ville hvert kort se ens ud, og det ene felt hun skal
+//                     bruge for at finde derhen stod med graat nedenunder.
+//
+// Ét sted, saa dagsliste og tidslinje ikke kan komme til at vise forskelligt.
+const BETALER_ER_IKKE_STEDET = ["nexus", "aeldrelov"];
+
+function opgaveIdentitet(t) {
+  const kunde = (t.customerName || t.customer_name || "").trim();
+  const reference = (t.reference || "").trim();
+  const adresse = (t.address || t.address_text || "").trim();
+  const type = t.contractType || t.contract_type || "privat";
+
+  if (BETALER_ER_IKKE_STEDET.includes(type)) {
+    // Borgeren foerst. Mangler referencen, baerer adressen opgaven alene — det er
+    // stadig bedre end kommunens navn, som ikke fortaeller hende noget.
+    return { primaer: reference || adresse, sekundaer: reference ? adresse : "",
+             kunde, kundeDaempet: true, adresse };
+  }
+  // Kunden er stedet. Referencen kan vaere en kontaktperson og staar under adressen.
+  return { primaer: kunde || adresse, sekundaer: adresse,
+           kunde: reference, kundeDaempet: true, adresse };
+}
+
 // ── Tidslinje for dagen ──────────────────────────────────────────────────────
 //
 // Samme segmenter som listen, men tegnet paa en klokkeslaets-skala. Beregningen er
@@ -1042,6 +1075,7 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
           }
 
           const t = seg.task;
+          const ident = opgaveIdentitet(t);
           const aftalt = !!tidOf(t);
           const h = Math.max((t.duration || 0) * PX_PR_MIN, 34);
           const st = STATUS_FARVER[t.status] || STATUS_FARVER.planlagt;
@@ -1056,27 +1090,27 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
                        borderLeft: `4px solid ${st.kant}`,
                        // Plads i hoejre side til navigationsikonet, saa teksten ikke
                        // loeber ind under det.
-                       paddingRight: t.address ? 34 : 9 }}>
+                       paddingRight: ident.adresse ? 34 : 9 }}>
               {/* Samme prioritering som paa kortet: hvem og hvor, ikke hvem der
                   betaler. Med kundenavnet foerst stod der "Jammerbugt Kommune" paa
                   hver eneste blok, og dagen kunne ikke laeses. */}
               <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap",
                             overflow: "hidden", textOverflow: "ellipsis" }}>
                 {aftalt ? fmtClock(seg.start) : `ca. ${fmtClock(seg.start)}`} ·{" "}
-                {t.reference || t.address || t.customer_name || t.title}
+                {ident.primaer || t.title}
               </div>
               {h > 46 && (
                 <div style={{ fontSize: 11, opacity: 0.85, whiteSpace: "nowrap",
                               overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {t.reference && t.address ? `${t.address} · ` : ""}{fmtMin(t.duration || 0)}
+                  {ident.sekundaer ? `${ident.sekundaer} · ` : ""}{fmtMin(t.duration || 0)}
                 </div>
               )}
             </button>
             {/* Naviger direkte fra tidslinjen. Blokken er for smal til en knap med
                 tekst, saa det er et ikon — men trykfladen er 30x30, saa den kan
                 rammes med en finger uden at aabne opgaven ved et uheld. */}
-            {t.address && (
-              <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.address)}`}
+            {ident.adresse && (
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ident.adresse)}`}
                 target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
                 aria-label={da ? "Kør derhen" : "Navigate"} title={da ? "Kør derhen" : "Navigate"}
                 style={{ position: "absolute", right: 3, top: 3, width: 30, height: 30,
@@ -3246,6 +3280,7 @@ function TaskCard({ seg, employee, lang, onClick }) {
   const myLogged = (t.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
   const clProg = { done: (t.checklist || []).filter((i) => i.done).length, total: (t.checklist || []).length };
   const translatedTitle = useTranslatedTitle(t.title, lang);
+  const ident = opgaveIdentitet(t);
   return (
     <div style={{ ...s.taskCard, opacity: done ? 0.7 : 1 }} onClick={onClick}>
       <div style={{ ...s.taskAccent, background: done ? "#22C55E" : inProgress ? "#F59E0B" : "#D6247A" }} />
@@ -3253,41 +3288,39 @@ function TaskCard({ seg, employee, lang, onClick }) {
         <div style={s.taskTime}>{fmtClock(seg.start)}</div>
         <div style={s.taskTitle}>{translatedTitle}</div>
 
-        {/* ADRESSEN ER DET VIGTIGSTE PAA KORTET, ikke kundenavnet.
-            Paa de kommunale opgaver staar der "Jammerbugt Kommune" paa alle 548 —
-            kommunen er den der faar regningen, men arbejdet foregaar hjemme hos en
-            borger. Stod kommunen stort, ville hvert kort se ens ud, og det ene
-            felt hun faktisk skal bruge for at finde derhen stod med graat i
-            elleve punkt.
-            Derfor: hvem hun skal hen til og hvor, foerst. Kunden bagefter, daempet. */}
-        {(t.reference || t.address) && (
+        {/* Hvem og hvor. Hvad der staar oeverst afgoeres af kontrakttypen —
+            se opgaveIdentitet(). */}
+        {ident.primaer && (
           <div style={s.taskHvor}>
             <MapPin size={14} color="#D6247A" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ minWidth: 0 }}>
-              {/* Referencen er borgerens navn paa kommunale opgaver. Paa private er
-                  den som regel tom, og saa staar adressen alene. */}
-              {t.reference && <div style={s.taskReference}>{t.reference}</div>}
-              {t.address && <div style={s.taskAdresseTekst}>{t.address}</div>}
+              <div style={s.taskReference}>{ident.primaer}</div>
+              {ident.sekundaer && <div style={s.taskAdresseTekst}>{ident.sekundaer}</div>}
             </div>
           </div>
         )}
 
         {/* Naviger. Ét tryk fra kortet — hun skal ikke aabne opgaven og lede foerst.
             stopPropagation, ellers aabner kortet sig bagved kortet der aabner. */}
-        {t.address && (
-          <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.address)}`}
+        {ident.adresse && (
+          <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ident.adresse)}`}
             target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
             style={s.taskNavKnap}>
             <Navigation size={12} /> {lang === "da" ? "Kør derhen" : "Navigate"}
           </a>
         )}
 
-        {t.customerName && (
+        {/* Nederst staar den der ikke er stedet: paa kommunale opgaver kommunen der
+            betaler, paa private en eventuel kontaktperson. Er der ingen, staar der
+            kun maerket. */}
+        {(ident.kunde || t.contractType) && (
           <div style={s.taskCustomer}>
-            <Building2 size={11} color="#94A3B8" />
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {t.customerName}
-            </span>
+            {ident.kunde && <Building2 size={11} color="#94A3B8" />}
+            {ident.kunde && (
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {ident.kunde}
+              </span>
+            )}
             {t.contractType === "nexus" && <span style={{ fontSize:9.5, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>Nexus</span>}
             {t.contractType === "privat" && <span style={{ fontSize:9.5, fontWeight:700, color:"#9C1B5D", background:"#FFF6FA", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>{lang === "da" ? "Privat" : "Private"}</span>}
             {t.contractType === "aeldrelov" && <span style={{ fontSize:9.5, fontWeight:700, color:"#C2410C", background:"#FFF7ED", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>Ældrelov</span>}
