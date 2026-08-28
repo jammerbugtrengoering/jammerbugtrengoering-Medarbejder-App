@@ -939,12 +939,158 @@ function computeDaySchedule(dayTasks, settings, employee) {
   return segments;
 }
 
+// ── Tidslinje for dagen ──────────────────────────────────────────────────────
+//
+// Samme segmenter som listen, men tegnet paa en klokkeslaets-skala. Beregningen er
+// den samme - computeDaySchedule har allerede regnet start og varighed ud - saa de
+// to visninger kan ikke komme til at vise forskellige tider.
+//
+// EN VIGTIG FORSKEL PAA DE TO. I listen laeser man tiderne som en raekkefoelge. Paa
+// et gitter ligner et klokkeslaet et loefte, og 18 % af opgaverne har ikke et aftalt
+// tidspunkt - deres tid er REGNET ud fra hvornaar dagen begynder og hvor lang tid
+// det foregaaende tager. Skrider dagen, skrider de med.
+//
+// Derfor tegnes de to slags forskelligt: aftalt tid staar fast og fuldt optrukket,
+// beregnet tid er stiplet og faar "ca." foran. Uden den forskel ville en medarbejder
+// love en kunde et tidspunkt, systemet aldrig har lovet hende.
+// Farver pr. status. Samme betydning som i listen, men daempet — paa et gitter
+// ligger blokkene taet, og maettede farver ville goere dagen ulaeselig.
+const STATUS_FARVER = {
+  planlagt:    { bag: "#EFF6FF", kant: "#3B82F6", tekst: "#1E3A8A" },
+  i_gang:      { bag: "#FFFBEB", kant: "#D97706", tekst: "#78350F" },
+  "udført":    { bag: "#F0FDF4", kant: "#16A34A", tekst: "#14532D" },
+  unscheduled: { bag: "#F8FAFC", kant: "#94A3B8", tekst: "#334155" },
+};
+
+const PX_PR_MIN = 1.7;
+
+function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
+  const da = lang === "da";
+  const [nu, setNu] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
+
+  // Nu-linjen skal flytte sig af sig selv. Uden det staar den stille, til nogen
+  // aabner appen igen - og saa er den forkert netop naar man kigger paa den.
+  useEffect(() => {
+    if (!erIDag) return;
+    const t = setInterval(() => {
+      const d = new Date();
+      setNu(d.getHours() * 60 + d.getMinutes());
+    }, 60000);
+    return () => clearInterval(t);
+  }, [erIDag]);
+
+  if (!schedule.length) return null;
+
+  const slut = (seg) => seg.start + (seg.type === "task" ? (seg.task.duration || 0) : seg.minutes);
+  const foerste = Math.min(...schedule.map((x) => x.start));
+  const sidste = Math.max(...schedule.map(slut));
+
+  // Hele timer i begge ender, saa skalaen har pæne streger at hænge paa.
+  const fraTime = Math.floor(foerste / 60);
+  const tilTime = Math.ceil(sidste / 60);
+  const fra = fraTime * 60;
+  const hoejde = (tilTime - fraTime) * 60 * PX_PR_MIN;
+  const timer = [];
+  for (let t = fraTime; t <= tilTime; t++) timer.push(t);
+
+  const tidOf = (t) => t.scheduled_time || t.scheduledTime || null;
+
+  return (
+    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+      {/* Klokkeslaets-skalaen */}
+      <div style={{ width: 42, flexShrink: 0, position: "relative", height: hoejde }}>
+        {timer.map((t) => (
+          <div key={t} style={{ position: "absolute", top: (t * 60 - fra) * PX_PR_MIN - 7,
+                                right: 6, fontSize: 11.5, color: "#94A3B8" }}>
+            {String(t).padStart(2, "0")}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, position: "relative", height: hoejde,
+                    borderLeft: "1px solid #E2E8F0" }}>
+        {timer.map((t) => (
+          <div key={t} style={{ position: "absolute", left: 0, right: 0,
+                                top: (t * 60 - fra) * PX_PR_MIN,
+                                borderTop: "1px solid #F1F5F9" }} />
+        ))}
+
+        {schedule.map((seg) => {
+          const top = (seg.start - fra) * PX_PR_MIN;
+          if (seg.type === "transport") {
+            const h = Math.max(seg.minutes * PX_PR_MIN, 14);
+            return (
+              <div key={seg.key} title={da ? "Kørsel" : "Travel"}
+                style={{ position: "absolute", left: 6, right: 8, top, height: h,
+                         display: "flex", alignItems: "center", gap: 5,
+                         background: "repeating-linear-gradient(45deg,#F8FAFC,#F8FAFC 5px,#F1F5F9 5px,#F1F5F9 10px)",
+                         borderRadius: 5, padding: "0 7px", overflow: "hidden" }}>
+                <Car size={11} color="#94A3B8" />
+                <span style={{ fontSize: 10.5, color: "#94A3B8", whiteSpace: "nowrap" }}>
+                  {fmtMin(seg.minutes)}
+                </span>
+              </div>
+            );
+          }
+
+          const t = seg.task;
+          const aftalt = !!tidOf(t);
+          const h = Math.max((t.duration || 0) * PX_PR_MIN, 34);
+          const st = STATUS_FARVER[t.status] || STATUS_FARVER.planlagt;
+          return (
+            <button key={t.id} onClick={() => onVaelg(t)}
+              style={{ position: "absolute", left: 6, right: 8, top, height: h,
+                       textAlign: "left", padding: "5px 9px", cursor: "pointer",
+                       background: st.bag, color: st.tekst,
+                       borderRadius: 7, overflow: "hidden",
+                       border: aftalt ? `1px solid ${st.kant}` : `1px dashed ${st.kant}`,
+                       borderLeft: `4px solid ${st.kant}` }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap",
+                            overflow: "hidden", textOverflow: "ellipsis" }}>
+                {aftalt ? fmtClock(seg.start) : `ca. ${fmtClock(seg.start)}`} · {t.customer_name || t.title}
+              </div>
+              {h > 46 && (
+                <div style={{ fontSize: 11, opacity: 0.85, whiteSpace: "nowrap",
+                              overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {t.title} · {fmtMin(t.duration || 0)}
+                </div>
+              )}
+            </button>
+          );
+        })}
+
+        {/* Nu-linjen. Kun paa dagen i dag, og kun naar den er inden for skalaen —
+            ellers ville den klistre til toppen om morgenen og til bunden om aftenen
+            og se ud som om klokken stod stille. */}
+        {erIDag && nu >= fra && nu <= tilTime * 60 && (
+          <div style={{ position: "absolute", left: -4, right: 0,
+                        top: (nu - fra) * PX_PR_MIN, height: 0,
+                        borderTop: "2px solid #D6247A", zIndex: 2 }}>
+            <div style={{ position: "absolute", left: -3, top: -4, width: 8, height: 8,
+                          borderRadius: "50%", background: "#D6247A" }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Language selector ─────────────────────────────────────────────────────────
 
 // ── Hjælpeside ────────────────────────────────────────────────────────────────
 // Samme indhold som den trykte brugervejledning, men bygget til telefon:
 // fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
 const HELP_DA = [
+  { t: "Liste eller tidslinje", p: [
+    "Øverst på dagen kan du vælge, om opgaverne skal stå som en liste eller som en tidslinje med klokkeslæt ned ad siden.",
+    "Tidslinjen viser dagen som en kalender: hvor længe hver opgave tager, og hvor meget kørsel der er imellem. En rød streg viser, hvad klokken er nu.",
+    "Er kanten om en opgave fuldt optrukket, er tidspunktet aftalt med kunden. Er den stiplet, og står der «ca.», er tidspunktet regnet ud fra hvornår din dag begynder — skrider dagen, skrider det med.",
+    "Lov aldrig en kunde et «ca.»-tidspunkt. Ring til kontoret, hvis kunden skal have en fast tid.",
+    "Dit valg huskes til næste gang du åbner appen.",
+  ] },
   { t: "Beskeder på telefonen", p: [
     "Appen kan give dig besked, når du mangler at registrere tid, når din plan bliver ændret, og når kontoret har svaret på et ønske om ny tid.",
     "Du slår dem til under din profil — tryk på dit navn øverst og find «Beskeder på telefonen».",
@@ -1045,6 +1191,13 @@ const HELP_DA = [
       "Hænger appen? Luk siden og åbn den igen." ] },
 ];
 const HELP_EN = [
+  { t: "List or timeline", p: [
+    "At the top of the day you can choose whether the tasks are shown as a list or as a timeline with the clock running down the page.",
+    "The timeline shows the day like a calendar: how long each job takes and how much travel there is in between. A red line shows the current time.",
+    "A solid border means the time is agreed with the customer. A dashed border with “ca.” means the time is calculated from when your day starts — if the day slips, so does it.",
+    "Never promise a customer a “ca.” time. Call the office if the customer needs a fixed time.",
+    "Your choice is remembered for next time.",
+  ] },
   { t: "Notifications on your phone", p: [
     "The app can notify you when time entries are missing, when your schedule changes, and when the office has replied to a request for a new time.",
     "Turn them on under your profile — tap your name at the top and find “Notifications”.",
@@ -3384,6 +3537,8 @@ export default function MedarbejderApp() {
   // åbne på den rigtige dag — ellers viste appen fredag til en der møder om lørdagen.
   const weekendJumpDone = useRef(false);
   const [openTask, setOpenTask] = useState(null);
+  const [dagsVisning, setDagsVisning] = useState(() => localStorage.getItem("wl_dagsvisning") || "liste");
+  useEffect(() => { localStorage.setItem("wl_dagsvisning", dagsVisning); }, [dagsVisning]);
   // Kun planlaeggere ser knappen. Databasen afviser kaldet uanset hvad, hvis den
   // der spoerger ikke er administrator — reglen ligger ikke i en skjult knap.
   const [nytMoede, setNytMoede] = useState(false);
@@ -4151,7 +4306,26 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           </div>
         )}
 
-        {schedule.map((seg) => {
+        {schedule.length > 0 && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            {[["liste", lang === "da" ? "Liste" : "List"],
+              ["tid", lang === "da" ? "Tidslinje" : "Timeline"]].map(([k, navn]) => (
+              <button key={k} onClick={() => setDagsVisning(k)}
+                style={{ flex: 1, padding: "9px 0", borderRadius: 10, minHeight: 40,
+                         border: dagsVisning === k ? "2px solid #D6247A" : "1.5px solid #E2E8F0",
+                         background: dagsVisning === k ? "#FCE4EF" : "#fff",
+                         color: dagsVisning === k ? "#D6247A" : "#475569",
+                         fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>{navn}</button>
+            ))}
+          </div>
+        )}
+
+        {dagsVisning === "tid" && schedule.length > 0 && (
+          <Tidslinje schedule={schedule} employee={employee} lang={lang}
+            erIDag={day === todayWorkdayKey()} onVaelg={setOpenTask} />
+        )}
+
+        {dagsVisning === "liste" && schedule.map((seg) => {
           if (seg.type === "transport") {
             return (
               <div key={seg.key} style={s.transportRow}>
