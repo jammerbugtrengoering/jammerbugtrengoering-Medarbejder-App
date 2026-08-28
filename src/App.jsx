@@ -644,6 +644,25 @@ async function translateTask(task, targetLang) {
   ]);
   return { ...task, title, checklist };
 }
+// ── Solsikken ────────────────────────────────────────────────────────────────
+//
+// Et paaskeaeg. Charlotte og Jonna har bygget systemet sammen, og hendes navn faar
+// en solsikke — men kun paa deres to skaerme. Alle andre ser navnet som det staar.
+//
+// DEN MAA ALDRIG NAA DATA. Mails, loenfilen og alt der sendes videre laeser navnet
+// fra employees.name og roerer ikke den her funktion. Solsikken saettes foerst naar
+// navnet TEGNES. Laa den i datalaget, ville den foer eller siden staa i en faktura.
+const SOLSIKKE_NAVN = "Charlotte Thorsager Kronborg";
+const SOLSIKKE_SEERE = ["Charlotte Thorsager Kronborg", "Jonna Jensen IT"];
+
+let solsikkeSeer = "";
+function saetSolsikkeSeer(navn) { solsikkeSeer = navn || ""; }
+
+function medSolsikke(navn) {
+  if (navn !== SOLSIKKE_NAVN) return navn;
+  return SOLSIKKE_SEERE.includes(solsikkeSeer) ? navn + " \u{1F33B}" : navn;
+}
+
 function fmtMin(min) {
   if (!min || min <= 0) return "0m";
   const h = Math.floor(min / 60), m = Math.round(min % 60);
@@ -3485,7 +3504,7 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
                         fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{initialer}</div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap",
-                          overflow: "hidden", textOverflow: "ellipsis" }}>{employee.name}</div>
+                          overflow: "hidden", textOverflow: "ellipsis" }}>{medSolsikke(employee.name)}</div>
             <div style={{ fontSize: 12, opacity: 0.65 }}>
               {da ? "Indstillinger" : "Settings"}
             </div>
@@ -4117,6 +4136,8 @@ useEffect(() => {
         setDataLoading(false);
         return;
       }
+      // Paaskeaegget: se medSolsikke().
+      saetSolsikkeSeer(empData?.name);
       if (!empData) { setDataLoading(false); return; }
       setKopiHentet(null);
       // Hvem der sidst var logget ind. Uden den kan vi ikke finde den rigtige kopi
