@@ -1807,6 +1807,7 @@ function InstallerBjaelke({ lang }) {
 const TILBUD_MAKS_FOTOS = 10;
 
 function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
+  const synlig = useSynligHoejde();
   const [tilbud, setTilbud] = useState(null);
   const [henter, setHenter] = useState(true);
   const [lister, setLister] = useState([]);
@@ -2010,7 +2011,8 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
 
   if (henter) return (
     <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
-      <div style={s.sheet}><div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Indlæser…</div></div>
+      <div style={{ ...s.sheet, height: synlig.hoejde, maxHeight: synlig.hoejde,
+                    marginTop: synlig.top, alignSelf: "flex-start" }}><div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>Indlæser…</div></div>
     </div>
   );
 
@@ -2033,7 +2035,8 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
 
   return (
     <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
-      <div style={s.sheet}>
+      <div style={{ ...s.sheet, height: synlig.hoejde, maxHeight: synlig.hoejde,
+                    marginTop: synlig.top, alignSelf: "flex-start" }}>
         {/* Tilbage-knap som paa de andre skaerme. Uden den var der ingen vej ud af
             tilbuddet uden at gemme — og et tryk udenfor lukker heller ikke, fordi
             skaermen ligger inde i opgavens overlay. */}
@@ -2382,7 +2385,8 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
   if (sendt) {
     return (
       <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
-        <div style={s.sheet}>
+        <div style={{ ...s.sheet, height: synlig.hoejde, maxHeight: synlig.hoejde,
+                    marginTop: synlig.top, alignSelf: "flex-start" }}>
           <div style={s.afslutTop}>{task.customerName || task.title}</div>
           <div style={{ flex: 1, overflowY: "auto", padding: "28px 20px", textAlign: "center" }}>
             <div style={s.kvitteringCirkel}><Check size={34} color="#16A34A" strokeWidth={3} /></div>
@@ -2400,10 +2404,9 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
   }
 
   return (
-    <div onClick={(e) => e.stopPropagation()}
-      // Hoejden kommer fra visualViewport, ikke fra inset:0 — se useSynligHoejde().
-      style={{ ...s.overlay, bottom: "auto", top: synlig.top, height: synlig.hoejde }}>
-      <div style={s.sheet}>
+    <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+      <div style={{ ...s.sheet, height: synlig.hoejde, maxHeight: synlig.hoejde,
+                    marginTop: synlig.top, alignSelf: "flex-start" }}>
         <div style={s.afslutTop}>
           <button style={s.afslutTilbage} onClick={() => (art ? setArt(null) : onAfbryd())}>
             <ChevronLeft size={16} /> {tr.back}
@@ -2742,9 +2745,9 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
   // skridt end det hun stod paa — hun ville se noget skifte under fingeren.
   if (udleveringer === null) {
     return (
-      <div onClick={(e) => e.stopPropagation()}
-        style={{ ...s.overlay, bottom: "auto", top: synlig.top, height: synlig.hoejde }}>
-        <div style={s.sheet}>
+      <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+        <div style={{ ...s.sheet, height: synlig.hoejde, maxHeight: synlig.hoejde,
+                    marginTop: synlig.top, alignSelf: "flex-start" }}>
           <div style={s.afslutTop}>{task.customerName || task.title}</div>
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 15 }}>
             {tr.loading}
@@ -2759,11 +2762,9 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
       // stopPropagation er ikke pynt: flowet ligger inde i opgavens overlay, som
       // lukker paa klik. Uden den ville ethvert tryk paa plus, minus eller Videre
       // boble op og lukke hele opgaven med alt det indtastede.
-      <div onClick={(e) => e.stopPropagation()}
-        // Se useSynligHoejde(): uden den her havner "Afslut opgaven" under
-        // tastaturet, saa snart hun skriver i beskeden til kontoret.
-        style={{ ...s.overlay, bottom: "auto", top: synlig.top, height: synlig.hoejde }}>
-        <div style={s.sheet}>
+      <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+        <div style={{ ...s.sheet, height: synlig.hoejde, maxHeight: synlig.hoejde,
+                    marginTop: synlig.top, alignSelf: "flex-start" }}>
           <div style={s.afslutTop}>{task.customerName || task.title}</div>
           <div style={{ flex: 1, overflowY: "auto", padding: "28px 20px", textAlign: "center" }}>
             <div style={s.kvitteringCirkel}><Check size={34} color="#16A34A" strokeWidth={3} /></div>
@@ -2804,7 +2805,8 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
 
   return (
     <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
-      <div style={s.sheet}>
+      <div style={{ ...s.sheet, height: synlig.hoejde, maxHeight: synlig.hoejde,
+                    marginTop: synlig.top, alignSelf: "flex-start" }}>
         <div style={s.afslutTop}>
           <button style={s.afslutTilbage} onClick={() => (trinNr === 0 ? onAfbryd() : setTrinNr((n) => n - 1))}>
             <ChevronLeft size={16} /> {tr.back}
