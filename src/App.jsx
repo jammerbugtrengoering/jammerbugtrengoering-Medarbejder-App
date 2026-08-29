@@ -644,6 +644,41 @@ async function translateTask(task, targetLang) {
   ]);
   return { ...task, title, checklist };
 }
+// Hvor meget af skaermen er der reelt tilbage?
+//
+// Naar tastaturet kommer op paa iOS, krymper layout-viewporten IKKE. Et element med
+// position:fixed og inset:0 bliver ved med at vaere skaermhoejt, og alt i bunden
+// havner under tastaturet. Det var derfor "Afslut opgaven" blev klippet over, saa
+// snart man skrev i beskeden til kontoret.
+//
+// visualViewport er den del der faktisk er synlig. Vi laeser hoejden derfra og
+// saetter den paa arket, saa det krymper i stedet for at gemme sig bagved.
+//
+// offsetTop er ogsaa noedvendig: ruller iOS hele siden op for at gøre plads til
+// tastaturet, skal arket foelge med ned igen — ellers staar toppen uden for skaermen.
+function useSynligHoejde() {
+  const [maal, setMaal] = useState(() => ({
+    hoejde: typeof window !== "undefined" && window.visualViewport
+      ? window.visualViewport.height : "100%",
+    top: 0,
+  }));
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;                      // Aeldre browsere: alt som foer.
+    const opdater = () => setMaal({ hoejde: vv.height, top: vv.offsetTop });
+    opdater();
+    vv.addEventListener("resize", opdater);
+    vv.addEventListener("scroll", opdater);
+    return () => {
+      vv.removeEventListener("resize", opdater);
+      vv.removeEventListener("scroll", opdater);
+    };
+  }, []);
+
+  return maal;
+}
+
 // ── Solsikken ────────────────────────────────────────────────────────────────
 //
 // Et paaskeaeg. Charlotte og Jonna har bygget systemet sammen, og hendes navn faar
@@ -2242,6 +2277,7 @@ function NytMoedeSkaerm({ supabaseClient, employee, onLuk, onOprettet }) {
 // valg under folden, saa man skulle scrolle for at opdage at man havde trykket paa
 // noget — og en melding om at man ikke kan komme ind er ikke noget man skal lede efter.
 function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSendt }) {
+  const synlig = useSynligHoejde();
   const [art, setArt] = useState(null);
   const [dato, setDato] = useState("");
   const [klokken, setKlokken] = useState("");
@@ -2364,7 +2400,9 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
   }
 
   return (
-    <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()}
+      // Hoejden kommer fra visualViewport, ikke fra inset:0 — se useSynligHoejde().
+      style={{ ...s.overlay, bottom: "auto", top: synlig.top, height: synlig.hoejde }}>
       <div style={s.sheet}>
         <div style={s.afslutTop}>
           <button style={s.afslutTilbage} onClick={() => (art ? setArt(null) : onAfbryd())}>
@@ -2373,7 +2411,11 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
           <span>{task.customerName || ""}</span>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "18px 16px 20px" }}>
+        {/* scrollPaddingBottom giver browseren lov til at rulle feltet fri af
+            tastaturet af sig selv, naar det faar fokus. Uden det staar markoeren
+            praecis paa kanten. */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "18px 16px 20px",
+                      scrollPaddingBottom: 120, WebkitOverflowScrolling: "touch" }}>
           {!art ? (
             <>
               <div style={s.trinSpoergsmaal}>{tr.reportProblemTitle}</div>
@@ -2449,6 +2491,7 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
 // allerede staar, saa en pause midt i arbejdet eller to medarbejdere paa samme
 // opgave fungerer praecis som foer.
 function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, onSetStatus, onAfbryd, onFaerdig }) {
+  const synlig = useSynligHoejde();
   const erNexus = task.contractType === "nexus";
 
   // Produkter udleveres paa KONTORET af planlaeggeren. Medarbejderen vaelger altsaa
@@ -2699,7 +2742,8 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
   // skridt end det hun stod paa — hun ville se noget skifte under fingeren.
   if (udleveringer === null) {
     return (
-      <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ ...s.overlay, bottom: "auto", top: synlig.top, height: synlig.hoejde }}>
         <div style={s.sheet}>
           <div style={s.afslutTop}>{task.customerName || task.title}</div>
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 15 }}>
@@ -2715,7 +2759,10 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
       // stopPropagation er ikke pynt: flowet ligger inde i opgavens overlay, som
       // lukker paa klik. Uden den ville ethvert tryk paa plus, minus eller Videre
       // boble op og lukke hele opgaven med alt det indtastede.
-      <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+      <div onClick={(e) => e.stopPropagation()}
+        // Se useSynligHoejde(): uden den her havner "Afslut opgaven" under
+        // tastaturet, saa snart hun skriver i beskeden til kontoret.
+        style={{ ...s.overlay, bottom: "auto", top: synlig.top, height: synlig.hoejde }}>
         <div style={s.sheet}>
           <div style={s.afslutTop}>{task.customerName || task.title}</div>
           <div style={{ flex: 1, overflowY: "auto", padding: "28px 20px", textAlign: "center" }}>
@@ -4944,7 +4991,8 @@ const s = {
   // Bunden er en fast bjaelke, saa den handling der foerer videre altid er synlig.
   // Foer laa afslut-knappen nederst efter alt indhold, og paa en opgave med en lang
   // tjekliste skulle man scrolle forbi hele skaermen for at komme til den.
-  afslutBund: { borderTop:"1px solid #F1F5F9", padding:"12px 16px 26px", background:"#fff", flexShrink:0 },
+  afslutBund: { borderTop:"1px solid #F1F5F9", background:"#fff", flexShrink:0,
+    padding:"12px 16px calc(14px + env(safe-area-inset-bottom))" },
   trinSpoergsmaal: { fontSize:19, fontWeight:600, color:"#111111", lineHeight:1.35 },
   trinHjaelp: { fontSize:14, color:"#64748B", lineHeight:1.5, marginTop:6 },
   trinFod: { fontSize:12.5, color:"#94A3B8", marginTop:12, textAlign:"center", lineHeight:1.5 },
