@@ -3954,6 +3954,11 @@ export default function MedarbejderApp() {
 
   useEffect(() => {
     let opdater;
+    // Intervallet skal kunne stoppes igen. Det levede foer resten af appens levetid
+    // uden nogen at rydde op efter sig — i praksis harmloest, fordi komponenten
+    // aldrig forsvinder, men i udviklingstilstand koerer effekten to gange, og saa
+    // laa der to timere og tjekkede det samme.
+    let urSW;
     (async () => {
       try {
         const { registerSW } = await import("virtual:pwa-register");
@@ -3962,7 +3967,7 @@ export default function MedarbejderApp() {
           onRegisteredSW(_url, reg) {
             // Tjek en gang i timen. En telefon der ligger aaben hele dagen ville ellers
             // foerst opdage en rettelse naeste gang appen blev lukket helt ned.
-            if (reg) setInterval(() => reg.update(), 60 * 60 * 1000);
+            if (reg) urSW = setInterval(() => reg.update(), 60 * 60 * 1000);
           },
         });
       } catch {
@@ -3970,6 +3975,7 @@ export default function MedarbejderApp() {
         // service worker, og appen henter alt friskt hver gang.
       }
     })();
+    return () => { if (urSW) clearInterval(urSW); };
   }, []);
 
   // Gemmer sprogvalget paa medarbejderen. lang_valgt saettes samtidig: derefter
