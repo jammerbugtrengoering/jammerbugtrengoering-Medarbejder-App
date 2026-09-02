@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import {
   Clock, CheckCircle2, Video, Lock, ListChecks, Check,
-  Navigation, Building2, Car, LogOut, ChevronLeft, ChevronRight,
+  Navigation, Building2, Car, ChevronLeft, ChevronRight,
   X, MapPin,
   // Ikoner og ikke emoji i topbjaelken. Emoji tegnes af telefonens eget saet, og
   // Androids Noto er bredere end Apples — bjaelken kan altsaa passe paa en iPhone
