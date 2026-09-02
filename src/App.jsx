@@ -4665,7 +4665,11 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           <select
             value={viewEmpId || ""}
             onChange={(e) => setViewEmpId(e.target.value || null)}
-            style={{ padding: "6px 10px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1", background: "#fff" }}>
+            // color staar eksplicit: uden den vaelger browseren selv en farve til
+            // formularfelter, og i moerk tilstand er den hvid — paa den hvide
+            // baggrund lige her.
+            style={{ padding: "6px 10px", fontSize: 13, borderRadius: 8, border: "1px solid #CBD5E1",
+                     background: "#fff", color: "#111111", fontFamily: "inherit" }}>
             <option value="">Mig selv</option>
             {allEmployees.filter((e) => !employee || e.id !== employee.id).map((e) => (
               <option key={e.id} value={e.id}>{e.name}</option>
