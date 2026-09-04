@@ -3,7 +3,7 @@ import { supabase } from "./supabaseClient";
 import {
   Clock, CheckCircle2, Video, Lock, ListChecks, Check,
   Navigation, Building2, Car, ChevronLeft, ChevronRight,
-  X, MapPin,
+  X, MapPin, Key,
   // Ikoner og ikke emoji i topbjaelken. Emoji tegnes af telefonens eget saet, og
   // Androids Noto er bredere end Apples — bjaelken kan altsaa passe paa en iPhone
   // og loebe over paa en Android uden at nogen har roert koden. Et ikon er lige
@@ -1140,7 +1140,36 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
           const ident = opgaveIdentitet(t);
           const aftalt = !!tidOf(t);
           const h = Math.max((t.duration || 0) * PX_PR_MIN, 34);
-          const st = STATUS_FARVER[t.status] || STATUS_FARVER.planlagt;
+
+          // Fuldfoert betyder HENDES flueben — ikke opgavens status.
+          // Tidslinjen farvede efter t.status, og det er ikke det samme: paa en
+          // opgave to medarbejdere deler, staar status stadig 'planlagt' indtil
+          // begge er faerdige. Hun kunne altsaa have meldt sig faerdig og stadig
+          // se en bla blok. Listen har hele tiden brugt completed_by_employee.
+          // ?. med vilje: en tidslinje uden profil skal vise dagen uden flueben,
+          // ikke give hvid skaerm midt i en arbejdsdag.
+          const gjort = !!((t.completed_by_employee || {})[employee?.id]);
+          const st = gjort
+            ? STATUS_FARVER["udført"]
+            : (STATUS_FARVER[t.status] || STATUS_FARVER.planlagt);
+
+          // Samme tal som paa kortet i listen, regnet paa samme maade.
+          const minLogget = (t.timeLog || [])
+            .filter((l) => l.empId === employee?.id)
+            .reduce((sum, l) => sum + (l.minutes || 0), 0);
+          const tjekGjort = (t.checklist || []).filter((i) => i.done).length;
+          const tjekIalt  = (t.checklist || []).length;
+          const maerke = t.contractType === "nexus" ? { tekst: "Nexus", farve: "#4F46E5", bag: "#EEF2FF" }
+                       : t.contractType === "aeldrelov" ? { tekst: "Ældrelov", farve: "#C2410C", bag: "#FFF7ED" }
+                       : t.contractType === "privat" ? { tekst: da ? "Privat" : "Private", farve: "#9C1B5D", bag: "#FFF6FA" }
+                       : null;
+          // Hvor meget der er plads til. En kvarters opgave er 34 px hoej — der er
+          // kun plads til én linje, og saa skal det vaere klokkeslaet og hvem.
+          const visLinje2 = h > 46;
+          const visLinje3 = h > 74;
+          const smaaMaerker = [];
+          if (tjekIalt > 0) smaaMaerker.push({ ikon: <ListChecks size={10} />, tekst: `${tjekGjort}/${tjekIalt}` });
+          if (minLogget > 0) smaaMaerker.push({ ikon: <Clock size={10} />, tekst: fmtMin(minLogget) });
           return (
             <div key={t.id} style={{ position: "absolute", left: 6, right: 8, top, height: h }}>
             <button onClick={() => onVaelg(t)}
@@ -1156,15 +1185,68 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
               {/* Samme prioritering som paa kortet: hvem og hvor, ikke hvem der
                   betaler. Med kundenavnet foerst stod der "Jammerbugt Kommune" paa
                   hver eneste blok, og dagen kunne ikke laeses. */}
-              <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap",
-                            overflow: "hidden", textOverflow: "ellipsis" }}>
-                {aftalt ? fmtClock(seg.start) : `ca. ${fmtClock(seg.start)}`} ·{" "}
-                {ident.primaer || t.title}
+              {/* Fluebenet staar foerst paa linjen. Farven alene er ikke nok:
+                  groen og blaa ligner hinanden paa en telefon i sollys, og
+                  farveblinde ser ingen forskel. Samme ikon som i listen. */}
+              <div style={{ fontSize: 12.5, fontWeight: 700, display: "flex",
+                            alignItems: "center", gap: 4, minWidth: 0 }}>
+                {gjort && <CheckCircle2 size={13} style={{ flexShrink: 0 }} />}
+                {/* Noeglen staar paa foerste linje, ogsaa naar blokken er for lav
+                    til andet. En kvarters opgave man koerer 30 km til uden noeglen
+                    er en spildt tur — det maa aldrig vaere det, der klippes vaek.
+                    Teksten «Hent nøgle» staar paa tredje linje, naar der er plads. */}
+                {t.needsKeyPickup && <Key size={12} style={{ flexShrink: 0 }} />}
+                <span style={{ whiteSpace: "nowrap", overflow: "hidden",
+                               textOverflow: "ellipsis", minWidth: 0 }}>
+                  {aftalt ? fmtClock(seg.start) : `ca. ${fmtClock(seg.start)}`} ·{" "}
+                  {ident.primaer || t.title}
+                </span>
               </div>
-              {h > 46 && (
+
+              {visLinje2 && (
                 <div style={{ fontSize: 11, opacity: 0.85, whiteSpace: "nowrap",
                               overflow: "hidden", textOverflow: "ellipsis" }}>
                   {ident.sekundaer ? `${ident.sekundaer} · ` : ""}{fmtMin(t.duration || 0)}
+                </div>
+              )}
+
+              {/* Tredje linje kun naar blokken er hoej nok. Presses de ind paa en
+                  kort opgave, klippes klokkeslaettet af — og det er det vigtigste. */}
+              {visLinje3 && (t.needsKeyPickup || smaaMaerker.length > 0 || maerke || ident.kunde) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2,
+                              flexWrap: "nowrap", overflow: "hidden" }}>
+                  {/* Foerst i raekken, saa det er betaleren der klippes af og ikke
+                      noeglen. Ikonet paa foerste linje er sikkerhedsnettet — det her
+                      er teksten, der siger hvad ikonet betyder. */}
+                  {t.needsKeyPickup && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 2,
+                                   fontSize: 9.5, fontWeight: 700, color: "#92400E",
+                                   background: "#FEF3C7", borderRadius: 6,
+                                   padding: "1px 5px", flexShrink: 0 }}>
+                      <Key size={9} />{da ? "Hent nøgle" : "Key"}
+                    </span>
+                  )}
+                  {smaaMaerker.map((m, i) => (
+                    <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 2,
+                                           fontSize: 10, fontWeight: 600, opacity: 0.9,
+                                           flexShrink: 0 }}>
+                      {m.ikon}{m.tekst}
+                    </span>
+                  ))}
+                  {maerke && (
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: maerke.farve,
+                                   background: maerke.bag, borderRadius: 6,
+                                   padding: "1px 5px", flexShrink: 0 }}>{maerke.tekst}</span>
+                  )}
+                  {/* Den der betaler — ikke den hun besoeger. Nederst, som i listen. */}
+                  {ident.kunde && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 2,
+                                   fontSize: 10, opacity: 0.7, minWidth: 0,
+                                   whiteSpace: "nowrap", overflow: "hidden",
+                                   textOverflow: "ellipsis" }}>
+                      <Building2 size={10} style={{ flexShrink: 0 }} />{ident.kunde}
+                    </span>
+                  )}
                 </div>
               )}
             </button>
@@ -1225,6 +1307,8 @@ const HELP_DA = [
   { t: "Liste eller tidslinje", p: [
     "Dagen vises som en tidslinje med klokkeslæt ned ad siden. Vil du hellere have opgaverne som en almindelig liste, kan du skifte i dine indstillinger — tryk på dit navn øverst.",
     "Tidslinjen viser dagen som en kalender: hvor længe hver opgave tager, og hvor meget kørsel der er imellem. En rød streg viser, hvad klokken er nu.",
+    "Har du meldt en opgave færdig, bliver blokken grøn og får et flueben. Er der plads i blokken, står også din registrerede tid, tjeklisten, om nøglen skal hentes på kontoret, og hvem der får regningen — det samme som på listen.",
+    "Korte opgaver har kun plads til klokkeslæt og navn. Åbn opgaven for at se resten.",
     "Er kanten om en opgave fuldt optrukket, er tidspunktet aftalt med kunden. Er den stiplet, og står der «ca.», er tidspunktet regnet ud fra hvornår din dag begynder — skrider dagen, skrider det med.",
     "Lov aldrig en kunde et «ca.»-tidspunkt. Ring til kontoret, hvis kunden skal have en fast tid.",
     "Dit valg huskes til næste gang du åbner appen. Skifter du telefon, står den på tidslinje igen.",
@@ -1348,6 +1432,8 @@ const HELP_EN = [
   { t: "List or timeline", p: [
     "The day is shown as a timeline with the clock running down the page. If you prefer a plain list, you can switch in your settings — tap your name at the top.",
     "The timeline shows the day like a calendar: how long each job takes and how much travel there is in between. A red line shows the current time.",
+    "Once you have marked a job finished, the block turns green and gets a tick. If the block is tall enough, it also shows your logged time, the checklist, whether the key must be collected at the office, and who is invoiced — the same as on the list.",
+    "Short jobs only have room for the time and the name. Open the job to see the rest.",
     "A solid border means the time is agreed with the customer. A dashed border with “ca.” means the time is calculated from when your day starts — if the day slips, so does it.",
     "Never promise a customer a “ca.” time. Call the office if the customer needs a fixed time.",
     "Your choice is remembered for next time. On a new phone it starts on timeline again.",
