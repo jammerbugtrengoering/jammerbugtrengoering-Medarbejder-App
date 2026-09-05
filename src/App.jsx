@@ -1403,8 +1403,19 @@ const HELP_DA = [
       "Referatet er lavet til at blive dikteret. Tryk på mikrofonen på tastaturet og tal — ret det bagefter.",
       "Du kan lægge op til 10 billeder på. De er interne, medmindre du på tilbuddet vælger at vise dem til kunden.",
       "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage." ] },
+  { t: "Dine timer — de tre tal", p: [
+      "Tryk på bil-ikonet øverst. Under fanen Timer kan du se, hvad der bliver rapporteret til løn.",
+      "Der står tre tal, og de er ikke det samme. «Planlagt» er den tid, kontoret afsatte til opgaven. «Registreret» er den tid, du selv har trykket. «Til løn» er det, kontoret har godkendt.",
+      "Kun godkendte timer kommer med i lønfilen. Det er derfor, «Til løn» kan være mindre end «Registreret» — dine timer er ikke væk, kontoret har bare ikke set dem igennem endnu.",
+      "Står der «Ingen tid registreret» ved en opgave, mangler du at registrere. Gør det, inden måneden lukkes — uden registreret tid bliver der ikke udbetalt for opgaven.",
+      "«Heraf weekend» er de timer, der udløser weekendtillæg, hvis du er på den ordning.",
+      "Med pilene øverst kan du gå tilbage i tiden. Du kan se denne måned og elleve måneder tilbage.",
+      "Passer et tal ikke med det, du husker, så tag fat i kontoret med datoen og opgaven. Så kan I kigge på det samme.",
+    ] },
   { t: "Din kørsel", p: [
-      "Tryk på bil-ikonet øverst for at se din beregnede kørsel.",
+      "Under fanen Kørsel — samme sted som timerne — ser du din beregnede kørsel.",
+      "Også her står der, om turen er godkendt til udbetaling, og hvor mange kilometer der er godkendt i alt.",
+      "Satsen pr. kilometer sættes i lønsystemet og står ikke i appen. Den ændres ved lov hvert år.",
       "Du skal ikke selv taste kilometer — det regnes ud fra dine opgaver, når du har registreret din tid.",
       "Har du kørsel med i din arbejdstid, står der «Kørsel hjemmefra» øverst på dagen og «Kørsel hjem» nederst. Klokkeslættet øverst er altså hvornår du tager hjemmefra, ikke hvornår du skal være hos den første kunde.",
       "Ser du ikke de to linjer, er du ikke på den ordning, og din kørsel afregnes med kilometerpenge i stedet. Spørg kontoret hvis du er i tvivl om hvad der gælder for dig." ] },
@@ -1560,10 +1571,21 @@ const HELP_EN = [
       "The notes field is made for dictation. Tap the microphone on the keyboard and speak — edit it afterwards.",
       "You can add up to 10 photos. They are internal unless you choose to show them to the customer on the quote.",
       "\"Send to customer\" creates the PDF and mails a link she can accept from. If she accepts, the agreement is created as a draft — you set the start date and weekdays yourself." ] },
+  { t: "Your hours — the three figures", p: [
+      "Tap the car icon at the top. The Hours tab shows what is reported to payroll.",
+      "There are three figures, and they are not the same thing. \"Planned\" is the time the office set aside for the job. \"Logged\" is the time you registered yourself. \"To payroll\" is what the office has approved.",
+      "Only approved hours go into the payroll file. That is why \"To payroll\" can be lower than \"Logged\" — your hours are not lost, the office simply has not reviewed them yet.",
+      "If a job says \"No time logged\", you still need to register it. Do it before the month closes — without logged time the job is not paid.",
+      "\"Of which weekend\" is the hours that trigger the weekend supplement, if you are on that arrangement.",
+      "Use the arrows at the top to go back in time. You can see this month and eleven months back.",
+      "If a figure does not match what you remember, contact the office with the date and the job. Then you are both looking at the same thing.",
+    ] },
   { t: "Your mileage", p: [
+      "The Driving tab — same place as your hours — shows your calculated mileage.",
+      "It also shows whether each trip is approved for payment, and how many kilometres are approved in total.",
+      "The rate per kilometre is set in the payroll system and is not shown in the app. It changes by law every year.",
       "If travel is part of your working hours, the day starts with \"Travel from home\" and ends with \"Travel home\". The time at the top is when you leave home, not when you must be at the first customer.",
       "If you do not see those two lines, you are not on that arrangement, and your driving is paid as mileage instead. Ask the office if you are unsure what applies to you.",
-      "Tap the car icon at the top to see your calculated mileage.",
       "You do not enter kilometres yourself — it is calculated from your jobs once you register your time." ] },
   { t: "If something goes wrong", p: [
       "Cannot log in? Check your email and use \"Forgot password?\".",
@@ -4954,8 +4976,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
       {showHelp && <HelpPage lang={lang} onClose={() => setShowHelp(false)} />}
 
       {showKm && (
-        <KmPage
-          employee={employee}
+        <TidOgKmPage
           lang={lang}
           supabaseClient={supabase}
           onClose={() => setShowKm(false)}
@@ -5424,67 +5445,318 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
 }
 
 
-function KmPage({ employee, lang, supabaseClient, onClose }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
+// ── Min tid og kørsel ────────────────────────────────────────────────────────
+//
+// Hvorfor siden findes: der var laebende diskussioner om timer, fordi der er TRE tal
+// og ikke to. Planlagt tid er hvad kontoret afsatte. Registreret tid er hvad hun
+// trykkede. Godkendt tid er hvad kontoret har sat flueben ved — og kun dét naar
+// Danloen-filen. Hun troede registreret var lig udbetalt, og saa ringede hun.
+//
+// Nu kan hun se alle tre selv, og hvad forskellen skyldes.
+//
+// Tallene hentes gennem mine_timer og mine_km i databasen, ikke ved at regne paa
+// opgaverne her. Datoen skal udledes af aar + ISO-uge + ugedag, og findes den
+// beregning to steder, driver de fra hinanden — saa ville hendes tal ikke passe med
+// kontorets, og saa var vi lige vidt.
+
+const MDR_DA = ["Januar","Februar","Marts","April","Maj","Juni",
+                "Juli","August","September","Oktober","November","December"];
+const MDR_EN = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+
+// Timer med dansk komma. 135 minutter bliver til 2,25.
+function timerTekst(minutter, da) {
+  const t = (Number(minutter) || 0) / 60;
+  const s = t.toFixed(2).replace(/0$/, "").replace(/[.,]$/, "");
+  return da ? s.replace(".", ",") : s;
+}
+
+// Bevidst INGEN employee-prop. Siden viser altid den indloggedes egne tal, fordi
+// mine_timer og mine_km slaar op paa auth.uid() i databasen. Tog komponenten et
+// medarbejder-id ind, ville den se ud som om man kunne bede om en andens timer — og
+// den misforstaaelse er farlig at efterlade i koden paa netop den her side.
+function TidOgKmPage({ lang, supabaseClient, onClose }) {
+  const da = lang === "da";
+  const nu = new Date();
+  const [fane, setFane] = useState("timer");
+  const [aar, setAar] = useState(nu.getFullYear());
+  const [maaned, setMaaned] = useState(nu.getMonth() + 1);   // 1-12
+  const [timer, setTimer] = useState([]);
+  const [km, setKm] = useState([]);
+  const [henter, setHenter] = useState(true);
+  const [fejl, setFejl] = useState("");
+
+  // Vinduet: denne maaned og 11 tilbage. Aeldre maaneder er afregnet for laengst, og
+  // en liste uden ende inviterer til at rode i noget, ingen kan lave om paa alligevel.
+  const nyeste = nu.getFullYear() * 12 + nu.getMonth();
+  const valgt = aar * 12 + (maaned - 1);
+  const kanFrem = valgt < nyeste;
+  const kanTilbage = valgt > nyeste - 11;
+
+  function skift(retning) {
+    const n = valgt + retning;
+    if (n > nyeste || n < nyeste - 11) return;
+    setAar(Math.floor(n / 12));
+    setMaaned((n % 12) + 1);
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      const { data } = await supabaseClient
-        .from("km_log")
-        .select("work_date, leg_order, from_address, to_address, km, minutes")
-        .eq("employee_id", employee.id)
-        .order("work_date", { ascending: false })
-        .order("leg_order", { ascending: true })
-        .limit(200);
-      if (cancelled) return;
-      setRows(data || []);
-      setLoading(false);
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [employee.id]);
+    let afbrudt = false;
+    (async () => {
+      setHenter(true); setFejl("");
+      const [t, k] = await Promise.all([
+        supabaseClient.rpc("mine_timer", { p_aar: aar, p_maaned: maaned }),
+        supabaseClient.rpc("mine_km",    { p_aar: aar, p_maaned: maaned }),
+      ]);
+      if (afbrudt) return;
+      // Fejlen maa ikke kastes vaek. En tom liste og "kunne ikke hente" ser ens ud for
+      // brugeren, og her betyder forskellen "du har ingen timer" mod "vi ved det ikke"
+      // — paa en side der handler om hendes loen.
+      if (t.error || k.error) {
+        setFejl((t.error || k.error).message);
+        setTimer([]); setKm([]);
+      } else {
+        setTimer(t.data || []);
+        setKm(k.data || []);
+      }
+      setHenter(false);
+    })();
+    return () => { afbrudt = true; };
+  }, [aar, maaned, supabaseClient]);
 
-  const byDate = {};
-  rows.forEach((r) => {
-    if (!byDate[r.work_date]) byDate[r.work_date] = [];
-    byDate[r.work_date].push(r);
+  // Summerne. Godkendt regnes af de linjer der HAR flueben — ikke af alt.
+  const sum = timer.reduce((a, r) => ({
+    planlagt:  a.planlagt + (r.planlagt || 0),
+    registreret: a.registreret + (r.registreret || 0),
+    godkendt:  a.godkendt + (r.godkendt ? (r.registreret || 0) : 0),
+    weekend:   a.weekend + (r.weekend ? (r.registreret || 0) : 0),
+  }), { planlagt: 0, registreret: 0, godkendt: 0, weekend: 0 });
+  const afventer = sum.registreret - sum.godkendt;
+  const manglerTid = timer.filter((r) => (r.registreret || 0) === 0).length;
+
+  const kmIalt = km.reduce((s, r) => s + (Number(r.km) || 0), 0);
+  const kmGodkendt = km.reduce((s, r) => s + (r.godkendt ? (Number(r.km) || 0) : 0), 0);
+
+  const kmDage = [];
+  km.forEach((r) => {
+    const sidste = kmDage[kmDage.length - 1];
+    if (sidste && sidste.dato === r.dato) sidste.ture.push(r);
+    else kmDage.push({ dato: r.dato, ture: [r] });
   });
-  const dates = Object.keys(byDate).sort((a, b) => (a < b ? 1 : -1));
+
+  const dagTekst = (iso) => new Date(iso + "T12:00:00")
+    .toLocaleDateString(da ? "da-DK" : "en-GB",
+      { weekday: "short", day: "numeric", month: "short" });
+
+  const kort = (etiket, vaerdi, farve, bag) => (
+    <div style={{ background: bag || "#F8FAFC", borderRadius: 10, padding: "10px 8px", minWidth: 0 }}>
+      <div style={{ fontSize: 11, color: farve || "#64748B", marginBottom: 3,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{etiket}</div>
+      <div style={{ fontSize: 19, fontWeight: 700, color: farve || "#111111" }}>{vaerdi}</div>
+    </div>
+  );
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 50, overflowY: "auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #F1F5F9", position: "sticky", top: 0, background: "#fff" }}>
-        <div style={{ fontWeight: 700, fontSize: 17 }}>{lang === "da" ? "Min kørsel" : "My driving"}</div>
-        <button onClick={onClose} style={{ border: "none", background: "#F1F5F9", borderRadius: 8, width: 32, height: 32, fontSize: 16, cursor: "pointer" }}>✕</button>
+    <div style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 50,
+                  display: "flex", flexDirection: "column" }}>
+      {/* env(safe-area-inset-top): siden fylder hele skaermen, og uden den laegger
+          overskriften sig ind under statuslinjen paa iPhone. Paa Android er tallet nul. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "calc(14px + env(safe-area-inset-top)) 16px 12px",
+                    borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 17 }}>
+          {da ? "Min tid og kørsel" : "My time and driving"}
+        </div>
+        <button onClick={onClose} aria-label={da ? "Luk" : "Close"}
+          style={{ border: "none", background: "#F1F5F9", borderRadius: 8, width: 34, height: 34,
+                   display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <X size={17} />
+        </button>
       </div>
-      <div style={{ padding: 16 }}>
-        {loading && <div style={{ color: "#64748B" }}>{lang === "da" ? "Indlæser..." : "Loading..."}</div>}
-        {!loading && dates.length === 0 && (
-          <div style={{ color: "#64748B", padding: 20, textAlign: "center" }}>
-            {lang === "da" ? "Ingen kørsel registreret endnu." : "No driving registered yet."}
+
+      <div style={{ display: "flex", borderBottom: "1px solid #F1F5F9", padding: "0 16px", flexShrink: 0 }}>
+        {[["timer", da ? "Timer" : "Hours"], ["km", da ? "Kørsel" : "Driving"]].map(([k, l]) => (
+          <button key={k} onClick={() => setFane(k)}
+            style={{ padding: "10px 0", marginRight: 22, border: "none", background: "transparent",
+                     fontSize: 14, fontFamily: "inherit", cursor: "pointer",
+                     fontWeight: fane === k ? 700 : 500,
+                     color: fane === k ? "#D6247A" : "#94A3B8",
+                     borderBottom: fane === k ? "2.5px solid #D6247A" : "2.5px solid transparent" }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* Maanedsvaelgeren. Pilene forsvinder ikke i enderne — de bliver blege og
+          reagerer ikke. En knap der pludselig er vaek flytter alt ved siden af. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "10px 16px", borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
+        <button onClick={() => skift(-1)} disabled={!kanTilbage}
+          aria-label={da ? "Forrige måned" : "Previous month"}
+          style={{ border: "none", background: "transparent", padding: 6, cursor: kanTilbage ? "pointer" : "default",
+                   opacity: kanTilbage ? 1 : 0.25, display: "flex" }}>
+          <ChevronLeft size={20} color="#475569" />
+        </button>
+        <div style={{ fontSize: 14.5, fontWeight: 700 }}>
+          {(da ? MDR_DA : MDR_EN)[maaned - 1]} {aar}
+        </div>
+        <button onClick={() => skift(1)} disabled={!kanFrem}
+          aria-label={da ? "Næste måned" : "Next month"}
+          style={{ border: "none", background: "transparent", padding: 6, cursor: kanFrem ? "pointer" : "default",
+                   opacity: kanFrem ? 1 : 0.25, display: "flex" }}>
+          <ChevronRight size={20} color="#475569" />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto",
+                    padding: "14px 16px calc(28px + env(safe-area-inset-bottom))" }}>
+        {henter && <div style={{ color: "#94A3B8", padding: 20, textAlign: "center" }}>
+          {da ? "Henter…" : "Loading…"}</div>}
+
+        {!henter && fejl && (
+          <div style={{ background: "#FEE2E2", color: "#991B1B", borderRadius: 10,
+                        padding: "12px 14px", fontSize: 13.5, lineHeight: 1.5 }}>
+            {da ? "Tallene kunne ikke hentes. Prøv igen, når du har dækning."
+                : "The figures could not be loaded. Try again when you have coverage."}
           </div>
         )}
-        {!loading && dates.map((d) => {
-          const legs = byDate[d];
-          const total = legs.reduce((s, r) => s + (Number(r.km) || 0), 0);
-          return (
-            <div key={d} style={{ marginBottom: 18, border: "1px solid #F1F5F9", borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", background: "#F8FAFC" }}>
-                <span style={{ fontWeight: 700, fontSize: 13 }}>{d}</span>
-                <span style={{ fontWeight: 700, fontSize: 13, color: "#4F46E5" }}>{total.toFixed(1)} km</span>
-              </div>
-              {legs.map((r, i) => (
-                <div key={i} style={{ padding: "10px 14px", borderTop: i > 0 ? "1px solid #F1F5F9" : "none", fontSize: 13 }}>
-                  <div style={{ color: "#111111" }}>{r.from_address} → {r.to_address}</div>
-                  <div style={{ color: "#94A3B8", fontSize: 12, marginTop: 2 }}>{r.km != null ? Number(r.km).toFixed(1) + " km" : "—"} {r.minutes != null ? "· " + r.minutes + " min" : ""}</div>
-                </div>
-              ))}
+
+        {!henter && !fejl && fane === "timer" && (
+          timer.length === 0 ? (
+            <div style={{ color: "#94A3B8", padding: 30, textAlign: "center", fontSize: 14 }}>
+              {da ? "Ingen opgaver i denne måned." : "No jobs this month."}
             </div>
-          );
-        })}
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+                {kort(da ? "Planlagt" : "Planned", timerTekst(sum.planlagt, da))}
+                {kort(da ? "Registreret" : "Logged", timerTekst(sum.registreret, da))}
+                {kort(da ? "Til løn" : "To payroll", timerTekst(sum.godkendt, da), "#15803D", "#F0FDF4")}
+              </div>
+
+              {afventer > 0 && (
+                <div style={{ display: "flex", gap: 9, background: "#FEF3C7", borderRadius: 10,
+                              padding: "11px 13px", marginTop: 10 }}>
+                  <Clock size={16} color="#92400E" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div style={{ fontSize: 12.5, color: "#92400E", lineHeight: 1.5 }}>
+                    {da
+                      ? `${timerTekst(afventer, da)} timer venter stadig på kontorets godkendelse. Kun godkendte timer kommer med på lønsedlen.`
+                      : `${timerTekst(afventer, da)} hours are still awaiting the office's approval. Only approved hours reach your payslip.`}
+                  </div>
+                </div>
+              )}
+
+              {manglerTid > 0 && (
+                <div style={{ display: "flex", gap: 9, background: "#FEE2E2", borderRadius: 10,
+                              padding: "11px 13px", marginTop: 8 }}>
+                  <Clock size={16} color="#991B1B" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div style={{ fontSize: 12.5, color: "#991B1B", lineHeight: 1.5 }}>
+                    {da
+                      ? `${manglerTid} ${manglerTid === 1 ? "opgave mangler" : "opgaver mangler"} tid. Uden registreret tid bliver der ikke udbetalt for dem.`
+                      : `${manglerTid} ${manglerTid === 1 ? "job is" : "jobs are"} missing time. Without logged time they are not paid.`}
+                  </div>
+                </div>
+              )}
+
+              {sum.weekend > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5,
+                              color: "#64748B", padding: "12px 2px 6px" }}>
+                  <span>{da ? "Heraf weekend" : "Of which weekend"}</span>
+                  <span style={{ color: "#111111", fontWeight: 600 }}>
+                    {timerTekst(sum.weekend, da)} {da ? "timer" : "hours"}
+                  </span>
+                </div>
+              )}
+
+              <div style={{ borderTop: "1px solid #F1F5F9", marginTop: 6 }}>
+                {timer.map((r) => {
+                  const ingen = (r.registreret || 0) === 0;
+                  return (
+                    <div key={r.opgave_id}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                               gap: 10, padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, color: "#111111" }}>{dagTekst(r.dato)}</div>
+                        <div style={{ fontSize: 11.5, color: "#94A3B8", whiteSpace: "nowrap",
+                                      overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {r.hvor || r.titel}{r.weekend ? (da ? " · weekend" : " · weekend") : ""}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 13.5, color: "#111111" }}>
+                          <span style={{ color: "#94A3B8" }}>{timerTekst(r.planlagt, da)}</span>
+                          {" → "}
+                          {ingen ? <span style={{ color: "#DC2626" }}>—</span>
+                                 : timerTekst(r.registreret, da)}
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 700,
+                                      color: ingen ? "#DC2626" : r.godkendt ? "#15803D" : "#B45309" }}>
+                          {ingen ? (da ? "Ingen tid registreret" : "No time logged")
+                                 : r.godkendt ? (da ? "Godkendt" : "Approved")
+                                              : (da ? "Afventer kontoret" : "Awaiting office")}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )
+        )}
+
+        {!henter && !fejl && fane === "km" && (
+          km.length === 0 ? (
+            <div style={{ color: "#94A3B8", padding: 30, textAlign: "center", fontSize: 14 }}>
+              {da ? "Ingen kørsel i denne måned." : "No driving this month."}
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                {kort(da ? "Kørt i alt" : "Driven in total", kmIalt.toFixed(1).replace(".", da ? "," : ".") + " km")}
+                {kort(da ? "Til løn" : "To payroll",
+                      kmGodkendt.toFixed(1).replace(".", da ? "," : ".") + " km", "#15803D", "#F0FDF4")}
+              </div>
+              <div style={{ fontSize: 11.5, color: "#94A3B8", padding: "10px 2px 4px", lineHeight: 1.5 }}>
+                {da ? "Satsen pr. kilometer sættes i lønsystemet, ikke her."
+                    : "The rate per kilometre is set in the payroll system, not here."}
+              </div>
+
+              {kmDage.map((d) => {
+                const dagIalt = d.ture.reduce((s, r) => s + (Number(r.km) || 0), 0);
+                return (
+                  <div key={d.dato} style={{ marginTop: 12, border: "1px solid #F1F5F9",
+                                             borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between",
+                                  padding: "9px 13px", background: "#F8FAFC" }}>
+                      <span style={{ fontWeight: 700, fontSize: 12.5 }}>{dagTekst(d.dato)}</span>
+                      <span style={{ fontWeight: 700, fontSize: 12.5, color: "#4F46E5" }}>
+                        {dagIalt.toFixed(1).replace(".", da ? "," : ".")} km
+                      </span>
+                    </div>
+                    {d.ture.map((r, i) => (
+                      <div key={r.linje_id}
+                        style={{ padding: "9px 13px", fontSize: 12.5,
+                                 borderTop: i > 0 ? "1px solid #F1F5F9" : "none" }}>
+                        <div style={{ color: "#111111" }}>{r.fra} → {r.til}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between",
+                                      color: "#94A3B8", fontSize: 11.5, marginTop: 2 }}>
+                          <span>
+                            {r.km != null ? Number(r.km).toFixed(1).replace(".", da ? "," : ".") + " km" : "—"}
+                            {r.minutter != null ? " · " + r.minutter + " min" : ""}
+                          </span>
+                          <span style={{ fontWeight: 700, color: r.godkendt ? "#15803D" : "#B45309" }}>
+                            {r.godkendt ? (da ? "Godkendt" : "Approved")
+                                        : (da ? "Afventer" : "Awaiting")}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </>
+          )
+        )}
       </div>
     </div>
   );
