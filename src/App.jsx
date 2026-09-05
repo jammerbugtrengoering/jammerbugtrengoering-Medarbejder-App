@@ -1446,7 +1446,7 @@ const HELP_DA = [
   { t: "Hvem kan se hvad", p: [
       "Kontoret kan se dine opgaver, din registrerede tid og din løn. Det skal de for at kunne planlægge og udbetale.",
       "Dine kolleger kan ikke se din løn, dine noter eller dine adgangskoder. Det er ikke bare skjult på skærmen — databasen afviser det.",
-      "Uden for huset: databasen ligger hos Supabase i Frankfurt. Mails sendes gennem Brevo i Frankrig. Beregningen af afstande sker hos et tysk ruteberegningsfirma og hos statens adresseregister, som får adressen men ikke dit navn.",
+      "Uden for huset: databasen ligger hos Supabase i Stockholm. Mails sendes gennem Brevo i Frankrig. Beregningen af afstande sker hos et tysk ruteberegningsfirma og hos statens adresseregister, som får adressen men ikke dit navn.",
       "Beskeder på telefonen går gennem Apple og Google. Indholdet er krypteret undervejs — de kan ikke læse, hvad der står.",
       "Lønfilen sendes ikke automatisk nogen steder. Kontoret henter den som en fil og lægger den selv op i Danløn.",
     ] },
@@ -1612,7 +1612,7 @@ const HELP_EN = [
   { t: "Who can see what", p: [
       "The office can see your jobs, your logged time and your pay. They need to, in order to plan and to pay you.",
       "Your colleagues cannot see your pay, your notes or your access codes. It is not merely hidden on screen — the database refuses it.",
-      "Outside the company: the database is hosted by Supabase in Frankfurt. Email is sent through Brevo in France. Distances are calculated by a German routing service and by the Danish state address register, which receive the address but not your name.",
+      "Outside the company: the database is hosted by Supabase in Stockholm. Email is sent through Brevo in France. Distances are calculated by a German routing service and by the Danish state address register, which receive the address but not your name.",
       "Notifications travel through Apple and Google. The content is encrypted on the way — they cannot read what it says.",
       "The payroll file is not sent anywhere automatically. The office downloads it as a file and uploads it to Danløn themselves.",
     ] },
