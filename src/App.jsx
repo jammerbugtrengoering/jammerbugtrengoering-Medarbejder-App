@@ -1413,6 +1413,38 @@ const HELP_DA = [
       "Kan du ikke se dine opgaver? Tjek at du står på den rigtige uge og dag.",
       "Mangler der en opgave? Kontakt kontoret — de kan flytte den.",
       "Hænger appen? Luk siden og åbn den igen." ] },
+  // Privatlivspolitikken staar til sidst, men den er ikke en fodnote. Den er skrevet
+  // ud fra de felter, der faktisk findes i databasen — ikke ud fra en skabelon. Aendrer
+  // vi, hvad appen gemmer, skal den her tekst rettes i samme ombaering.
+  { t: "Dine personoplysninger", p: [
+      "Jammerbugt Rengøring er ansvarlig for de oplysninger, appen gemmer om dig. Her står præcis hvad det er.",
+      "Om dig selv: dit navn, din arbejdsmail, dit sprogvalg, hvornår du normalt møder, dine kompetencer og hvilke områder du dækker.",
+      "Din hjemmeadresse, hvis du er på en ordning hvor kørsel hjemmefra tæller med. Den bruges kun til at regne afstanden til dagens første opgave — ikke til andet.",
+      "Om dit arbejde: hvilke opgaver du er sat på, hvornår du har registreret tid, hvor lang tid, og de beskeder du sender til kontoret.",
+      "Om din løn: din timeløn og tidligere satser, om du har weekendtillæg og SH-betaling, og dit medarbejdernummer i Danløn.",
+      "Fravær registreres som fravær. Der står aldrig hvorfor du var væk.",
+      "Slår du beskeder til, gemmes en teknisk adresse på din telefon, så beskeden kan finde frem.",
+    ] },
+  { t: "Det appen ikke gemmer", p: [
+      "Appen følger dig ikke. Der er ingen GPS og ingen positionsmåling — hverken i arbejdstiden eller udenfor. Kørslen regnes ud fra adresserne på dine opgaver, ikke fra hvor telefonen har været.",
+      "Der ligger intet CPR-nummer i systemet. Lønfilen bruger dit Danløn-nummer.",
+      "Der ligger ingen bankoplysninger og intet kontonummer.",
+      "Der ligger ingen helbredsoplysninger, diagnoser eller sygdomsårsager.",
+    ] },
+  { t: "Hvem kan se hvad", p: [
+      "Kontoret kan se dine opgaver, din registrerede tid og din løn. Det skal de for at kunne planlægge og udbetale.",
+      "Dine kolleger kan ikke se din løn, dine noter eller dine adgangskoder. Det er ikke bare skjult på skærmen — databasen afviser det.",
+      "Uden for huset: databasen ligger hos Supabase i Frankfurt. Mails sendes gennem Brevo i Frankrig. Beregningen af afstande sker hos et tysk ruteberegningsfirma og hos statens adresseregister, som får adressen men ikke dit navn.",
+      "Beskeder på telefonen går gennem Apple og Google. Indholdet er krypteret undervejs — de kan ikke læse, hvad der står.",
+      "Lønfilen sendes ikke automatisk nogen steder. Kontoret henter den som en fil og lægger den selv op i Danløn.",
+    ] },
+  { t: "Hvor længe, og dine rettigheder", p: [
+      "Stopper du, slettes dit login og din arbejdsmail med det samme, og du bliver logget ud af alle telefoner.",
+      "Dit navn og dokumentationen for løn og kørsel bliver stående. Den skal kunne fremvises år efter — også hvis du selv får brug for den.",
+      "Billeder på opgaver slettes automatisk efter 12 måneder. Adgangskoder til kundernes hjem slettes tre måneder efter, at opgaven er afsluttet.",
+      "Du har ret til at se, hvad vi har om dig, og til at få rettet noget der er forkert. Spørg kontoret.",
+      "Beskeder på telefonen slår du selv til og fra under dine indstillinger.",
+    ] },
 ];
 const HELP_EN = [
   { t: "Finding your way there", p: [
@@ -1538,6 +1570,35 @@ const HELP_EN = [
       "Cannot see your jobs? Check you are on the right week and day.",
       "A job is missing? Contact the office — they can move it.",
       "App stuck? Close the page and open it again." ] },
+  { t: "Your personal data", p: [
+      "Jammerbugt Rengøring is responsible for the information the app stores about you. This is exactly what it is.",
+      "About you: your name, your work email, your language choice, your usual start time, your skills and the areas you cover.",
+      "Your home address, if you are on an arrangement where travel from home counts as working time. It is used only to calculate the distance to the first job of the day — nothing else.",
+      "About your work: which jobs you are assigned, when you logged time, how long, and the messages you send to the office.",
+      "About your pay: your hourly rate and previous rates, whether you have the weekend supplement and holiday pay, and your employee number in Danløn.",
+      "Absence is recorded as absence. It never says why you were away.",
+      "If you turn notifications on, a technical address for your phone is stored so the message can reach you.",
+    ] },
+  { t: "What the app does not store", p: [
+      "The app does not track you. There is no GPS and no location tracking — neither during working hours nor outside them. Mileage is calculated from the addresses of your jobs, not from where your phone has been.",
+      "There is no civil registration number anywhere in the system. The payroll file uses your Danløn number.",
+      "There are no bank details and no account number.",
+      "There is no health information, no diagnoses and no reasons for sickness.",
+    ] },
+  { t: "Who can see what", p: [
+      "The office can see your jobs, your logged time and your pay. They need to, in order to plan and to pay you.",
+      "Your colleagues cannot see your pay, your notes or your access codes. It is not merely hidden on screen — the database refuses it.",
+      "Outside the company: the database is hosted by Supabase in Frankfurt. Email is sent through Brevo in France. Distances are calculated by a German routing service and by the Danish state address register, which receive the address but not your name.",
+      "Notifications travel through Apple and Google. The content is encrypted on the way — they cannot read what it says.",
+      "The payroll file is not sent anywhere automatically. The office downloads it as a file and uploads it to Danløn themselves.",
+    ] },
+  { t: "How long, and your rights", p: [
+      "If you leave, your login and work email are deleted immediately, and you are signed out on every phone.",
+      "Your name and the documentation of pay and mileage remain. It has to be available years later — including if you need it yourself.",
+      "Photos on jobs are deleted automatically after 12 months. Access codes to customers' homes are deleted three months after the job is completed.",
+      "You have the right to see what we hold about you, and to have anything incorrect corrected. Ask the office.",
+      "Notifications on your phone are yours to turn on and off under your settings.",
+    ] },
 ];
 
 // Udskriver vejledningen som den staar i appen. Hjaelpeteksten er kilden — der
