@@ -1411,6 +1411,7 @@ const HELP_DA = [
       "«Heraf weekend» er de timer, der udløser weekendtillæg, hvis du er på den ordning.",
       "Med pilene øverst kan du gå tilbage i tiden. Du kan se denne måned og elleve måneder tilbage.",
       "Passer et tal ikke med det, du husker, så tag fat i kontoret med datoen og opgaven. Så kan I kigge på det samme.",
+      "Er du planlægger og har valgt en kollega under «Se plan for», viser siden hendes tal og ikke dine. Hendes navn står i overskriften, og der er en orange bjælke øverst.",
     ] },
   { t: "Din kørsel", p: [
       "Under fanen Kørsel — samme sted som timerne — ser du din beregnede kørsel.",
@@ -1579,6 +1580,7 @@ const HELP_EN = [
       "\"Of which weekend\" is the hours that trigger the weekend supplement, if you are on that arrangement.",
       "Use the arrows at the top to go back in time. You can see this month and eleven months back.",
       "If a figure does not match what you remember, contact the office with the date and the job. Then you are both looking at the same thing.",
+      "If you are a planner and have selected a colleague under \"Se plan for\", the page shows her figures, not yours. Her name is in the heading and an orange bar appears at the top.",
     ] },
   { t: "Your mileage", p: [
       "The Driving tab — same place as your hours — shows your calculated mileage.",
@@ -4979,6 +4981,10 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
         <TidOgKmPage
           lang={lang}
           supabaseClient={supabase}
+          // Foelger «Se plan for». Uden det saa kontoret sine egne timer, mens de
+          // troede, de hjalp hende med hendes — og gav hende svar paa et forkert tal.
+          visEmpId={viewingOther ? viewEmpId : null}
+          visEmpNavn={viewedEmployee?.name || ""}
           onClose={() => setShowKm(false)}
         />
       )}
@@ -5471,12 +5477,15 @@ function timerTekst(minutter, da) {
   return da ? s.replace(".", ",") : s;
 }
 
-// Bevidst INGEN employee-prop. Siden viser altid den indloggedes egne tal, fordi
-// mine_timer og mine_km slaar op paa auth.uid() i databasen. Tog komponenten et
-// medarbejder-id ind, ville den se ud som om man kunne bede om en andens timer — og
-// den misforstaaelse er farlig at efterlade i koden paa netop den her side.
-function TidOgKmPage({ lang, supabaseClient, onClose }) {
+// visEmpId er den medarbejder, kontoret har valgt i «Se plan for». Er den tom, viser
+// siden den indloggedes egne tal.
+//
+// Selve afgoerelsen af, om man MAA se en anden, ligger ikke her. Databasen ser bort
+// fra id'et, med mindre kalderen er planlaegger — laa afgoerelsen i appen, kunne den
+// omgaas ved at kalde API'et direkte. Her bruges det kun til at vise det rigtige navn.
+function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
   const da = lang === "da";
+  const anden = !!visEmpId;
   const nu = new Date();
   const [fane, setFane] = useState("timer");
   const [aar, setAar] = useState(nu.getFullYear());
@@ -5505,8 +5514,8 @@ function TidOgKmPage({ lang, supabaseClient, onClose }) {
     (async () => {
       setHenter(true); setFejl("");
       const [t, k] = await Promise.all([
-        supabaseClient.rpc("mine_timer", { p_aar: aar, p_maaned: maaned }),
-        supabaseClient.rpc("mine_km",    { p_aar: aar, p_maaned: maaned }),
+        supabaseClient.rpc("mine_timer", { p_aar: aar, p_maaned: maaned, p_emp: visEmpId || null }),
+        supabaseClient.rpc("mine_km",    { p_aar: aar, p_maaned: maaned, p_emp: visEmpId || null }),
       ]);
       if (afbrudt) return;
       // Fejlen maa ikke kastes vaek. En tom liste og "kunne ikke hente" ser ens ud for
@@ -5522,7 +5531,7 @@ function TidOgKmPage({ lang, supabaseClient, onClose }) {
       setHenter(false);
     })();
     return () => { afbrudt = true; };
-  }, [aar, maaned, supabaseClient]);
+  }, [aar, maaned, supabaseClient, visEmpId]);
 
   // Summerne. Godkendt regnes af de linjer der HAR flueben — ikke af alt.
   const sum = timer.reduce((a, r) => ({
@@ -5564,8 +5573,16 @@ function TidOgKmPage({ lang, supabaseClient, onClose }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "calc(14px + env(safe-area-inset-top)) 16px 12px",
                     borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 17 }}>
-          {da ? "Min tid og kørsel" : "My time and driving"}
+        {/* Navnet i overskriften, ikke «Min». Siden ligger over hele skaermen, saa
+            baanderet ude i planen om at man ser en kollega er skjult imens — og saa
+            ville kontoret sidde og kigge paa hendes timer under overskriften «Min
+            tid». Det er den slags, der bliver til en forkert besked til en
+            medarbejder. */}
+        <div style={{ fontWeight: 700, fontSize: 17, minWidth: 0, paddingRight: 10,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {anden
+            ? (visEmpNavn || (da ? "Kollegas tid og kørsel" : "Colleague's time and driving"))
+            : (da ? "Min tid og kørsel" : "My time and driving")}
         </div>
         <button onClick={onClose} aria-label={da ? "Luk" : "Close"}
           style={{ border: "none", background: "#F1F5F9", borderRadius: 8, width: 34, height: 34,
@@ -5573,6 +5590,14 @@ function TidOgKmPage({ lang, supabaseClient, onClose }) {
           <X size={17} />
         </button>
       </div>
+
+      {anden && (
+        <div style={{ background: "#FFF7ED", borderLeft: "4px solid #C2410C", color: "#9A3412",
+                      padding: "9px 14px", fontSize: 12.5, lineHeight: 1.45, flexShrink: 0 }}>
+          {da ? "Du ser en kollegas tal. Kun visning."
+              : "You are viewing a colleague's figures. View only."}
+        </div>
+      )}
 
       <div style={{ display: "flex", borderBottom: "1px solid #F1F5F9", padding: "0 16px", flexShrink: 0 }}>
         {[["timer", da ? "Timer" : "Hours"], ["km", da ? "Kørsel" : "Driving"]].map(([k, l]) => (
