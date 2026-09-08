@@ -1411,6 +1411,7 @@ const HELP_DA = [
       "«Heraf weekend» er de timer, der udløser weekendtillæg, hvis du er på den ordning.",
       "Med pilene øverst kan du gå tilbage i tiden. Du kan se denne måned og elleve måneder tilbage.",
       "Passer et tal ikke med det, du husker, så tag fat i kontoret med datoen og opgaven. Så kan I kigge på det samme.",
+      "Er du med på en opgave for at lære, står det på opgaven. Registrér din tid som altid — den tæller på din løn præcis som alt andet. Det er kun kundens faktura, den ikke går på.",
       "Er du planlægger og har valgt en kollega under «Se plan for», viser siden hendes tal og ikke dine. Hendes navn står i overskriften, og der er en orange bjælke øverst.",
     ] },
   { t: "Din kørsel", p: [
@@ -1581,6 +1582,7 @@ const HELP_EN = [
       "\"Of which weekend\" is the hours that trigger the weekend supplement, if you are on that arrangement.",
       "Use the arrows at the top to go back in time. You can see this month and eleven months back.",
       "If a figure does not match what you remember, contact the office with the date and the job. Then you are both looking at the same thing.",
+      "If you are on a job to learn, it says so on the job. Log your time as usual — it counts towards your pay just like anything else. It is only the customer's invoice it does not go on.",
       "If you are a planner and have selected a colleague under \"Se plan for\", the page shows her figures, not yours. Her name is in the heading and an orange bar appears at the top.",
     ] },
   { t: "Your mileage", p: [
@@ -3253,6 +3255,9 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
   const t = translatedTask || task;
   const myLogged = (task.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
   const totalLogged = (task.timeLog || []).reduce((s, l) => s + (l.minutes || 0), 0);
+  // Er hun med for at laere paa netop denne opgave? Det er kontoret der saetter det,
+  // og kun paa den enkelte opgave — hun kan sagtens vaere fast paa sine egne samme uge.
+  const migUnderOplaering = (task.oplaering || []).includes(employee.id);
   const done = !!((task.completed_by_employee || {})[employee.id]);
   const clProg = { done: (task.checklist || []).filter((i) => i.done).length, total: (task.checklist || []).length };
   const mapsUrl = task.address
@@ -3287,6 +3292,21 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
           </div>
           <div style={s.sheetTitle}>{t.title}</div>
           <div style={s.sheetMeta}>{fmtMin(t.duration)}{clProg.total > 0 ? ` · ${clProg.done}/${clProg.total} ${tr.tasks.toLowerCase()}` : ""}</div>
+
+          {/* Ordlyden er vigtig. Ser hun bare «oplaering», er den naerliggende tanke
+              at tiden saa ikke taeller — og saa holder hun op med at registrere den.
+              Derfor staar loennen foerst og forklaringen bagefter. */}
+          {migUnderOplaering && (
+            <div style={{ background: "#FEF3C7", borderRadius: 10, padding: "11px 13px",
+                          marginTop: 10, fontSize: 13, lineHeight: 1.5, color: "#92400E" }}>
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                {lang === "da" ? "Du er med på denne opgave for at lære" : "You are on this job to learn"}
+              </div>
+              {lang === "da"
+                ? "Registrér din tid som altid — den kommer på din lønseddel. Kunden faktureres kun for den, der udfører opgaven."
+                : "Log your time as usual — it goes on your payslip. The customer is only invoiced for the person doing the job."}
+            </div>
+          )}
 
           {/* Customer + address + navigation + Nexus link */}
           {/* Nexus-knappen skal ogsaa vises paa opgaver UDEN kunde og adresse.
@@ -3579,6 +3599,12 @@ function TaskCard({ seg, employee, lang, onClick }) {
             inde i opgaven — hun skal se det inden hun koerer, ikke naar hun staar der. */}
         {t.needsKeyPickup && (
           <div style={s.noegleMaerke}>🔑 {lang === "da" ? "Hent nøgle/adgangskort på kontoret" : "Pick up key or access card at the office"}</div>
+        )}
+        {(t.oplaering || []).includes(employee.id) && (
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#92400E", background: "#FEF3C7",
+                        borderRadius: 8, padding: "5px 8px", marginTop: 6 }}>
+            {lang === "da" ? "Du er med for at lære" : "You are here to learn"}
+          </div>
         )}
         <div style={s.taskMeta}>
           <span style={s.taskDuration}>{fmtMin(t.duration)}</span>
@@ -4443,6 +4469,9 @@ useEffect(() => {
             ...i,
             timeLog: i.time_log ?? [],
             requiredSkills: i.required_skills ?? [],
+            // Hvem der er med paa DENNE opgave for at laere. Sat af kontoret pr.
+            // opgave — hun kan sagtens vaere fast paa sine egne opgaver samme uge.
+            oplaering: i.oplaering_medarbejdere ?? [],
             customerName: i.customer_name || "",
             address: i.address_text || "",
             // Referencen. Paa kommunale opgaver staar BORGERENS navn her, mens
