@@ -5628,7 +5628,7 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
         <div style={{ fontWeight: 700, fontSize: 17, minWidth: 0, paddingRight: 10,
                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {anden
-            ? (visEmpNavn || (da ? "Kollegas tid og kørsel" : "Colleague's time and driving"))
+            ? (medSolsikke(visEmpNavn) || (da ? "Kollegas tid og kørsel" : "Colleague's time and driving"))
             : (da ? "Min tid og kørsel" : "My time and driving")}
         </div>
         <button onClick={onClose} aria-label={da ? "Luk" : "Close"}
