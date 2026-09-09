@@ -687,22 +687,32 @@ function useSynligHoejde() {
 // DEN MAA ALDRIG NAA DATA. Mails, loenfilen og alt der sendes videre laeser navnet
 // fra employees.name og roerer ikke den her funktion. Solsikken saettes foerst naar
 // navnet TEGNES. Laa den i datalaget, ville den foer eller siden staa i en faktura.
-const SOLSIKKE_NAVN = "Charlotte Thorsager Kronborg";
-const SOLSIKKE_SEERE = ["Charlotte Thorsager Kronborg", "Jonna Jensen IT"];
+// Charlotte findes paa sit id og ikke paa sit navn. Foerste udgave slog op paa
+// navnetekst, og listen indeholdt "Jonna Jensen IT" — en medarbejder der siden er
+// omdoebt til "Udvikler IT". Dermed holdt solsikken op med at vise sig, uden at nogen
+// kunne se hvorfor: der var ingen fejl, kun en streng der ikke passede paa noget mere.
+const SOLSIKKE_ID = "e5";                  // Charlotte Thorsager Kronborg
 
-let solsikkeSeer = "";
-function saetSolsikkeSeer(navn) { solsikkeSeer = navn || ""; }
+// Hvem der maa se den: alle planlaeggere. Ikke en liste over bestemte personer.
+//
+// En navngiven liste skal vedligeholdes, og det er lige praecis dét, der gik galt
+// foerste gang. Kontoret skifter desuden mellem medarbejdere hele tiden — det skal
+// vaere den, der SIDDER ved planen, der ser den, uanset hvem hun kigger paa.
+let solsikkeSeerErPlanlaegger = false;
+function saetSolsikkeSeer(erPlanlaegger) { solsikkeSeerErPlanlaegger = !!erPlanlaegger; }
 
-function medSolsikke(navn) {
-  if (navn !== SOLSIKKE_NAVN) return navn;
-  return SOLSIKKE_SEERE.includes(solsikkeSeer) ? navn + " \u{1F33B}" : navn;
+function medSolsikke(navn, empId) {
+  if (empId !== SOLSIKKE_ID) return navn;
+  return solsikkeSeerErPlanlaegger ? navn + " \u{1F33B}" : navn;
 }
 
 // Initialerne i den runde knap. Er det Charlotte selv der er logget ind, staar der
 // en solsikke i stedet for "CT" — det er hendes app, og hun ved godt hvem hun er.
 // Alle andre faar deres egne initialer som foer.
-function avatarTegn(navn) {
-  if (navn === SOLSIKKE_NAVN && solsikkeSeer === SOLSIKKE_NAVN) return "\u{1F33B}";
+function avatarTegn(navn, empId) {
+  // Avataren i hjoernet er altid den indloggedes egen, saa er id'et Charlottes, er
+  // det Charlotte selv der kigger. Ingen grund til ogsaa at spoerge om seeren.
+  if (empId === SOLSIKKE_ID) return "\u{1F33B}";
   return (navn || "").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
@@ -3718,7 +3728,7 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
   const da = lang === "da";
   const [underside, setUnderside] = useState(null);   // null | "sprog" | "dag"
 
-  const initialer = avatarTegn(employee.name);
+  const initialer = avatarTegn(employee.name, employee.id);
 
   const raekke = {
     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
@@ -3774,7 +3784,7 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
                         fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{initialer}</div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap",
-                          overflow: "hidden", textOverflow: "ellipsis" }}>{medSolsikke(employee.name)}</div>
+                          overflow: "hidden", textOverflow: "ellipsis" }}>{medSolsikke(employee.name, employee.id)}</div>
             <div style={{ fontSize: 12, opacity: 0.65 }}>
               {da ? "Indstillinger" : "Settings"}
             </div>
@@ -4413,7 +4423,7 @@ useEffect(() => {
         return;
       }
       // Paaskeaegget: se medSolsikke().
-      saetSolsikkeSeer(empData?.name);
+      saetSolsikkeSeer(empData?.is_admin);
       if (!empData) { setDataLoading(false); return; }
       setKopiHentet(null);
       // Hvem der sidst var logget ind. Uden den kan vi ikke finde den rigtige kopi
@@ -4859,7 +4869,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             style={{ ...s.signOutBtn, display:"flex", alignItems:"center", gap:6, color:"#E2E8F0", fontSize:13, fontWeight:600 }}
             onClick={() => setShowProfile((v) => !v)}>
             <span style={{ width:28, height:28, borderRadius:"50%", background:"#D6247A", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>
-              {avatarTegn(employee.name)}
+              {avatarTegn(employee.name, employee.id)}
             </span>
           </button>
         </div>
@@ -5628,7 +5638,7 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
         <div style={{ fontWeight: 700, fontSize: 17, minWidth: 0, paddingRight: 10,
                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {anden
-            ? (medSolsikke(visEmpNavn) || (da ? "Kollegas tid og kørsel" : "Colleague's time and driving"))
+            ? (medSolsikke(visEmpNavn, visEmpId) || (da ? "Kollegas tid og kørsel" : "Colleague's time and driving"))
             : (da ? "Min tid og kørsel" : "My time and driving")}
         </div>
         <button onClick={onClose} aria-label={da ? "Luk" : "Close"}
