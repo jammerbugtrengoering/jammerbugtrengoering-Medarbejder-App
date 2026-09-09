@@ -1411,6 +1411,7 @@ const HELP_DA = [
       "«Heraf weekend» er de timer, der udløser weekendtillæg, hvis du er på den ordning.",
       "Med pilene øverst kan du gå tilbage i tiden. Du kan se denne måned og elleve måneder tilbage.",
       "Passer et tal ikke med det, du husker, så tag fat i kontoret med datoen og opgaven. Så kan I kigge på det samme.",
+      "Er I flere på en opgave, kan kontoret have fordelt timerne ulige. Den tid der foreslås, når du afslutter, er DIN andel — ikke hele opgavens.",
       "Er du med på en opgave for at lære, står det på opgaven. Registrér din tid som altid — den tæller på din løn præcis som alt andet. Det er kun kundens faktura, den ikke går på.",
       "Er du planlægger og har valgt en kollega under «Se plan for», viser siden hendes tal og ikke dine. Hendes navn står i overskriften, og der er en orange bjælke øverst.",
     ] },
@@ -1582,6 +1583,7 @@ const HELP_EN = [
       "\"Of which weekend\" is the hours that trigger the weekend supplement, if you are on that arrangement.",
       "Use the arrows at the top to go back in time. You can see this month and eleven months back.",
       "If a figure does not match what you remember, contact the office with the date and the job. Then you are both looking at the same thing.",
+      "If several of you are on a job, the office may have split the hours unevenly. The time suggested when you finish is YOUR share — not the whole job.",
       "If you are on a job to learn, it says so on the job. Log your time as usual — it counts towards your pay just like anything else. It is only the customer's invoice it does not go on.",
       "If you are a planner and have selected a colleague under \"Se plan for\", the page shows her figures, not yours. Her name is in the heading and an orange bar appears at the top.",
     ] },
@@ -2722,8 +2724,20 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
   // saa meget arbejde i alt — ellers ville to der begge gjorde praecis som planlagt
   // faa besked om at de havde overskredet tiden med 100 %.
   const antalPaa = Math.max(1, (task.assignees || []).length);
-  const minEgenTid = task.duration || 0;
-  const planlagt = minEgenTid * antalPaa;
+  // HENDES andel, ikke opgavens varighed. Er timerne fordelt — fx ti timer delt
+  // fire-fire-to — skal hendes skaerm starte paa hendes egne fire timer. Ellers ville
+  // hun faa gennemsnittet foreslaaet og se ud til at overskride med det samme.
+  //
+  // Er der ikke fordelt, er andelen opgavens varighed, praecis som foer.
+  const fordeling = task.tidFordeling || task.tid_fordeling || {};
+  const minEgenTid = Number(fordeling[employee.id]) > 0
+    ? Math.round(Number(fordeling[employee.id]))
+    : (task.duration || 0);
+  // Alt planlagt arbejde paa opgaven: summen af andelene, hvis der er fordelt.
+  const planlagt = Object.keys(fordeling).length > 0
+    ? (task.assignees || []).reduce((sum, id) => sum
+        + (Number(fordeling[id]) > 0 ? Math.round(Number(fordeling[id])) : (task.duration || 0)), 0)
+    : minEgenTid * antalPaa;
   // Hvad HUN selv har registreret. Startvaerdien skal vaere hendes egen resterende
   // tid, ikke opgavens — ellers ville hun faa kollegaens andel foreslaaet.
   const migLoggede = (task.timeLog || [])
@@ -4472,6 +4486,8 @@ useEffect(() => {
             // Hvem der er med paa DENNE opgave for at laere. Sat af kontoret pr.
             // opgave — hun kan sagtens vaere fast paa sine egne opgaver samme uge.
             oplaering: i.oplaering_medarbejdere ?? [],
+            // Fordelingen af timer mellem dem der er paa. Tom = alle bruger duration.
+            tidFordeling: i.tid_fordeling ?? {},
             customerName: i.customer_name || "",
             address: i.address_text || "",
             // Referencen. Paa kommunale opgaver staar BORGERENS navn her, mens
