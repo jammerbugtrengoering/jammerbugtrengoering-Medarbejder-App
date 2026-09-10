@@ -2898,10 +2898,21 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
       }
       // Nexus-kvitteringen er ikke en spaerring, men den skal registreres — ogsaa
       // naar fluebenet IKKE er sat, saa kontoret kan foelge op paa netop de opgaver.
+      //
+      // Her blev der kastet ved alt andet end netvaerksfejl, og det kostede seks
+      // opgaver mellem 24. august og 10. september: vagten paa instances kendte ikke
+      // nexus_confirmed og afviste skrivningen med 42501. Fordi kastet skete FOER
+      // onSetStatus, blev opgaven aldrig lukket. Tiden var registreret, opgaven stod
+      // som planlagt, og kunden fik ingen regning — for et flueben der udtrykkeligt
+      // ikke maa spaerre for noget.
+      //
+      // Derfor: kvitteringen kan aldrig vaelte afslutningen. Gaar skrivningen ikke
+      // igennem, ryger den i koeen. Afviser databasen den ogsaa der, smider koeen den
+      // vaek og skriver i konsollen — og opgaven er stadig lukket, hvilket er det der
+      // baerer loen, koersel og fakturering.
       if (erNexus) {
         const { error: nxErr } = await supabaseClient
           .from("instances").update({ nexus_confirmed: nexusOk }).eq("id", task.id);
-        if (nxErr && !erNetvaerksfejl(nxErr)) throw new Error(nxErr.message);
         if (nxErr) await koeTilfoej({ art: "nexus", args: { opgaveId: task.id, bekraeftet: nexusOk } });
       }
       // Bekraeftelsen binder udleveringen til DENNE opgave, og foerst der kan varerne
