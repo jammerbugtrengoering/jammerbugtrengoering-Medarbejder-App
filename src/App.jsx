@@ -4316,8 +4316,11 @@ export default function MedarbejderApp() {
   const [manglerHenter, setManglerHenter] = useState(true);
   const [manglerFejl, setManglerFejl] = useState("");
   // Trykker hun paa en opgave fra en anden uge, skal planen foerst hente den uge.
-  // Id'et parkeres her, og opgaven aabnes naar ugen er hjemme.
+  // Opgaven parkeres her — id OG uge — og aabnes naar netop den uge er hjemme.
   const [aabnNaarKlar, setAabnNaarKlar] = useState(null);
+  // Den uge der rent faktisk ligger i instances lige nu. Se kommentaren ved
+  // setIndlaestUge i hentningen: weekOffset skifter foer dataene er byttet ud.
+  const [indlaestUge, setIndlaestUge] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
@@ -4466,6 +4469,7 @@ useEffect(() => {
         if (kopi) {
           setEmployee(kopi.employee);
           setInstances(kopi.instances || []);
+          setIndlaestUge({ aar: a, uge: u });
           if (kopi.travelSettings) setTravelSettings(kopi.travelSettings);
           setKopiHentet(kopi.hentet);
           setDataLoading(false);
@@ -4571,6 +4575,13 @@ useEffect(() => {
         });
 
       setInstances(myInstances);
+      // Hvilken uge staar der faktisk i instances nu?
+      //
+      // weekOffset kan ikke bruges til det: den skifter med det samme, mens
+      // hentningen tager tid, saa i det oejeblik peger de to hver sin vej. Det var
+      // praecis dét, der fik «aabn opgaven fra manglelisten» til at give op og bare
+      // vise ugeoversigten — den ledte efter opgaven i den GAMLE uges data.
+      setIndlaestUge({ aar: targetYear, uge: targetWeek });
 
       const { data: travel } = await supabase.from("travel_settings").select("*").eq("id", "default").single();
       const { data: overrides } = await supabase.from("travel_overrides").select("*");
@@ -4641,28 +4652,35 @@ useEffect(() => {
     return () => { afbrudt = true; };
   }, [session?.user?.id, instances, viewingOther, viewEmpId]);
 
-  // Ugen er hentet — nu kan den opgave, hun trykkede paa, aabnes.
+  // Den rigtige uge er hentet — nu kan den opgave, hun trykkede paa, aabnes.
   //
-  // Findes den ikke i den hentede uge, ryddes oensket alligevel. Ellers ville appen
-  // sidde og vente paa en opgave, der fx er slettet af kontoret i mellemtiden, og
-  // aabne den naeste gang ugen tilfaeldigvis blev hentet igen.
+  // Der ventes paa indlaestUge og ikke paa dataLoading. Da det var dataLoading, kom
+  // effekten til at koere i det oejeblik, hvor weekOffset allerede var skiftet, mens
+  // instances endnu var den gamle uge og hentningen ikke var naaet at melde sig i
+  // gang. Saa blev opgaven ikke fundet, oensket blev ryddet, og hun endte paa
+  // ugeoversigten i stedet for inde i opgaven. Det virkede paa telefonen og faldt i
+  // browseren — forskellen var alene, hvor hurtigt svaret kom.
+  //
+  // Findes opgaven ikke i den uge, den hoerer til, ryddes oensket alligevel: saa er
+  // den fjernet af kontoret i mellemtiden, og appen skal ikke vente paa den for evigt.
   useEffect(() => {
-    if (!aabnNaarKlar || dataLoading) return;
-    const t = instances.find((x) => x.id === aabnNaarKlar);
+    if (!aabnNaarKlar || !indlaestUge) return;
+    if (indlaestUge.aar !== aabnNaarKlar.aar || indlaestUge.uge !== aabnNaarKlar.uge) return;
+    const t = instances.find((x) => x.id === aabnNaarKlar.id);
     if (t) setOpenTask(t);
     setAabnNaarKlar(null);
-  }, [aabnNaarKlar, instances, dataLoading]);
+  }, [aabnNaarKlar, instances, indlaestUge]);
 
   // Fra listen over manglende til selve opgaven.
   function aabnManglende(m) {
     setVisMangler(false);
     setDay(m.dag);
-    const delta = ugerFraNu(m.aar, m.uge);
     const t = instances.find((x) => x.id === m.opgave_id);
-    // Er opgaven allerede hentet, aabnes den med det samme. Ellers skiftes ugen, og
-    // den anden effekt tager over, naar dataene er hjemme.
-    if (delta === weekOffset && t) setOpenTask(t);
-    else { setAabnNaarKlar(m.opgave_id); setWeekOffset(delta); }
+    // Er opgaven allerede hentet, aabnes den med det samme — saa skal skaermen ikke
+    // blinke gennem en hentning for ingenting.
+    if (t) { setOpenTask(t); return; }
+    setAabnNaarKlar({ id: m.opgave_id, aar: m.aar, uge: m.uge });
+    setWeekOffset(ugerFraNu(m.aar, m.uge));
   }
 
   // Returnerer true/false. Afslutningsflowet er nødt til at kunne se om det gik godt:
