@@ -399,6 +399,10 @@ const T = {
     gapsLead: (n) => (n === 1
       ? "Der er én opgave, du mangler at gøre færdig."
       : `Der er ${n} opgaver, du mangler at gøre færdig.`),
+    gapsLeadOther: (n, navn) => (n === 1
+      ? `${navn} mangler at gøre én opgave færdig.`
+      : `${navn} mangler at gøre ${n} opgaver færdige.`),
+    gapsNoneOther: (navn) => `${navn} mangler ingenting. Alt er registreret og afsluttet.`,
     gapsHint: "Tryk på en opgave for at åbne den. Ældste øverst — de er tættest på at gå tabt.",
     gapsMonthWarn: "Når måneden lukker, kan timerne og kørslen ikke længere komme med på lønnen.",
     gapsNeedTime: "tid",
@@ -574,6 +578,10 @@ const T = {
     gapsLead: (n) => (n === 1
       ? "There is one job you still need to finish."
       : `There are ${n} jobs you still need to finish.`),
+    gapsLeadOther: (n, navn) => (n === 1
+      ? `${navn} has one job left to finish.`
+      : `${navn} has ${n} jobs left to finish.`),
+    gapsNoneOther: (navn) => `${navn} is not missing anything. Everything is registered and completed.`,
     gapsHint: "Tap a job to open it. Oldest first — those are closest to being lost.",
     gapsMonthWarn: "Once the month closes, the hours and mileage can no longer go to payroll.",
     gapsNeedTime: "time",
@@ -1404,6 +1412,7 @@ const HELP_DA = [
       "Tryk på det, og du får hele listen — også opgaver fra tidligere uger, som du ellers skulle bladre tilbage for at finde. Ældste står øverst, for det er dem, der er tættest på at gå tabt.",
       "Tryk på en opgave i listen, så åbner den, og du kan registrere og afslutte med det samme. Den forsvinder fra listen, og tallet tæller ned.",
       "Er der intet udråbstegn, mangler du ingenting. Det er den samme opgørelse, som påmindelsesmailen kl. 18 bruger — de kan ikke komme til at sige hver sit.",
+      "Til kontoret: vælger du en kollega under «Se plan for», viser udråbstegnet hendes tal og hendes liste, så I kan hjælpe hende over telefonen. Det er kun visning — I kan ikke registrere for hende.",
       "Husk: når måneden lukker, kan timer og kørsel fra den måned ikke længere komme med på lønnen." ] },
   { t: "Nexus-borgere", p: [
       "Er opgaven hos en Nexus-borger, står det øverst på opgaven, og der er en knap til at åbne KMD Nexus.",
@@ -1582,6 +1591,7 @@ const HELP_EN = [
       "Tap it to see the whole list — including jobs from earlier weeks that you would otherwise have to page back to find. Oldest first, because those are closest to being lost.",
       "Tap a job in the list and it opens, so you can log the time and finish it right away. It then disappears from the list, and the number counts down.",
       "No warning icon means you are not missing anything. It is the same reckoning the 6 pm reminder email uses — the two cannot disagree.",
+      "For the office: pick a colleague under \"Se plan for\" and the warning icon shows her count and her list, so you can help her over the phone. View only — you cannot register on her behalf.",
       "Remember: once the month closes, hours and mileage from that month can no longer go to payroll." ] },
   { t: "Nexus citizens", p: [
       "If the job is for a Nexus citizen, it says so at the top of the job, and there is a button to open KMD Nexus.",
@@ -4609,22 +4619,27 @@ useEffect(() => {
   // taeller ned mens hun arbejder. Et tal, der bliver staaende efter man har gjort
   // arbejdet, er vaerre end intet tal.
   //
-  // Kigger en planlaegger paa en kollegas uge, hentes der ikke: mine_manglende()
-  // svarer altid for den der er logget ind, og tallet ville altsaa vaere HENDES eget
-  // mens skaermen viser en andens plan.
+  // Opslaget FOELGER «Se plan for». Det er ikke pynt: foerste udgave gemte bare
+  // ikonet, naar kontoret kiggede paa en kollega — for ellers stod planlaeggerens
+  // eget tal over hendes plan. Men saa kunne kontoret ikke se, hvad hun manglede,
+  // netop naar de havde hende i roeret, og det er dér, spoergsmaalet stilles.
+  //
+  // Vagten ligger i databasen: kun en administrator kan pege paa en anden. Sender en
+  // almindelig medarbejder et id ind, faar hun stille og roligt sine egne.
   useEffect(() => {
-    if (!session?.user?.id || viewingOther) return;
+    if (!session?.user?.id) return;
     let afbrudt = false;
     (async () => {
       setManglerHenter(true); setManglerFejl("");
-      const { data, error } = await supabase.rpc("mine_manglende");
+      const { data, error } = await supabase.rpc("mine_manglende",
+        { p_emp: viewingOther ? viewEmpId : null });
       if (afbrudt) return;
       if (error) { setManglerFejl(error.message); setMangler([]); }
       else setMangler(data || []);
       setManglerHenter(false);
     })();
     return () => { afbrudt = true; };
-  }, [session?.user?.id, instances, viewingOther]);
+  }, [session?.user?.id, instances, viewingOther, viewEmpId]);
 
   // Ugen er hentet — nu kan den opgave, hun trykkede paa, aabnes.
   //
@@ -4943,7 +4958,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
               ville koste plads hver eneste dag for at sige "ingenting".
               Naar det saa dukker op, betyder det noget — og saa skal tallet med,
               for «du mangler noget» og «du mangler sytten ting» er ikke samme besked. */}
-          {!viewingOther && mangler.length > 0 && (
+          {mangler.length > 0 && (
             <button
               style={{ position:"relative", border:"none", background:"#FEF3C7", color:"#B45309", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
               onClick={() => setVisMangler(true)}
@@ -5160,6 +5175,11 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
         <ManglerPage
           lang={lang} tr={tr}
           raekker={mangler} henter={manglerHenter} fejl={manglerFejl}
+          // Navnet med, naar det er en kollegas. Siden ligger over hele skaermen, saa
+          // baanderet om at man ser en anden er skjult imens — og saa ville kontoret
+          // sidde og kigge paa hendes liste under overskriften «Det du mangler».
+          visEmpId={viewingOther ? viewEmpId : null}
+          visEmpNavn={viewingOther ? (viewedEmployee?.name || "") : ""}
           onAabn={aabnManglende}
           onClose={() => setVisMangler(false)}
         />
@@ -5683,8 +5703,9 @@ function timerTekst(minutter, da) {
 // AEldste oeverst. Det er ikke en smagssag: naar maaneden lukker, er det de gamle
 // opgaver, der falder ud af loennen, og de nyeste kan hun altid naa. En liste med
 // nyeste foerst ville begrave netop dem, det haster med.
-function ManglerPage({ lang, tr, raekker, henter, fejl, onAabn, onClose }) {
+function ManglerPage({ lang, tr, raekker, henter, fejl, visEmpId, visEmpNavn, onAabn, onClose }) {
   const da = lang === "da";
+  const anden = !!visEmpNavn;
   const manglerTekst = (m) => (m === "tid og udført" ? tr.gapsNeedBoth
                              : m === "tid" ? tr.gapsNeedTime
                              : tr.gapsNeedDone);
@@ -5702,7 +5723,7 @@ function ManglerPage({ lang, tr, raekker, henter, fejl, onAabn, onClose }) {
                     borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 17, minWidth: 0, paddingRight: 10,
                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {tr.gapsTitle}
+          {anden ? medSolsikke(visEmpNavn, visEmpId) : tr.gapsTitle}
         </div>
         <button onClick={onClose} aria-label={da ? "Luk" : "Close"}
           style={{ border: "none", background: "#F1F5F9", borderRadius: 8, width: 34, height: 34,
@@ -5710,6 +5731,14 @@ function ManglerPage({ lang, tr, raekker, henter, fejl, onAabn, onClose }) {
           <X size={17} />
         </button>
       </div>
+
+      {anden && (
+        <div style={{ background: "#FFF7ED", borderLeft: "4px solid #C2410C", color: "#9A3412",
+                      padding: "9px 14px", fontSize: 12.5, lineHeight: 1.45, flexShrink: 0 }}>
+          {da ? "Du ser en kollegas liste. Kun visning — du kan ikke registrere for hende."
+              : "You are viewing a colleague's list. View only — you cannot register on her behalf."}
+        </div>
+      )}
 
       <div style={{ flex: 1, overflowY: "auto",
                     padding: "14px 16px calc(28px + env(safe-area-inset-bottom))" }}>
@@ -5730,15 +5759,19 @@ function ManglerPage({ lang, tr, raekker, henter, fejl, onAabn, onClose }) {
           <div style={{ textAlign: "center", padding: "40px 20px" }}>
             <CheckCircle2 size={40} color="#16A34A" strokeWidth={1.8} />
             <div style={{ marginTop: 12, fontSize: 14.5, color: "#475569", lineHeight: 1.5 }}>
-              {tr.gapsNone}
+              {anden ? tr.gapsNoneOther(visEmpNavn) : tr.gapsNone}
             </div>
           </div>
         )}
 
         {!henter && !fejl && raekker.length > 0 && (
           <>
+            {/* «Du mangler» duer ikke, naar kontoret kigger paa hende. Det er ikke
+                sprogpynt: den planlaegger, der laeser sin egen skaerm som en besked
+                om sit eget arbejde, ringer ikke til hende. */}
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
-              {tr.gapsLead(raekker.length)}
+              {anden ? tr.gapsLeadOther(raekker.length, visEmpNavn)
+                     : tr.gapsLead(raekker.length)}
             </div>
             <div style={{ fontSize: 12.5, color: "#64748B", lineHeight: 1.5, marginBottom: 12 }}>
               {tr.gapsHint}
