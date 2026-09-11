@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
+import { weekInfoWithOffset, ugerFraNu } from "./uger";
 import {
   Clock, CheckCircle2, Video, Lock, ListChecks, Check,
   Navigation, Building2, Car, ChevronLeft, ChevronRight,
@@ -8,7 +9,7 @@ import {
   // Androids Noto er bredere end Apples — bjaelken kan altsaa passe paa en iPhone
   // og loebe over paa en Android uden at nogen har roert koden. Et ikon er lige
   // bredt overalt.
-  CalendarPlus, Shirt, HelpCircle,
+  CalendarPlus, Shirt, HelpCircle, AlertTriangle,
 } from "lucide-react";
 
 // ── Gemt kopi af ugens opgaver ───────────────────────────────────────────────
@@ -389,6 +390,21 @@ const T = {
     nexusSkipNote: "Kom du ikke i Nexus? Sæt ikke flueben — så følger kontoret op. Du kan godt afslutte alligevel.",
     nexusDone: "kvitteret",
     nexusMissing: "mangler",
+    // ── Det du mangler ──
+    gapsTitle: "Det du mangler",
+    gapsAria: "Se hvad du mangler at registrere",
+    gapsLoading: "Henter…",
+    gapsError: "Listen kunne ikke hentes. Prøv igen, når du har dækning.",
+    gapsNone: "Du mangler ingenting. Alt er registreret og afsluttet.",
+    gapsLead: (n) => (n === 1
+      ? "Der er én opgave, du mangler at gøre færdig."
+      : `Der er ${n} opgaver, du mangler at gøre færdig.`),
+    gapsHint: "Tryk på en opgave for at åbne den. Ældste øverst — de er tættest på at gå tabt.",
+    gapsMonthWarn: "Når måneden lukker, kan timerne og kørslen ikke længere komme med på lønnen.",
+    gapsNeedTime: "tid",
+    gapsNeedDone: "udført",
+    gapsNeedBoth: "tid og udført",
+    gapsLogged: (m) => `${m} min registreret`,
     finishOpen: "Afslut opgave",
     reportProblem: "Der er et problem",
     reportProblemTitle: "Hvad er der sket?",
@@ -549,6 +565,21 @@ const T = {
     nexusSkipNote: "Could not get into Nexus? Leave it unticked — the office will follow up. You can still finish.",
     nexusDone: "signed off",
     nexusMissing: "missing",
+    // ── What you are missing ──
+    gapsTitle: "What you are missing",
+    gapsAria: "See what you still need to register",
+    gapsLoading: "Loading…",
+    gapsError: "The list could not be loaded. Try again when you have coverage.",
+    gapsNone: "You are not missing anything. Everything is registered and completed.",
+    gapsLead: (n) => (n === 1
+      ? "There is one job you still need to finish."
+      : `There are ${n} jobs you still need to finish.`),
+    gapsHint: "Tap a job to open it. Oldest first — those are closest to being lost.",
+    gapsMonthWarn: "Once the month closes, the hours and mileage can no longer go to payroll.",
+    gapsNeedTime: "time",
+    gapsNeedDone: "completion",
+    gapsNeedBoth: "time and completion",
+    gapsLogged: (m) => `${m} min logged`,
     finishOpen: "Complete job",
     reportProblem: "There is a problem",
     reportProblemTitle: "What happened?",
@@ -726,27 +757,8 @@ function fmtClock(minutesFromMidnight) {
   const m = Math.round(minutesFromMidnight % 60);
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
-// Beregner både ISO-ugenummer OG det år ugen hører til. Omkring årsskiftet kan
-// de to afvige (30. dec. kan høre til uge 1 i det nye år), og da planlæggeren
-// gemmer både week og year på hver opgave, SKAL vi matche på begge — ellers
-// blandes fx uge 30 i 2026 sammen med uge 30 i 2027.
-function isoWeekInfo(date) {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const dayNum = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - dayNum + 3); // Nærmeste torsdag afgør ISO-uge-året
-  const isoYear = d.getFullYear();
-  const yearStart = new Date(isoYear, 0, 1);
-  const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-  return { week, year: isoYear };
-}
-// Finder (uge, år) et antal uger fra i dag. Regner i rigtige 7-dages spring over
-// kalenderen, så navigation forbi uge 52/53 ruller korrekt over til det nye år
-// i stedet for at give ugyldige ugenumre som 53, 54, 55...
-function weekInfoWithOffset(offset) {
-  const d = new Date();
-  d.setDate(d.getDate() + offset * 7);
-  return isoWeekInfo(d);
-}
+// Ugeregningen ligger i src/uger.js med sin egen test. Den kan tage fejl uden at
+// sige noget — en forkert uge giver en forkert dagsliste, ikke en fejlmeddelelse.
 // ---- KMD Nexus Mobile: åbn appen hvis den er installeret, ellers hent den ----
 // Identifikatorer verificeret mod de officielle butikssider (udgiver KMD A/S):
 //   iOS      https://apps.apple.com/dk/app/kmd-nexus-mobile/id6449771475
@@ -1387,6 +1399,12 @@ const HELP_DA = [
       "Det er lige meget hvilken opgave hos kunden du står på — udleveringen følger dig og kunden, ikke en bestemt dag. Bliver opgaven flyttet, følger den med.",
       "Siger du nej, bliver varerne stående hos dig og dukker op igen næste gang du er hos kunden. Kunden får først en regning for dem når du har sagt ja.",
       "Bliver du ikke spurgt, har du ingen varer med til den kunde. Så er der ét trin mindre, og tælleren øverst siger fx «1 af 2»." ] },
+  { t: "Det du mangler", p: [
+      "Mangler du at registrere tid eller markere en opgave som udført, kommer der et gult udråbstegn øverst med et tal. Tallet er antallet af opgaver, der ikke er gjort færdige.",
+      "Tryk på det, og du får hele listen — også opgaver fra tidligere uger, som du ellers skulle bladre tilbage for at finde. Ældste står øverst, for det er dem, der er tættest på at gå tabt.",
+      "Tryk på en opgave i listen, så åbner den, og du kan registrere og afslutte med det samme. Den forsvinder fra listen, og tallet tæller ned.",
+      "Er der intet udråbstegn, mangler du ingenting. Det er den samme opgørelse, som påmindelsesmailen kl. 18 bruger — de kan ikke komme til at sige hver sit.",
+      "Husk: når måneden lukker, kan timer og kørsel fra den måned ikke længere komme med på lønnen." ] },
   { t: "Nexus-borgere", p: [
       "Er opgaven hos en Nexus-borger, står det øverst på opgaven, og der er en knap til at åbne KMD Nexus.",
       "Når du afslutter, kommer der et ekstra trin hvor du bliver mindet om at kvittere i Nexus. Kommunen betaler efter det der står i Nexus — ikke efter det du skriver her.",
@@ -1559,6 +1577,12 @@ const HELP_EN = [
       "It does not matter which job for that customer you are on — the handover follows you and the customer, not a particular day. If the job is moved, it comes along.",
       "If you say no, the items stay with you and show up again next time you visit that customer. The customer is only invoiced once you say yes.",
       "If you are not asked, you have nothing for that customer. Then there is one step fewer, and the counter at the top says for example \"1 of 2\"." ] },
+  { t: "What you are missing", p: [
+      "If you still need to log time or mark a job as completed, a yellow warning icon appears at the top with a number. The number is how many jobs are not finished.",
+      "Tap it to see the whole list — including jobs from earlier weeks that you would otherwise have to page back to find. Oldest first, because those are closest to being lost.",
+      "Tap a job in the list and it opens, so you can log the time and finish it right away. It then disappears from the list, and the number counts down.",
+      "No warning icon means you are not missing anything. It is the same reckoning the 6 pm reminder email uses — the two cannot disagree.",
+      "Remember: once the month closes, hours and mileage from that month can no longer go to payroll." ] },
   { t: "Nexus citizens", p: [
       "If the job is for a Nexus citizen, it says so at the top of the job, and there is a button to open KMD Nexus.",
       "When you complete the job there is an extra step reminding you to sign off in Nexus. The municipality pays according to Nexus — not according to what you write here.",
@@ -4276,6 +4300,14 @@ export default function MedarbejderApp() {
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showKm, setShowKm] = useState(false);
+  // Det hun mangler — paa tvaers af ALLE uger, ikke kun den hun kigger paa.
+  const [visMangler, setVisMangler] = useState(false);
+  const [mangler, setMangler] = useState([]);
+  const [manglerHenter, setManglerHenter] = useState(true);
+  const [manglerFejl, setManglerFejl] = useState("");
+  // Trykker hun paa en opgave fra en anden uge, skal planen foerst hente den uge.
+  // Id'et parkeres her, og opgaven aabnes naar ugen er hjemme.
+  const [aabnNaarKlar, setAabnNaarKlar] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
@@ -4568,6 +4600,56 @@ useEffect(() => {
     }
   }, [instances]);
 
+  // Hent «det du mangler» paa tvaers af alle uger.
+  //
+  // Den haenger paa instances og ikke paa genhent. genhent taelles kun op naar
+  // skrivekoeen er toemt, altsaa efter en tur uden daekning — men instances skiftes
+  // hver gang der registreres tid eller afsluttes en opgave. Saa falder opgaven af
+  // listen i samme oejeblik hun er faerdig med den, og tallet paa udraabstegnet
+  // taeller ned mens hun arbejder. Et tal, der bliver staaende efter man har gjort
+  // arbejdet, er vaerre end intet tal.
+  //
+  // Kigger en planlaegger paa en kollegas uge, hentes der ikke: mine_manglende()
+  // svarer altid for den der er logget ind, og tallet ville altsaa vaere HENDES eget
+  // mens skaermen viser en andens plan.
+  useEffect(() => {
+    if (!session?.user?.id || viewingOther) return;
+    let afbrudt = false;
+    (async () => {
+      setManglerHenter(true); setManglerFejl("");
+      const { data, error } = await supabase.rpc("mine_manglende");
+      if (afbrudt) return;
+      if (error) { setManglerFejl(error.message); setMangler([]); }
+      else setMangler(data || []);
+      setManglerHenter(false);
+    })();
+    return () => { afbrudt = true; };
+  }, [session?.user?.id, instances, viewingOther]);
+
+  // Ugen er hentet — nu kan den opgave, hun trykkede paa, aabnes.
+  //
+  // Findes den ikke i den hentede uge, ryddes oensket alligevel. Ellers ville appen
+  // sidde og vente paa en opgave, der fx er slettet af kontoret i mellemtiden, og
+  // aabne den naeste gang ugen tilfaeldigvis blev hentet igen.
+  useEffect(() => {
+    if (!aabnNaarKlar || dataLoading) return;
+    const t = instances.find((x) => x.id === aabnNaarKlar);
+    if (t) setOpenTask(t);
+    setAabnNaarKlar(null);
+  }, [aabnNaarKlar, instances, dataLoading]);
+
+  // Fra listen over manglende til selve opgaven.
+  function aabnManglende(m) {
+    setVisMangler(false);
+    setDay(m.dag);
+    const delta = ugerFraNu(m.aar, m.uge);
+    const t = instances.find((x) => x.id === m.opgave_id);
+    // Er opgaven allerede hentet, aabnes den med det samme. Ellers skiftes ugen, og
+    // den anden effekt tager over, naar dataene er hjemme.
+    if (delta === weekOffset && t) setOpenTask(t);
+    else { setAabnNaarKlar(m.opgave_id); setWeekOffset(delta); }
+  }
+
   // Returnerer true/false. Afslutningsflowet er nødt til at kunne se om det gik godt:
   // før returnerede funktionen ingenting, og et lydløst afbrud — fx når en planlægger
   // kigger i en kollegas plan — endte i en kvittering på noget der aldrig blev gemt.
@@ -4855,6 +4937,35 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
               <CalendarPlus size={17} />
             </button>
           )}
+          {/* Udraabstegnet vises KUN naar der er noget at raabe om.
+              Der er fire ikoner plus avatar heroppe i forvejen, og bjaelken er
+              braekket foer paa en smal skaerm. Et femte ikon, der normalt er tomt,
+              ville koste plads hver eneste dag for at sige "ingenting".
+              Naar det saa dukker op, betyder det noget — og saa skal tallet med,
+              for «du mangler noget» og «du mangler sytten ting» er ikke samme besked. */}
+          {!viewingOther && mangler.length > 0 && (
+            <button
+              style={{ position:"relative", border:"none", background:"#FEF3C7", color:"#B45309", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
+              onClick={() => setVisMangler(true)}
+              aria-label={`${tr.gapsAria} (${mangler.length})`}
+              title={tr.gapsAria}>
+              <AlertTriangle size={17} />
+              {/* Tallet ligger OVEN PAA ikonet og ikke ved siden af.
+                  Regnestykket: fem knapper à 34 px plus avatar og mellemrum fylder
+                  254 px i hoejre side. Stod tallet ved siden af, voksede knappen til
+                  omkring 52, og paa en 360 px skaerm var der saa ikke plads tilbage
+                  til appens navn — bjaelken klipper hellere titlen end knapperne, saa
+                  fejlen ville vise sig som et navn, der forsvandt.
+                  fontSize og lineHeight staar fast: paa Android er stor systemskrift
+                  udbredt, og et maerke der vokser, ville stikke ud over ikonet. */}
+              <span style={{ position:"absolute", top:-4, right:-4, minWidth:16, height:16,
+                             padding:"0 4px", borderRadius:99, background:"#B45309",
+                             color:"#fff", fontSize:10.5, lineHeight:"16px", fontWeight:700,
+                             textAlign:"center", boxSizing:"border-box" }}>
+                {mangler.length}
+              </span>
+            </button>
+          )}
           <button
             style={{ border:"none", background:"#FCE4EF", color:"#D6247A", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
             onClick={() => setShowShop(true)}
@@ -5044,6 +5155,15 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
       )}
 
       {showHelp && <HelpPage lang={lang} onClose={() => setShowHelp(false)} />}
+
+      {visMangler && (
+        <ManglerPage
+          lang={lang} tr={tr}
+          raekker={mangler} henter={manglerHenter} fejl={manglerFejl}
+          onAabn={aabnManglende}
+          onClose={() => setVisMangler(false)}
+        />
+      )}
 
       {showKm && (
         <TidOgKmPage
@@ -5551,6 +5671,128 @@ function timerTekst(minutter, da) {
 // Selve afgoerelsen af, om man MAA se en anden, ligger ikke her. Databasen ser bort
 // fra id'et, med mindre kalderen er planlaegger — laa afgoerelsen i appen, kunne den
 // omgaas ved at kalde API'et direkte. Her bruges det kun til at vise det rigtige navn.
+// ── Det du mangler ───────────────────────────────────────────────────────────
+// Appen henter én uge ad gangen. Det betyder, at en opgave hun glemte for tre uger
+// siden var usynlig: hun skulle VIDE at den var der, og bladre tilbage til ugen for
+// at finde den. Paamindelsesmailen kendte den godt — men mailen kan man ikke trykke
+// paa, og den naar kun syv dage tilbage.
+//
+// Derfor denne side. Den henter mine_manglende(), som bruger noejagtig samme
+// definition som mailen, saa de to aldrig kan sige hver sit.
+//
+// AEldste oeverst. Det er ikke en smagssag: naar maaneden lukker, er det de gamle
+// opgaver, der falder ud af loennen, og de nyeste kan hun altid naa. En liste med
+// nyeste foerst ville begrave netop dem, det haster med.
+function ManglerPage({ lang, tr, raekker, henter, fejl, onAabn, onClose }) {
+  const da = lang === "da";
+  const manglerTekst = (m) => (m === "tid og udført" ? tr.gapsNeedBoth
+                             : m === "tid" ? tr.gapsNeedTime
+                             : tr.gapsNeedDone);
+  const dagTekst = (iso) => new Date(iso + "T12:00:00")
+    .toLocaleDateString(da ? "da-DK" : "en-GB",
+      { weekday: "short", day: "numeric", month: "short" });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 50,
+                  display: "flex", flexDirection: "column" }}>
+      {/* env(safe-area-inset-top): fuldskaermsside, saa uden den lægger overskriften
+          sig ind under statuslinjen paa iPhone. Paa Android er tallet som regel nul. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "calc(14px + env(safe-area-inset-top)) 16px 12px",
+                    borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 17, minWidth: 0, paddingRight: 10,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {tr.gapsTitle}
+        </div>
+        <button onClick={onClose} aria-label={da ? "Luk" : "Close"}
+          style={{ border: "none", background: "#F1F5F9", borderRadius: 8, width: 34, height: 34,
+                   display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <X size={17} />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto",
+                    padding: "14px 16px calc(28px + env(safe-area-inset-bottom))" }}>
+        {henter && (
+          <div style={{ color: "#94A3B8", padding: 20, textAlign: "center" }}>{tr.gapsLoading}</div>
+        )}
+
+        {/* Tom liste og "kunne ikke hente" ser ens ud, hvis man ikke skelner — og her
+            er forskellen "du er faerdig" mod "vi ved det ikke". */}
+        {!henter && fejl && (
+          <div style={{ background: "#FEE2E2", color: "#991B1B", borderRadius: 10,
+                        padding: "12px 14px", fontSize: 13.5, lineHeight: 1.5 }}>
+            {tr.gapsError}
+          </div>
+        )}
+
+        {!henter && !fejl && raekker.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 20px" }}>
+            <CheckCircle2 size={40} color="#16A34A" strokeWidth={1.8} />
+            <div style={{ marginTop: 12, fontSize: 14.5, color: "#475569", lineHeight: 1.5 }}>
+              {tr.gapsNone}
+            </div>
+          </div>
+        )}
+
+        {!henter && !fejl && raekker.length > 0 && (
+          <>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
+              {tr.gapsLead(raekker.length)}
+            </div>
+            <div style={{ fontSize: 12.5, color: "#64748B", lineHeight: 1.5, marginBottom: 12 }}>
+              {tr.gapsHint}
+            </div>
+            <div style={{ background: "#FEF3C7", borderLeft: "4px solid #D97706", borderRadius: 8,
+                          padding: "10px 12px", fontSize: 12.5, color: "#92400E",
+                          lineHeight: 1.5, marginBottom: 14 }}>
+              {tr.gapsMonthWarn}
+            </div>
+
+            {raekker.map((m) => (
+              // Hele kortet er trykflade, ikke en lille pil i kanten. Det skal kunne
+              // rammes med en behandsket finger — samme grund som paa nexus-trinnet.
+              <button key={m.opgave_id} type="button" onClick={() => onAabn(m)}
+                style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 8,
+                         border: "1px solid #E2E8F0", borderRadius: 12, background: "#fff",
+                         padding: "11px 13px", cursor: "pointer", fontFamily: "inherit",
+                         minHeight: 44 }}>
+                <div style={{ display: "flex", justifyContent: "space-between",
+                              alignItems: "baseline", gap: 10 }}>
+                  {/* Klokkeslaettet med, naar det er der: to besoeg hos samme borger
+                      samme dag kan ellers kun skelnes ved at aabne dem. */}
+                  <span style={{ fontSize: 12.5, color: "#64748B", whiteSpace: "nowrap" }}>
+                    {dagTekst(m.opgavedato)}
+                    {m.scheduled_time && ` · ${String(m.scheduled_time).slice(0, 5)}`}
+                  </span>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "#B45309",
+                                 background: "#FFFBEB", borderRadius: 6, padding: "3px 7px",
+                                 whiteSpace: "nowrap" }}>
+                    {manglerTekst(m.mangler)}
+                  </span>
+                </div>
+                {/* Samme regel som paa opgavekortet ude i dagen — opgaveIdentitet
+                    afgoer, om det er kunden eller borgeren, der hoerer oeverst. Skrev
+                    listen sin egen regel, ville de to skaerme kunne komme til at kalde
+                    den samme opgave to forskellige ting. */}
+                <div style={{ fontSize: 14.5, fontWeight: 600, color: "#111111",
+                              marginTop: 3, lineHeight: 1.35 }}>
+                  {opgaveIdentitet(m).primaer || m.titel}
+                </div>
+                <div style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 2, lineHeight: 1.4 }}>
+                  {[opgaveIdentitet(m).sekundaer, m.titel,
+                    m.minutter > 0 ? tr.gapsLogged(m.minutter) : null]
+                    .filter(Boolean).join(" · ")}
+                </div>
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
   const da = lang === "da";
   const anden = !!visEmpId;

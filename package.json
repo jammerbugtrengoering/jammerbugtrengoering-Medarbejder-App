@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "oxlint && node tjek-tdz.mjs && vite build",
+    "build": "oxlint && node tjek-tdz.mjs && node ugespring.test.mjs && vite build",
     "build:kun": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
