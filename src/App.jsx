@@ -382,6 +382,7 @@ const T = {
     finishNothingHappened: "Spring over — der skete ikke noget",
     finishDone: "Opgaven er afsluttet",
     finishNext: "Tilbage til dagens opgaver",
+    finishNextList: "Tilbage til listen",
     finishKmNote: "Din kørsel bliver beregnet i nat, nu hvor tiden er registreret.",
     nexusQ: "Husk at kvittere i Nexus",
     nexusHint: "Kommunen betaler efter det der står i Nexus — ikke efter det du skriver her.",
@@ -561,6 +562,7 @@ const T = {
     finishNothingHappened: "Skip — nothing happened",
     finishDone: "The job is complete",
     finishNext: "Back to today's jobs",
+    finishNextList: "Back to the list",
     finishKmNote: "Your mileage will be calculated tonight, now that the time is logged.",
     nexusQ: "Remember to sign off in Nexus",
     nexusHint: "The municipality pays according to Nexus — not according to what you write here.",
@@ -1411,6 +1413,7 @@ const HELP_DA = [
       "Mangler du at registrere tid eller markere en opgave som udført, kommer der et gult udråbstegn øverst med et tal. Tallet er antallet af opgaver, der ikke er gjort færdige.",
       "Tryk på det, og du får hele listen — også opgaver fra tidligere uger, som du ellers skulle bladre tilbage for at finde. Ældste står øverst, for det er dem, der er tættest på at gå tabt.",
       "Tryk på en opgave i listen, så åbner den, og du kan registrere og afslutte med det samme. Den forsvinder fra listen, og tallet tæller ned.",
+      "Du kommer altid tilbage til listen bagefter — også hvis du fortryder og hellere vil tage en anden først. Så kan du arbejde dig ned gennem den uden at lede efter udråbstegnet hver gang.",
       "Er der intet udråbstegn, mangler du ingenting. Det er den samme opgørelse, som påmindelsesmailen kl. 18 bruger — de kan ikke komme til at sige hver sit.",
       "Til kontoret: vælger du en kollega under «Se plan for», viser udråbstegnet hendes tal og hendes liste, så I kan hjælpe hende over telefonen. Det er kun visning — I kan ikke registrere for hende.",
       "Husk: når måneden lukker, kan timer og kørsel fra den måned ikke længere komme med på lønnen." ] },
@@ -1590,6 +1593,7 @@ const HELP_EN = [
       "If you still need to log time or mark a job as completed, a yellow warning icon appears at the top with a number. The number is how many jobs are not finished.",
       "Tap it to see the whole list — including jobs from earlier weeks that you would otherwise have to page back to find. Oldest first, because those are closest to being lost.",
       "Tap a job in the list and it opens, so you can log the time and finish it right away. It then disappears from the list, and the number counts down.",
+      "You always come back to the list afterwards — also if you change your mind and would rather take another one first. That way you can work your way down it without hunting for the warning icon every time.",
       "No warning icon means you are not missing anything. It is the same reckoning the 6 pm reminder email uses — the two cannot disagree.",
       "For the office: pick a colleague under \"Se plan for\" and the warning icon shows her count and her list, so you can help her over the phone. View only — you cannot register on her behalf.",
       "Remember: once the month closes, hours and mileage from that month can no longer go to payroll." ] },
@@ -2714,7 +2718,7 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
 // Flowet kan gennemloebes flere gange paa samme opgave. Tiden laegges oveni det der
 // allerede staar, saa en pause midt i arbejdet eller to medarbejdere paa samme
 // opgave fungerer praecis som foer.
-function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, onSetStatus, onAfbryd, onFaerdig }) {
+function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLogMinutes, onSetStatus, onAfbryd, onFaerdig }) {
   const synlig = useSynligHoejde();
   const erNexus = task.contractType === "nexus";
 
@@ -3040,7 +3044,11 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
             <div style={s.kvitteringNote}>{tr.finishKmNote}</div>
           </div>
           <div style={s.afslutBund}>
-            <button style={s.primaerStor} onClick={onFaerdig}>{tr.finishNext}</button>
+            {/* Knappen skal sige, hvor den foerer hen. Kom hun fra manglelisten,
+                lander hun dér igen — og saa maa der ikke staa «dagens opgaver». */}
+            <button style={s.primaerStor} onClick={onFaerdig}>
+              {fraListe ? tr.finishNextList : tr.finishNext}
+            </button>
           </div>
         </div>
       </div>
@@ -3215,7 +3223,7 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, onLogMinutes, 
 }
 
 // ── Task detail modal ─────────────────────────────────────────────────────────
-function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
+function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
   const tr = T[lang];
   const [translatedTask, setTranslatedTask] = useState(null);
   const [translating, setTranslating] = useState(false);
@@ -3569,6 +3577,7 @@ function TaskModal({ task, employee, lang, onClose, onLogMinutes, onSetStatus, o
         <AfslutOpgave
           task={task} employee={employee} lang={lang} tr={tr} supabaseClient={supabaseClient}
           onLogMinutes={onLogMinutes} onSetStatus={onSetStatus}
+          fraListe={fraListe}
           onAfbryd={() => setVisAfslut(false)}
           onFaerdig={() => { setVisAfslut(false); onClose(); }}
         />
@@ -4321,6 +4330,11 @@ export default function MedarbejderApp() {
   // Den uge der rent faktisk ligger i instances lige nu. Se kommentaren ved
   // setIndlaestUge i hentningen: weekOffset skifter foer dataene er byttet ud.
   const [indlaestUge, setIndlaestUge] = useState(null);
+  // Kom den aabne opgave fra manglelisten? Saa er listen det sted, hun arbejder FRA,
+  // og der skal hun tilbage til — ogsaa hvis hun fortryder og vil tage en anden
+  // foerst. Uden det blev hun efterladt i en uge, hun ikke selv havde valgt, og
+  // skulle finde udraabstegnet frem igen for hver eneste opgave.
+  const [fraManglelisten, setFraManglelisten] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
@@ -4665,15 +4679,20 @@ useEffect(() => {
   // den fjernet af kontoret i mellemtiden, og appen skal ikke vente paa den for evigt.
   useEffect(() => {
     if (!aabnNaarKlar || !indlaestUge) return;
+    // Naaede hun at aabne noget andet, mens ugen blev hentet, er det dét, hun sidder
+    // med. Saa skal vi ikke rive skaermen ud af haenderne paa hende for at vise den
+    // opgave, hun trykkede paa for et oejeblik siden.
+    if (openTask) { setAabnNaarKlar(null); return; }
     if (indlaestUge.aar !== aabnNaarKlar.aar || indlaestUge.uge !== aabnNaarKlar.uge) return;
     const t = instances.find((x) => x.id === aabnNaarKlar.id);
     if (t) setOpenTask(t);
     setAabnNaarKlar(null);
-  }, [aabnNaarKlar, instances, indlaestUge]);
+  }, [aabnNaarKlar, instances, indlaestUge, openTask]);
 
   // Fra listen over manglende til selve opgaven.
   function aabnManglende(m) {
     setVisMangler(false);
+    setFraManglelisten(true);
     setDay(m.dag);
     const t = instances.find((x) => x.id === m.opgave_id);
     // Er opgaven allerede hentet, aabnes den med det samme — saa skal skaermen ikke
@@ -4681,6 +4700,14 @@ useEffect(() => {
     if (t) { setOpenTask(t); return; }
     setAabnNaarKlar({ id: m.opgave_id, aar: m.aar, uge: m.uge });
     setWeekOffset(ugerFraNu(m.aar, m.uge));
+  }
+
+  // Ud af en opgave. Kom hun fra manglelisten, er det DEN, hun skal tilbage til —
+  // uanset om hun blev faerdig eller fortrød og vil tage en anden foerst. Listen er
+  // en arbejdsseddel, man hakker af, ikke en genvej man bruger én gang.
+  function lukOpgave() {
+    setOpenTask(null);
+    if (fraManglelisten) { setFraManglelisten(false); setVisMangler(true); }
   }
 
   // Returnerer true/false. Afslutningsflowet er nødt til at kunne se om det gik godt:
@@ -5228,7 +5255,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           employee={employee}
           supabaseClient={supabase}
           onSetStatus={setStatus}
-          onLuk={() => setOpenTask(null)}
+          onLuk={lukOpgave}
         />
       )}
 
@@ -5238,7 +5265,9 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           task={instances.find((t) => t.id === openTask.id) || openTask}
           employee={employee}
           lang={lang}
-          onClose={() => setOpenTask(null)}
+          onClose={lukOpgave}
+          // Kvitteringens knap skal sige, hvor den faktisk foerer hen.
+          fraListe={fraManglelisten}
           onLogMinutes={logMinutes}
           onSetStatus={setStatus}
           onToggleChecklist={toggleChecklistItem}
