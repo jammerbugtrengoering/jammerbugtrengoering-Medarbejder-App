@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import { weekInfoWithOffset, ugerFraNu } from "./uger";
+import { skiftTid, saetTimer, saetMinutter } from "./tidsfelt";
 import {
   Clock, CheckCircle2, Video, Lock, ListChecks, Check,
   Navigation, Building2, Car, ChevronLeft, ChevronRight,
@@ -1399,7 +1400,8 @@ const HELP_DA = [
   { t: "Trin 1 — hvor lang tid brugte du?", p: [
       "Feltet er sat til den tid der er afsat til dig. Passer det, trykker du bare «Videre» uden at ændre noget.",
       "Er I flere på opgaven, gælder tiden pr. person. Er der sat 1 time af og I er to, er der afsat 2 timer i alt — du skal kun skrive din egen tid, og du får ikke besked om overskridelse fordi din kollega også har registreret.",
-      "Skal det rettes, er der to rækker med − og + : øverst timer, nederst minutter. Minutterne går i spring af 5.",
+      "Skal det rettes, er der to rækker med − og + : øverst timer, nederst minutter. Knapperne går i spring af 5 minutter.",
+      "Du kan også trykke på selve tallet og skrive det, du vil — også 18 minutter eller andre tal, knapperne ikke rammer. Tiden skal passe med det, du faktisk har brugt.",
       "Det store tal foroven er det du registrerer i alt. Under det står om det passer med det planlagte.",
       "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden.",
       "Har du fortrudt en afslutning og åbner opgaven igen — fx for at tilføje et billede — står der 0, og det er helt i orden. Din tid er registreret i forvejen, og du skal ikke taste mere for at komme videre." ] },
@@ -1579,7 +1581,8 @@ const HELP_EN = [
   { t: "Step 1 — how long did it take?", p: [
       "The field is preset to the time planned for you. If that is right, just tap \"Next\" without changing anything.",
       "If there are several of you on the job, the time is per person. If 1 hour is planned and there are two of you, 2 hours are planned in total — you only enter your own time, and you are not told about an overrun because your colleague also registered.",
-      "To change it, use the two rows of − and + : hours on top, minutes below. Minutes move in steps of 5.",
+      "To change it, use the two rows of − and + : hours on top, minutes below. The buttons move in steps of 5 minutes.",
+      "You can also tap the number itself and type whatever you need — including 18 minutes or any other value the buttons do not land on. The time has to match what you actually spent.",
       "The large number at the top is the total you are registering. Below it you can see whether it matches the plan.",
       "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer.",
       "If you undid a completion and open the job again — for example to add a photo — it says 0, and that is fine. Your time is already registered, and you do not need to enter more to continue." ] },
@@ -2800,9 +2803,10 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
   // der allerede registreret tid — af en kollega, eller af hende selv foer en pause —
   // ville hele varigheden vaere en overskridelse fra foerste sekund, og hun ville
   // blive tvunget til at skrive en begrundelse for noget der passer fint.
-  const [samletMin, setSamletMin] = useState(
-    Math.round(Math.max(0, minEgenTid - migLoggede) / 5) * 5,
-  );
+  // Startvaerdien rundes IKKE laengere til naermeste fem. Er der 18 minutter tilbage
+  // af det planlagte, skal der staa 18 - ikke 20. Afrundingen var der, fordi
+  // vaelgeren kun kunne det, og nu kan den mere.
+  const [samletMin, setSamletMin] = useState(Math.max(0, Math.round(minEgenTid - migLoggede)));
   const timer = Math.floor(samletMin / 60);
   const minutter = samletMin % 60;
   const [begrundelse, setBegrundelse] = useState("");
@@ -2838,10 +2842,12 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
 
   // Loftet paa 12 timer er det samme som i den gamle timevaelger. Nedad stopper vi
   // ved 0 — en registrering paa nul minutter afvises alligevel af naeste trin.
-  function skift(delta) {
-    setFejl("");
-    setSamletMin((v) => Math.max(0, Math.min(12 * 60, v + delta)));
-  }
+  // Selve regnestykket ligger i src/tidsfelt.js med sin egen test. Her er kun
+  // koblingen til skaermen — tallet bliver til loen og til en regning, saa reglen
+  // skal kunne proeves af uden at aabne en telefon.
+  function skift(delta) { setFejl(""); setSamletMin((v) => skiftTid(v, delta)); }
+  function saetTimerFelt(v) { setFejl(""); setSamletMin((nu) => saetTimer(nu, v)); }
+  function saetMinutterFelt(v) { setFejl(""); setSamletMin((nu) => saetMinutter(nu, v)); }
 
   function videre() {
     setFejl("");
@@ -3102,11 +3108,22 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
                 )}
               </div>
 
+              {/* Tallene kan bade trykkes op og ned OG skrives direkte.
+                  Foer gik minutterne kun i spring af fem, og saa kunne 18 minutter
+                  slet ikke registreres — hun maatte skrive 20, og lonnen og
+                  fakturaen blev regnet paa noget, der ikke var sket.
+                  De to felter skriver begge i samletMin, saa der er stadig KUN ét
+                  tal bagved. To uafhaengige tilstande for timer og minutter er
+                  praecis det, der gjorde 55 + 5 til et problem sidste gang. */}
               <div style={{ marginTop: 16 }}>
                 <div style={s.stepperLabel}>{tr.finishHours}</div>
                 <div style={s.stepperRaekke}>
                   <button style={s.stepperBtn} onClick={() => skift(-60)} aria-label="minus">−</button>
-                  <div style={s.stepperTal}>{timer}</div>
+                  <input style={s.stepperFelt} type="number" inputMode="numeric" min="0" max="12"
+                    value={timer}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => saetTimerFelt(e.target.value)}
+                    aria-label={tr.finishHours} />
                   <button style={s.stepperBtn} onClick={() => skift(60)} aria-label="plus">+</button>
                 </div>
               </div>
@@ -3114,7 +3131,11 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
                 <div style={s.stepperLabel}>{tr.finishMinutes}</div>
                 <div style={s.stepperRaekke}>
                   <button style={s.stepperBtn} onClick={() => skift(-5)} aria-label="minus">−</button>
-                  <div style={s.stepperTal}>{String(minutter).padStart(2, "0")}</div>
+                  <input style={s.stepperFelt} type="number" inputMode="numeric" min="0" max="59"
+                    value={minutter}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => saetMinutterFelt(e.target.value)}
+                    aria-label={tr.finishMinutes} />
                   <button style={s.stepperBtn} onClick={() => skift(5)} aria-label="plus">+</button>
                 </div>
               </div>
@@ -5477,6 +5498,13 @@ const s = {
     fontSize:28, fontWeight:500, color:"#111111", cursor:"pointer", flexShrink:0, fontFamily:"inherit",
     display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 },
   stepperTal: { flex:1, textAlign:"center", fontSize:26, fontWeight:600, color:"#111111" },
+  // Tallet kan skrives direkte. − og + gaar i spring af fem, fordi det er det
+  // almindelige, men 18 minutter skal ogsaa kunne registreres — og 18 tryk paa
+  // plus er ikke et svar. Feltet ser ud som tallet gjorde foer; det skal ikke
+  // ligne en formular, bare et tal man kan rette i.
+  stepperFelt: { flex:1, width:"100%", minWidth:0, textAlign:"center", fontSize:26, fontWeight:600,
+    color:"#111111", border:"1.5px solid transparent", borderRadius:12, background:"#F8FAFC",
+    padding:"10px 0", fontFamily:"inherit", MozAppearance:"textfield" },
   primaerStor: { width:"100%", padding:"16px 0", borderRadius:12, border:"none", background:"#D6247A",
     color:"#fff", fontWeight:700, fontSize:16, cursor:"pointer", fontFamily:"inherit" },
   sekundaerStor: { width:"100%", padding:"15px 0", borderRadius:12, border:"1.5px solid #E2E8F0",

@@ -13,7 +13,8 @@
     "supabase/**",
     "netlify/**",
     "tjek-tdz.mjs",
-    "ugespring.test.mjs"
+    "ugespring.test.mjs",
+    "tidsfelt.test.mjs"
   ],
   "rules": {
     "no-undef": "error",
