@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prøv Worklist</title>
+<!--
+  ØVELSESUDGAVEN AF WORKLIST
+  ==========================
+
+  En hel arbejdsdag man kan gennemføre så mange gange man vil, uden at noget af
+  det er rigtigt. Filen taler ikke med databasen, gemmer ingenting og kan ikke
+  komme til at røre en rigtig kunde. Den kan lægges på en telefon, sendes i en
+  mail eller åbnes fra en usb-nøgle.
+
+  HVORFOR DEN FINDES
+  Der er ingen steder i den rigtige app, hvor man kan fejle sikkert. Alt hvad man
+  trykker på, hører til en rigtig borger eller et rigtigt firma. For en, der ikke
+  er tryg ved en telefon, betyder det, at det første tryk er skræmmende — og så
+  bliver det ikke til noget. Her koster et forkert tryk ingenting.
+
+  DE FIRE OPGAVER ER IKKE TILFÆLDIGE
+  Der er én af hver slags, fordi de fire slags ser forskellige ud på skærmen, og
+  fordi den forskel er det, folk oftest spørger om:
+    · privat og erhverv — kunden ER stedet. Navnet øverst er den, du skal besøge.
+    · nexus og ældrelov — borgeren står øverst, og firmanavnet nederst er den,
+      der får regningen. Det er IKKE et sted, du skal hen.
+  Den forveksling er værd at lave én gang her frem for første gang i en bil.
+
+  SKRIFTEN
+  Venstrestillet, luft mellem linjerne, ingen ord med store bogstaver og en
+  anelse varme i papiret frem for skarp hvid. Det er de samme valg som i den
+  rigtige app, og de er truffet med ordblinde brugere for øje.
+
+  RETTELSER
+  Alt indhold står i OPGAVER nedenfor. Teksterne må gerne rettes — det er
+  meningen, at kontoret selv kan skrue på dem.
+-->
+<style>
+  :root {
+    /* Kun lys udgave.
+       Uden den her linje tegner telefonen knapper og felter moerkt, naar den
+       staar i moerk tilstand — og teksten forsvinder, fordi farverne herunder
+       regner med en lys baggrund. Det er den samme fejl, som allerede er rettet
+       i selve Worklist; den skal ikke laves om igen her. */
+    color-scheme: light;
+    --pink: #D6247A;
+    --pink-mork: #9C1B5D;
+    --papir: #FDFCF8;
+    --bag: #F8FAFC;
+    --tekst: #111111;
+    --daempet: #64748B;
+    --kant: #E2E8F0;
+    --groen: #16A34A;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #E9EDF2;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+    color: var(--tekst);
+    /* 1.55 og ikke 1.3. Luft mellem linjerne er det enkelttiltag, der hjælper en
+       ordblind læser mest: ligger linjerne tæt, glider øjet ned i den forkerte
+       på vej tilbage, og sætningen skal læses forfra. */
+    line-height: 1.55;
+    text-align: left;
+    font-size: 17px;
+  }
+  /* Telefonrammen. På en telefon fylder den hele skærmen; på en computer står
+     den som en telefon midt på siden, så kontoret kan vise den frem. */
+  #ramme {
+    max-width: 430px; margin: 0 auto; min-height: 100svh;
+    background: var(--bag); position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  @media (min-width: 500px) {
+    #ramme { min-height: 92svh; margin-top: 4svh; border-radius: 28px;
+             box-shadow: 0 10px 50px rgba(0,0,0,.18); }
+  }
+
+  .top {
+    background: #111; color: #fff; padding: 16px 18px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-shrink: 0;
+  }
+  .top b { font-size: 17px; font-weight: 800; }
+  .top .under { font-size: 13px; color: #A3A3A3; }
+  .krydsknap {
+    border: 1px solid #444; background: transparent; color: #fff;
+    border-radius: 9px; padding: 7px 12px; font-size: 14px; cursor: pointer;
+    font-family: inherit; min-height: 40px;
+  }
+
+  .indhold { flex: 1; overflow-y: auto; padding: 16px; }
+
+  /* Vejledningen øverst på hver skærm. Én sætning, aldrig mere. */
+  .vejled {
+    background: #FCE4EF; color: var(--pink-mork);
+    border-radius: 12px; padding: 13px 15px; margin-bottom: 16px;
+    font-size: 15.5px; font-weight: 600;
+  }
+
+  .kort {
+    background: var(--papir); border: 1px solid #F1F5F9; border-radius: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 12px;
+    display: flex; overflow: hidden; cursor: pointer; width: 100%;
+    text-align: left; font-family: inherit; font-size: inherit; color: inherit;
+    padding: 0;
+  }
+  .kort .stribe { width: 6px; flex-shrink: 0; background: #3B82F6; }
+  .kort.faerdig .stribe { background: var(--groen); }
+  .kort .krop { padding: 14px 15px; flex: 1; min-width: 0; }
+  .kort .klok { font-size: 13.5px; color: var(--daempet); font-weight: 600; }
+  .kort .navn { font-size: 17px; font-weight: 700; margin: 2px 0 1px; }
+  .kort .adr  { font-size: 15px; color: #475569; }
+  .kort .fod  { font-size: 13.5px; color: #94A3B8; margin-top: 7px;
+                display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+
+  .maerkat { font-size: 12px; font-weight: 700; border-radius: 7px; padding: 2px 8px; }
+  .m-privat    { color:#9C1B5D; background:#FFF6FA; }
+  .m-erhverv   { color:#0F766E; background:#ECFDF5; }
+  .m-nexus     { color:#4F46E5; background:#EEF2FF; }
+  .m-aeldrelov { color:#C2410C; background:#FFF7ED; }
+
+  .flueben-gr { color: var(--groen); font-weight: 700; }
+
+  .knap {
+    width: 100%; border: none; border-radius: 14px; padding: 17px 16px;
+    font-size: 17px; font-weight: 700; cursor: pointer; font-family: inherit;
+    min-height: 56px;
+  }
+  .knap-primaer { background: var(--pink); color: #fff; }
+  .knap-anden   { background: var(--papir); color: #334155; border: 1.5px solid var(--kant); }
+  .knap:active { transform: translateY(1px); }
+
+  .afsnit { font-size: 14px; font-weight: 700; color: #475569; margin: 22px 0 9px; }
+
+  .tjek { display: flex; align-items: flex-start; gap: 13px; width: 100%;
+          background: transparent; border: none; padding: 13px 4px; cursor: pointer;
+          font-family: inherit; text-align: left; border-bottom: 1px solid #F1F5F9;
+          font-size: 16px; color: var(--tekst); min-height: 54px; }
+  .boks { width: 27px; height: 27px; border-radius: 8px; border: 2px solid #CBD5E1;
+          flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+          font-size: 17px; color: #fff; margin-top: 1px; }
+  .tjek.sat .boks { background: var(--groen); border-color: var(--groen); }
+  .tjek.sat span.t { text-decoration: line-through; color: #94A3B8; }
+
+  .info { background: var(--papir); border: 1px solid var(--kant); border-radius: 13px;
+          padding: 14px 15px; margin-bottom: 13px; font-size: 15.5px; }
+  .info .lbl { font-size: 13.5px; color: var(--daempet); }
+  .info .vrd { font-weight: 700; font-size: 17px; }
+
+  .tid { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 22px 0; }
+  .tidknap { width: 74px; height: 66px; border-radius: 14px; border: 1.5px solid var(--kant);
+             background: var(--papir); font-size: 30px; cursor: pointer; font-family: inherit;
+             color: #334155; }
+  .tidtal { font-size: 30px; font-weight: 800; min-width: 130px; text-align: center; }
+
+  .kvit { text-align: center; padding: 30px 12px; }
+  .kvitcirkel { width: 86px; height: 86px; border-radius: 50%; background: #F0FDF4;
+                border: 3px solid var(--groen); margin: 0 auto 20px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 42px; color: var(--groen); }
+  .kvit h2 { font-size: 23px; margin: 0 0 7px; }
+  .kvit p  { color: var(--daempet); margin: 0 0 6px; font-size: 16px; }
+
+  .fremdrift { font-size: 14.5px; color: var(--daempet); margin-bottom: 14px; }
+
+  .advarsel { background: #FEF3C7; border-left: 5px solid #D97706; border-radius: 9px;
+              padding: 13px 15px; font-size: 15.5px; margin-bottom: 14px; }
+
+  .lille { font-size: 14px; color: var(--daempet); }
+  .skjul { display: none !important; }
+</style>
+</head>
+<body>
+<div id="ramme"></div>
+
+<script>
+"use strict";
+
+/* ── Indholdet ──────────────────────────────────────────────────────────────
+   Fire opgaver, én af hver slags. Navne og adresser er opdigtede med vilje:
+   der må ikke stå en rigtig borger i en fil, der bliver sendt rundt.
+
+   «betalerErIkkeStedet» er den vigtige: på nexus og ældrelov står borgeren
+   øverst, og firmaet nederst er den, der får regningen. Det er den samme regel
+   som i den rigtige app.                                                      */
+const OPGAVER = [
+  {
+    id: 1, slags: "privat", maerkat: "Privat", klok: "08.00", minutter: 60,
+    navn: "Ellen Bach", adresse: "Klitvejen 12, Blokhus",
+    fod: "", betalerErIkkeStedet: false,
+    adgang: "Nøglen ligger i boksen ved døren. Kode 1904.",
+    tjek: ["Støvsugning i alle rum", "Gulvvask i køkken og bad", "Aftørring af flader"],
+  },
+  {
+    id: 2, slags: "erhverv", maerkat: "Erhverv", klok: "09.30", minutter: 90,
+    navn: "Davidsen A/S", adresse: "Vesterhavsparken 2, Hune",
+    fod: "Kontakt: Jens i receptionen", betalerErIkkeStedet: false,
+    adgang: "Alarmen slås fra med brik. Hent den i receptionen.",
+    tjek: ["Toiletter", "Frokoststue og køkken", "Kontorer — kun gulve", "Tøm skraldespande"],
+  },
+  {
+    id: 3, slags: "nexus", maerkat: "Nexus", klok: "11.30", minutter: 35,
+    navn: "Karl Aage Sørensen", adresse: "Bøgevej 14, Kaas",
+    fod: "Jammerbugt Kommune", betalerErIkkeStedet: true,
+    adgang: "Ring på. Han lukker selv op.",
+    tjek: ["Badeværelse", "Køkken", "Støvsugning"],
+    nexus: true,
+  },
+  {
+    id: 4, slags: "aeldrelov", maerkat: "Ældrelov", klok: "13.00", minutter: 40,
+    navn: "Ruth Pedersen", adresse: "Passagen 26, Aabybro",
+    fod: "Carelink Pleje Aalborg ApS", betalerErIkkeStedet: true,
+    adgang: "Nøgleboks ved opgangsdøren. Kode 2277.",
+    tjek: ["Støvsugning", "Gulvvask", "Skift af sengetøj"],
+  },
+];
+
+/* ── Tilstand ───────────────────────────────────────────────────────────────
+   Alt ligger i hukommelsen. Lukker man fanen, begynder man forfra — og det er
+   med vilje. Øvelsen skal kunne tages igen fra en ren tavle af den næste, der
+   får telefonen i hånden. */
+let skaerm = "velkomst";     // velkomst | dag | opgave | tid | nexus | kvittering | slut
+let aaben = null;            // id på den opgave, der er åben
+let tilstand = {};           // id → { faerdig, tjek:Set, minutter, nexusSat }
+
+function nulstil() {
+  tilstand = {};
+  OPGAVER.forEach((o) => {
+    tilstand[o.id] = { faerdig: false, tjek: new Set(), minutter: o.minutter, nexusSat: false };
+  });
+  skaerm = "velkomst"; aaben = null;
+}
+nulstil();
+
+const opg = (id) => OPGAVER.find((o) => o.id === id);
+const antalFaerdige = () => OPGAVER.filter((o) => tilstand[o.id].faerdig).length;
+
+function tidTekst(m) {
+  const t = Math.floor(m / 60), r = m % 60;
+  if (t && r) return t + " t " + r + " min";
+  if (t) return t + (t === 1 ? " time" : " timer");
+  return r + " min";
+}
+
+/* Teksten bygges med DOM og ikke med innerHTML af strenge med navne i. Det er
+   en øvelsesfil, men vanen er den rigtige: et navn med et vinkelparentes i
+   skal ikke kunne blive til noget, browseren udfører. */
+function el(tag, attr, ...boern) {
+  const n = document.createElement(tag);
+  for (const k in (attr || {})) {
+    if (k === "klasse") n.className = attr[k];
+    else if (k === "tryk") n.addEventListener("click", attr[k]);
+    else n.setAttribute(k, attr[k]);
+  }
+  boern.flat().forEach((b) => {
+    if (b === null || b === undefined || b === false) return;
+    n.appendChild(typeof b === "string" || typeof b === "number"
+      ? document.createTextNode(String(b)) : b);
+  });
+  return n;
+}
+
+/* Hedder «topbjaelke» og ikke «top».
+   En funktion ved navn top i den yderste skal kolliderer med window.top — det
+   er browserens eget navn for det oeverste vindue, og det kan ikke overskrives.
+   Siden gik i staa foer foerste linje blev tegnet. Fundet af proeven, ikke i en
+   browser, og det er praecis den slags, der ellers naar helt ud til en telefon. */
+function topbjaelke(titel, under, lukTekst, lukHandling) {
+  return el("div", { klasse: "top" },
+    el("div", {},
+      el("b", {}, titel),
+      under ? el("div", { klasse: "under" }, under) : null),
+    lukTekst ? el("button", { klasse: "krydsknap", tryk: lukHandling }, lukTekst) : null);
+}
+
+function tegn() {
+  const r = document.getElementById("ramme");
+  r.innerHTML = "";
+  ({ velkomst: tegnVelkomst, dag: tegnDag, opgave: tegnOpgave,
+     tid: tegnTid, nexus: tegnNexus, kvittering: tegnKvittering,
+     slut: tegnSlut })[skaerm](r);
+  r.querySelector(".indhold") && (r.querySelector(".indhold").scrollTop = 0);
+}
+
+/* ── Velkomst ───────────────────────────────────────────────────────────────
+   Den vigtigste skærm i hele filen. Ikke fordi den lærer nogen noget om appen,
+   men fordi den fjerner den frygt, der ellers gør, at det første tryk aldrig
+   bliver til noget. */
+function tegnVelkomst(r) {
+  r.appendChild(topbjaelke("Prøv Worklist", "Øvelse — intet af det her er rigtigt", null, null));
+  r.appendChild(el("div", { klasse: "indhold" },
+    el("div", { klasse: "kvit", style: "padding-top:22px" },
+      el("div", { klasse: "kvitcirkel", style: "background:#FFF6FA;border-color:#D6247A;color:#D6247A;font-size:38px" }, "✋"),
+      el("h2", {}, "Du kan ikke ødelægge noget"),
+      el("p", {}, "Det her er en øvelse. Der er ingen rigtige kunder, ingen rigtige borgere, og der bliver ikke gemt noget nogen steder."),
+      el("p", {}, "Tryk på alt. Prøv dig frem. Går det galt, begynder du bare forfra.")),
+    el("div", { klasse: "afsnit" }, "Sådan ser en dag ud"),
+    el("div", { klasse: "lille", style: "margin-bottom:18px" },
+      "Du har fire opgaver. For hver af dem skal du sætte flueben ved det, du har lavet, skrive hvor lang tid du brugte, og melde den færdig. Det er hele dagen."),
+    el("button", { klasse: "knap knap-primaer", tryk: () => { skaerm = "dag"; tegn(); } },
+      "Start øvelsen")));
+}
+
+/* ── Dagen ──────────────────────────────────────────────────────────────── */
+function tegnDag(r) {
+  const f = antalFaerdige();
+  r.appendChild(topbjaelke("Min dag", "Fredag den 18. september", "Forfra", () => { nulstil(); tegn(); }));
+
+  const indhold = el("div", { klasse: "indhold" });
+  indhold.appendChild(el("div", { klasse: "vejled" },
+    f === 0 ? "Tryk på den første opgave for at åbne den."
+            : f < OPGAVER.length ? "Godt. Tag den næste."
+            : "Alle fire er meldt færdige."));
+  indhold.appendChild(el("div", { klasse: "fremdrift" }, f + " af " + OPGAVER.length + " meldt færdig"));
+
+  OPGAVER.forEach((o) => {
+    const t = tilstand[o.id];
+    // På nexus og ældrelov står borgeren øverst og betaleren nederst. Det er
+    // den forskel, hele øvelsen handler om at få ind under huden.
+    const kort = el("button", { klasse: "kort" + (t.faerdig ? " faerdig" : ""),
+                                tryk: () => { aaben = o.id; skaerm = "opgave"; tegn(); } },
+      el("div", { klasse: "stribe" }),
+      el("div", { klasse: "krop" },
+        el("div", { klasse: "klok" }, o.klok + " · " + tidTekst(o.minutter)),
+        el("div", { klasse: "navn" }, o.navn),
+        el("div", { klasse: "adr" }, o.adresse),
+        el("div", { klasse: "fod" },
+          el("span", { klasse: "maerkat m-" + o.slags }, o.maerkat),
+          o.fod ? el("span", {}, o.fod) : null,
+          t.faerdig ? el("span", { klasse: "flueben-gr" }, "✓ Færdig") : null)));
+    indhold.appendChild(kort);
+  });
+
+  if (f === OPGAVER.length) {
+    indhold.appendChild(el("button", { klasse: "knap knap-primaer", style: "margin-top:10px",
+      tryk: () => { skaerm = "slut"; tegn(); } }, "Se hvordan det gik"));
+  }
+  r.appendChild(indhold);
+}
+
+/* ── Inde i opgaven ─────────────────────────────────────────────────────── */
+function tegnOpgave(r) {
+  const o = opg(aaben), t = tilstand[aaben];
+  r.appendChild(topbjaelke(o.navn, o.adresse, "Tilbage", () => { skaerm = "dag"; tegn(); }));
+
+  const sat = t.tjek.size, i_alt = o.tjek.length;
+  const indhold = el("div", { klasse: "indhold" });
+
+  indhold.appendChild(el("div", { klasse: "vejled" },
+    sat === 0 ? "Sæt flueben ved det, du har lavet. Tryk på linjen."
+              : sat < i_alt ? "Bliv ved. Der mangler " + (i_alt - sat) + "."
+              : "Alt er sat. Tryk «Afslut opgave» nederst."));
+
+  if (o.betalerErIkkeStedet) {
+    indhold.appendChild(el("div", { klasse: "advarsel" },
+      "Du skal hjem til " + o.navn + " på " + o.adresse + ". " +
+      o.fod + " nederst er den, der får regningen — ikke et sted, du skal hen."));
+  }
+
+  indhold.appendChild(el("div", { klasse: "info" },
+    el("div", { klasse: "lbl" }, "Adgang"),
+    el("div", {}, o.adgang)));
+
+  indhold.appendChild(el("div", { klasse: "info" },
+    el("div", { klasse: "lbl" }, "Afsat tid"),
+    el("div", { klasse: "vrd" }, tidTekst(o.minutter))));
+
+  indhold.appendChild(el("div", { klasse: "afsnit" }, "Opgaver  " + sat + "/" + i_alt));
+  o.tjek.forEach((tekst, i) => {
+    const er = t.tjek.has(i);
+    indhold.appendChild(el("button", { klasse: "tjek" + (er ? " sat" : ""),
+      tryk: () => { er ? t.tjek.delete(i) : t.tjek.add(i); tegn(); } },
+      el("span", { klasse: "boks" }, er ? "✓" : ""),
+      el("span", { klasse: "t" }, tekst)));
+  });
+
+  indhold.appendChild(el("div", { style: "height:22px" }));
+  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+    tryk: () => { skaerm = "tid"; tegn(); } }, "Afslut opgave"));
+  indhold.appendChild(el("div", { klasse: "lille", style: "margin-top:12px" },
+    "Du må gerne melde færdig, selvom der mangler et flueben. Så følger kontoret op."));
+
+  r.appendChild(indhold);
+}
+
+/* ── Trin 1: tiden ──────────────────────────────────────────────────────── */
+function tegnTid(r) {
+  const o = opg(aaben), t = tilstand[aaben];
+  r.appendChild(topbjaelke("Hvor lang tid?", o.navn, "Tilbage", () => { skaerm = "opgave"; tegn(); }));
+
+  const indhold = el("div", { klasse: "indhold" });
+  indhold.appendChild(el("div", { klasse: "vejled" },
+    "Tiden står allerede på det afsatte. Passer det, trykker du bare Videre."));
+
+  indhold.appendChild(el("div", { klasse: "tid" },
+    el("button", { klasse: "tidknap", "aria-label": "Fem minutter mindre",
+      tryk: () => { t.minutter = Math.max(5, t.minutter - 5); tegn(); } }, "−"),
+    el("div", { klasse: "tidtal" }, tidTekst(t.minutter)),
+    el("button", { klasse: "tidknap", "aria-label": "Fem minutter mere",
+      tryk: () => { t.minutter = t.minutter + 5; tegn(); } }, "+")));
+
+  if (t.minutter !== o.minutter) {
+    const flere = t.minutter > o.minutter;
+    indhold.appendChild(el("div", { klasse: "lille", style: "text-align:center;margin-bottom:16px" },
+      flere ? "Du har sat " + tidTekst(t.minutter - o.minutter) + " mere på end afsat. Det er i orden — skriv det bare som det var."
+            : "Du har sat " + tidTekst(o.minutter - t.minutter) + " mindre på end afsat."));
+  }
+
+  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+    tryk: () => { skaerm = o.nexus ? "nexus" : "kvittering"; if (!o.nexus) meldFaerdig(); tegn(); } },
+    "Videre"));
+  r.appendChild(indhold);
+}
+
+/* ── Ekstra trin på nexus-opgaver ───────────────────────────────────────── */
+function tegnNexus(r) {
+  const o = opg(aaben), t = tilstand[aaben];
+  r.appendChild(topbjaelke("Husk Nexus", o.navn, "Tilbage", () => { skaerm = "tid"; tegn(); }));
+
+  const indhold = el("div", { klasse: "indhold" });
+  indhold.appendChild(el("div", { klasse: "vejled" },
+    "På Nexus-opgaver skal du også kvittere i kommunens egen app."));
+  indhold.appendChild(el("div", { klasse: "advarsel" },
+    "Kommunen betaler efter det, der står i Nexus — ikke efter det, du skriver her."));
+
+  indhold.appendChild(el("button", { klasse: "tjek" + (t.nexusSat ? " sat" : ""),
+    tryk: () => { t.nexusSat = !t.nexusSat; tegn(); } },
+    el("span", { klasse: "boks" }, t.nexusSat ? "✓" : ""),
+    el("span", { klasse: "t" }, "Ja, jeg har kvitteret i Nexus")));
+
+  indhold.appendChild(el("div", { klasse: "lille", style: "margin:14px 0 20px" },
+    "Kom du ikke i Nexus? Lad være med at sætte flueben — så følger kontoret op. Du kan godt melde færdig alligevel."));
+
+  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+    tryk: () => { meldFaerdig(); skaerm = "kvittering"; tegn(); } }, "Meld færdig"));
+  r.appendChild(indhold);
+}
+
+function meldFaerdig() { tilstand[aaben].faerdig = true; }
+
+/* ── Kvitteringen ───────────────────────────────────────────────────────── */
+function tegnKvittering(r) {
+  const o = opg(aaben), t = tilstand[aaben];
+  r.appendChild(topbjaelke("Færdig", o.navn, null, null));
+
+  const alle = antalFaerdige() === OPGAVER.length;
+  const indhold = el("div", { klasse: "indhold" });
+  indhold.appendChild(el("div", { klasse: "kvit" },
+    el("div", { klasse: "kvitcirkel" }, "✓"),
+    el("h2", {}, "Meldt færdig"),
+    el("p", {}, o.navn)));
+
+  indhold.appendChild(el("div", { klasse: "info" },
+    el("div", { klasse: "lbl" }, "Registreret tid"),
+    el("div", { klasse: "vrd" }, tidTekst(t.minutter))));
+  indhold.appendChild(el("div", { klasse: "info" },
+    el("div", { klasse: "lbl" }, "Opgaver sat"),
+    el("div", { klasse: "vrd" }, t.tjek.size + " af " + o.tjek.length)));
+  if (o.nexus) {
+    indhold.appendChild(el("div", { klasse: "info" },
+      el("div", { klasse: "lbl" }, "Nexus"),
+      el("div", { klasse: "vrd" }, t.nexusSat ? "kvitteret" : "mangler")));
+  }
+
+  indhold.appendChild(el("div", { style: "height:14px" }));
+  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+    tryk: () => { skaerm = alle ? "slut" : "dag"; tegn(); } },
+    alle ? "Se hvordan det gik" : "Tilbage til dagen"));
+  r.appendChild(indhold);
+}
+
+/* ── Slut ───────────────────────────────────────────────────────────────── */
+function tegnSlut(r) {
+  r.appendChild(topbjaelke("Du er igennem", "Øvelsen er slut", null, null));
+  const indhold = el("div", { klasse: "indhold" });
+  indhold.appendChild(el("div", { klasse: "kvit" },
+    el("div", { klasse: "kvitcirkel" }, "✓"),
+    el("h2", {}, "Fire ud af fire"),
+    el("p", {}, "Det er præcis sådan, en rigtig dag foregår.")));
+
+  indhold.appendChild(el("div", { klasse: "afsnit" }, "Det du har prøvet"));
+  [
+    "Åbne en opgave og se, hvor du skal hen",
+    "Sætte flueben ved det, du har lavet",
+    "Skrive hvor lang tid du brugte",
+    "Melde opgaven færdig",
+    "Kvittere i Nexus på en kommunal opgave",
+  ].forEach((x) => indhold.appendChild(el("div", { klasse: "tjek sat" },
+    el("span", { klasse: "boks" }, "✓"), el("span", {}, x))));
+
+  indhold.appendChild(el("div", { klasse: "afsnit" }, "Den ene ting, du skal huske"));
+  indhold.appendChild(el("div", { klasse: "info" },
+    "På Nexus- og Ældrelov-opgaver står borgeren øverst. Firmanavnet nederst — kommunen eller Carelink — er den, der får regningen. Det er ikke et sted, du skal køre hen."));
+
+  indhold.appendChild(el("div", { style: "height:18px" }));
+  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+    tryk: () => { nulstil(); tegn(); } }, "Prøv igen"));
+  indhold.appendChild(el("div", { style: "height:10px" }));
+  indhold.appendChild(el("div", { klasse: "lille" },
+    "Du må tage øvelsen så mange gange, du vil. Ingen kan se, hvor mange gange."));
+  r.appendChild(indhold);
+}
+
+tegn();
+</script>
+</body>
+</html>

@@ -1323,6 +1323,12 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
 // Samme indhold som den trykte brugervejledning, men bygget til telefon:
 // fuld skærm, store trykflader og korte afsnit man kan skimme med én hånd.
 const HELP_DA = [
+  { t: "Er du ny? Start her", p: [
+    "Første gang du åbnede appen, kom der tre skærmbilleder. Vil du se dem igen, står knappen «Vis introduktionen igen» øverst her på siden.",
+    "Ved siden af står «Øv dig på en prøvedag». Det er en hel arbejdsdag med fire opgaver, hvor ingenting er rigtigt: der er ingen borgere, ingen kunder, og der bliver ikke gemt noget nogen steder.",
+    "Du må tage prøvedagen så mange gange, du vil. Ingen kan se, hvor mange gange du har gjort det.",
+    "Er der noget, du ikke kan finde ud af, så ring til kontoret. Det er ikke dumt at spørge — appen er ny for alle.",
+  ] },
   { t: "Sådan finder du derhen", p: [
     "På hver opgave står adressen med det samme — du behøver ikke åbne opgaven for at se, hvor du skal hen.",
     "Er det en kommunal opgave, står borgerens navn øverst og adressen under. Firmanavnet nederst er den, der får regningen — ikke den du skal besøge.",
@@ -1504,6 +1510,12 @@ const HELP_DA = [
     ] },
 ];
 const HELP_EN = [
+  { t: "New here? Start here", p: [
+    "The first time you opened the app you saw three screens. To see them again, use «Show the intro again» at the top of this page.",
+    "Next to it is «Practise on a test day». It is a full working day with four jobs where nothing is real: no citizens, no customers, and nothing is saved anywhere.",
+    "Take the test day as many times as you like. Nobody can see how many times you have done it.",
+    "If something is unclear, call the office. Asking is not silly — the app is new to everyone.",
+  ] },
   { t: "Finding your way there", p: [
     "The address is shown on every job — you do not have to open the job to see where to go.",
     "On municipal jobs the resident's name is at the top and the address below. The company name at the bottom is the one being invoiced, not the one you visit.",
@@ -1700,11 +1712,11 @@ function udskrivVejledning(sections, da) {
   );
   w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
 }
-function HelpPage({ lang, onClose }) {
+function HelpPage({ lang, onClose, onVisIgen }) {
   const da = lang === "da";
   const sections = da ? HELP_DA : HELP_EN;
   return (
-    <div style={{ position:"fixed", inset:0, background:"#fff", zIndex:120, display:"flex", flexDirection:"column" }}>
+    <div style={{ position:"fixed", inset:0, background:"#FDFCF8", zIndex:120, display:"flex", flexDirection:"column" }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
                     padding:"calc(14px + env(safe-area-inset-top)) 16px 14px",
                     borderBottom:"1px solid #E2E8F0", background:"#111", color:"#fff" }}>
@@ -1726,6 +1738,29 @@ function HelpPage({ lang, onClose }) {
           {da ? "Hver dag: åbn appen → tryk på opgaven → sæt flueben → registrér tid → marker som udført."
               : "Every day: open the app → tap the job → tick off tasks → register time → mark as done."}
         </div>
+        {/* Vejen tilbage til introduktionen.
+            Den vises kun én gang af sig selv, og den, der har trykket «Spring
+            over» på sin første dag, skal kunne finde den igen uden at skulle
+            ringe til kontoret. Øvelsen står lige under: der kan man prøve en hel
+            dag igennem uden at røre en rigtig kunde. */}
+        <div style={{ display:"flex", gap:9, flexWrap:"wrap", marginBottom:18 }}>
+          {onVisIgen && (
+            <button onClick={onVisIgen}
+              style={{ flex:"1 1 46%", border:"1.5px solid #E2E8F0", background:"#FDFCF8",
+                       borderRadius:11, padding:"13px 12px", fontSize:15, fontWeight:600,
+                       color:"#334155", cursor:"pointer", fontFamily:"inherit", minHeight:50 }}>
+              {da ? "Vis introduktionen igen" : "Show the intro again"}
+            </button>
+          )}
+          <a href="/proev.html" target="_blank" rel="noreferrer"
+            style={{ flex:"1 1 46%", border:"1.5px solid #E2E8F0", background:"#FDFCF8",
+                     borderRadius:11, padding:"13px 12px", fontSize:15, fontWeight:600,
+                     color:"#334155", textDecoration:"none", minHeight:50,
+                     display:"flex", alignItems:"center", justifyContent:"center" }}>
+            {da ? "Øv dig på en prøvedag" : "Practise on a test day"}
+          </a>
+        </div>
+
         {sections.map((sec, i) => (
           <div key={i} style={{ marginBottom:20 }}>
             <div style={{ fontWeight:800, fontSize:16, color:"#111", marginBottom:7 }}>{sec.t}</div>
@@ -1743,6 +1778,123 @@ function HelpPage({ lang, onClose }) {
         <div style={{ fontSize:13, color:"#94A3B8", borderTop:"1px solid #E2E8F0", paddingTop:12 }}>
           {da ? "Spørgsmål? Kontakt kontoret." : "Questions? Contact the office."}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Første gang ──────────────────────────────────────────────────────────────
+//
+// Tre skærmbilleder, første gang appen åbnes, og aldrig igen.
+//
+// Hvorfor ikke en rundvisning i det hele: fordi den bliver sprunget over. Der er
+// fireogtyve afsnit i hjælpen, og ingen læser dem, mens de står med en telefon,
+// de ikke er trygge ved. De tre her er skåret ned til det, der skal til for at
+// komme igennem den første dag — resten kan slås op, når der bliver brug for det.
+//
+// Den vigtigste af de tre er den første. Den handler ikke om appen, men om at
+// man ikke kan ødelægge noget. Det er den frygt, der gør, at det første tryk
+// ellers aldrig bliver til noget.
+const VELKOMST = {
+  da: [
+    { ikon: "✋", t: "Du kan ikke ødelægge noget",
+      p: ["Tryk roligt på det, du er i tvivl om. Der er altid en vej tilbage, og intet bliver sendt til kontoret, før du selv melder en opgave færdig.",
+          "Er der noget, du ikke kan finde ud af, så ring til kontoret. Det er ikke dumt at spørge."] },
+    { ikon: "📋", t: "Her er din dag",
+      p: ["Dine opgaver står i den rækkefølge, du skal tage dem. Adressen står på hver enkelt, så du kan se, hvor du skal hen uden at åbne noget.",
+          "Tryk på en opgave for at åbne den. Så kan du se, hvad der skal laves, og hvordan du kommer ind."] },
+    { ikon: "✓", t: "Sådan melder du færdig",
+      p: ["Sæt flueben ved det, du har lavet. Tryk så «Afslut opgave» nederst.",
+          "Du bliver spurgt, hvor lang tid du brugte. Tiden står på forhånd — passer den, trykker du bare videre.",
+          "Mangler der et flueben, må du godt melde færdig alligevel. Så følger kontoret op."] },
+  ],
+  en: [
+    { ikon: "✋", t: "You cannot break anything",
+      p: ["Tap anything you are unsure about. There is always a way back, and nothing is sent to the office until you finish a job yourself.",
+          "If something is unclear, call the office. Asking is not silly."] },
+    { ikon: "📋", t: "This is your day",
+      p: ["Your jobs are listed in the order you should take them. The address is on each one, so you can see where to go without opening anything.",
+          "Tap a job to open it. Then you can see what needs doing and how to get in."] },
+    { ikon: "✓", t: "How to finish a job",
+      p: ["Tick off what you have done. Then tap «Finish job» at the bottom.",
+          "You will be asked how long you spent. The time is filled in already — if it is right, just continue.",
+          "If a tick is missing you may still finish. The office will follow up."] },
+  ],
+};
+
+// Nøglen ligger i browseren og ikke i databasen. Med vilje: den hører til DEN
+// telefon, ikke til medarbejderen. Får hun en ny telefon, er det en ny første
+// gang — og det er netop dér, hun har brug for den igen.
+const VELKOMST_NOEGLE = "wl_velkomst_set";
+
+// Ikke eksporteret. Den bruges kun herinde, og et export ved siden af
+// komponenterne giver en advarsel om, at filen så indeholder to slags ting.
+//
+// Kan localStorage ikke læses — privat browsing, eller en telefon hvor det er
+// slået fra — svares der «set». Hellere springe introduktionen over end vise den
+// ved HVER åbning, fordi svaret alligevel ikke kan gemmes.
+function velkomstErSet() {
+  try { return localStorage.getItem(VELKOMST_NOEGLE) === "1"; } catch { return true; }
+}
+function husVelkomstSet() {
+  try { localStorage.setItem(VELKOMST_NOEGLE, "1"); } catch { /* privat browsing */ }
+}
+
+function Velkomst({ lang, navn, onLuk }) {
+  const da = lang === "da";
+  const trin = VELKOMST[da ? "da" : "en"];
+  const [nr, setNr] = useState(0);
+  const sidste = nr === trin.length - 1;
+  const t = trin[nr];
+
+  function luk() { husVelkomstSet(); onLuk(); }
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"#FDFCF8", zIndex:200,
+                  display:"flex", flexDirection:"column" }}>
+      <div style={{ display:"flex", justifyContent:"flex-end",
+                    padding:"calc(12px + env(safe-area-inset-top)) 14px 0" }}>
+        {/* «Spring over» står på hver skærm. En introduktion, man ikke kan komme
+            ud af, er en fælde — og den, der har set den før, skal ikke tvinges
+            igennem den igen for at komme til sin dag. */}
+        <button onClick={luk}
+          style={{ border:"none", background:"transparent", color:"#64748B",
+                   fontSize:15, fontFamily:"inherit", cursor:"pointer", padding:"10px 8px" }}>
+          {da ? "Spring over" : "Skip"}
+        </button>
+      </div>
+
+      <div style={{ flex:1, overflowY:"auto", padding:"8px 26px 20px",
+                    display:"flex", flexDirection:"column", justifyContent:"center",
+                    maxWidth:520, margin:"0 auto", width:"100%", boxSizing:"border-box" }}>
+        <div style={{ fontSize:58, marginBottom:18 }}>{t.ikon}</div>
+        <div style={{ fontSize:25, fontWeight:800, marginBottom:14, lineHeight:1.25 }}>
+          {nr === 0 && navn ? (da ? `Hej ${navn}. ` : `Hi ${navn}. `) : ""}{t.t}
+        </div>
+        {t.p.map((linje, i) => (
+          <div key={i} style={{ fontSize:17, lineHeight:1.6, color:"#334155", marginBottom:12 }}>
+            {linje}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding:"14px 20px calc(22px + env(safe-area-inset-bottom))",
+                    borderTop:"1px solid #F1F5F9" }}>
+        {/* Prikkerne viser, hvor langt man er. Tre skridt er til at overskue —
+            uden dem ved man ikke, om der kommer tyve mere. */}
+        <div style={{ display:"flex", justifyContent:"center", gap:8, marginBottom:16 }}>
+          {trin.map((_, i) => (
+            <div key={i} style={{ width: i === nr ? 22 : 8, height:8, borderRadius:4,
+                                  background: i === nr ? "#D6247A" : "#E2E8F0" }} />
+          ))}
+        </div>
+        <button
+          onClick={() => (sidste ? luk() : setNr(nr + 1))}
+          style={{ width:"100%", padding:"17px 0", borderRadius:14, border:"none",
+                   background:"#D6247A", color:"#fff", fontWeight:700, fontSize:17,
+                   cursor:"pointer", fontFamily:"inherit", minHeight:56 }}>
+          {sidste ? (da ? "Så er jeg klar" : "I am ready") : (da ? "Videre" : "Next")}
+        </button>
       </div>
     </div>
   );
@@ -4357,6 +4509,9 @@ export default function MedarbejderApp() {
   // skulle finde udraabstegnet frem igen for hver eneste opgave.
   const [fraManglelisten, setFraManglelisten] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  // Første gang appen åbnes på DEN her telefon. Startværdien læses én gang, så
+  // introduktionen ikke kan nå at blinke forbi for en, der har set den før.
+  const [visVelkomst, setVisVelkomst] = useState(() => !velkomstErSet());
   const [resetSent, setResetSent] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
     const [recoveryError, setRecoveryError] = useState("");
@@ -5235,7 +5390,15 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
         />
       )}
 
-      {showHelp && <HelpPage lang={lang} onClose={() => setShowHelp(false)} />}
+      {showHelp && <HelpPage lang={lang} onClose={() => setShowHelp(false)}
+                             onVisIgen={() => { setShowHelp(false); setVisVelkomst(true); }} />}
+
+      {/* Ligger øverst af alt. Er det hendes første gang på den her telefon, skal
+          hun ikke først skulle finde rundt i en dag, hun ikke forstår endnu. */}
+      {visVelkomst && (
+        <Velkomst lang={lang} navn={(employee?.name || "").split(" ")[0]}
+                  onLuk={() => setVisVelkomst(false)} />
+      )}
 
       {visMangler && (
         <ManglerPage
@@ -5308,6 +5471,16 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
+// Papirfarven under den tekst, der skal LÆSES.
+//
+// Knapper og felter bliver hvide — de skal se ud som noget, man trykker på. Men
+// de flader, hvor der står sætninger, får en anelse varme i stedet for at være
+// rent hvide. Skarp sort på skarp hvid giver visuel uro for en del ordblinde:
+// bogstaverne kan synes at flimre eller flyde sammen. Forskellen her er så lille,
+// at ingen lægger mærke til den — og det er meningen. Det skal ikke ligne en
+// særlig udgave for nogen.
+const PAPIR = "#FDFCF8";
+
 const s = {
   app: { fontFamily:"'Inter',-apple-system,system-ui,sans-serif", background:"#F8FAFC", minHeight:"100svh", color:"#111111", display:"flex", flexDirection:"column" },
   loading: { display:"flex", alignItems:"center", justifyContent:"center", height:"100svh", fontSize:15, color:"#9C1B5D" },
@@ -5363,7 +5536,7 @@ const s = {
   transportTime: { fontSize:12.5, color:"#475569", fontWeight:500 },
   transportNav: { display:"flex", alignItems:"center", gap:4, fontSize:12, fontWeight:700, color:"#D6247A", textDecoration:"none" },
 
-  taskCard: { display:"flex", alignItems:"stretch", background:"#fff", borderRadius:14, boxShadow:"0 1px 3px rgba(0,0,0,0.06)", cursor:"pointer", overflow:"hidden", border:"1px solid #F1F5F9" },
+  taskCard: { display:"flex", alignItems:"stretch", background:PAPIR, borderRadius:14, boxShadow:"0 1px 3px rgba(0,0,0,0.06)", cursor:"pointer", overflow:"hidden", border:"1px solid #F1F5F9" },
   taskAccent: { width:4, flexShrink:0 },
   taskBody: { flex:1, padding:"13px 12px", minWidth:0 },
   taskRight: { display:"flex", alignItems:"center", paddingRight:12 },
@@ -5385,7 +5558,7 @@ const s = {
   taskLogged: { display:"flex", alignItems:"center", gap:3, fontSize:12, color:"#9C1B5D", fontWeight:600 },
 
   overlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems:"stretch" },
-  sheet: { width:"100%", height:"100%", maxHeight:"100%", background:"#fff", borderRadius:0, display:"flex", flexDirection:"column", position:"relative" },
+  sheet: { width:"100%", height:"100%", maxHeight:"100%", background:PAPIR, borderRadius:0, display:"flex", flexDirection:"column", position:"relative" },
   dragHandle: { width:36, height:4, background:"#E2E8F0", borderRadius:99, margin:"12px auto 0" },
   sheetClose: { position:"absolute", top:12, right:14, border:"none", background:"#F1F5F9", borderRadius:99, width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"#475569" },
   sheetScroll: { flex:1, overflowY:"auto", padding:"8px 20px 20px" },
@@ -5395,7 +5568,14 @@ const s = {
   sheetTitle: { fontWeight:800, fontSize:20, color:"#111111", lineHeight:1.25, marginBottom:4 },
   sheetMeta: { fontSize:13, color:"#64748B", marginBottom:16 },
   sheetSection: { marginBottom:20, paddingBottom:20, borderBottom:"1px solid #F1F5F9" },
-  sheetSectionTitle: { display:"flex", alignItems:"center", gap:6, fontSize:12, fontWeight:700, color:"#475569", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 },
+  // Overskrifterne inde i opgaven — «Opgaver», «Video», «Produkter».
+  //
+  // De stod med STORE BOGSTAVER. Det ser ryddeligt ud, og det er sværere at
+  // læse: et ord i kapitæler har ingen over- og underlængder, så ordbilledet
+  // forsvinder, og bogstaverne skal stykkes sammen ét ad gangen. Det rammer
+  // ordblinde hårdest, men det er langsommere for alle. Størrelsen er sat lidt
+  // op til gengæld, så de stadig træder frem som overskrifter.
+  sheetSectionTitle: { display:"flex", alignItems:"center", gap:6, fontSize:13, fontWeight:700, color:"#475569", letterSpacing:"0.01em", marginBottom:10 },
   sheetCustomer: { fontWeight:700, fontSize:16, color:"#111111", marginBottom:4 },
   sheetAddress: { display:"flex", alignItems:"flex-start", gap:6, fontSize:13.5, color:"#475569", marginBottom:12 },
   sheetAccessText: { fontSize:14, color:"#111111", lineHeight:1.6, background:"#FCE4EF", padding:"12px 14px", borderRadius:10 },
@@ -5534,7 +5714,8 @@ const s = {
   notatInput: { width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:10, border:"1.5px solid #E2E8F0",
     fontSize:15, fontFamily:"inherit", resize:"vertical", outline:"none", background:"#fff", color:"#111111" },
   notatFejl: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:8 },
-  tilbudAfsnit: { fontSize:11.5, fontWeight:800, letterSpacing:".05em", textTransform:"uppercase",
+  // Samme grund som sheetSectionTitle: ingen kapitæler.
+  tilbudAfsnit: { fontSize:12.5, fontWeight:800, letterSpacing:".01em",
     color:"#9C1B5D", marginTop:20, marginBottom:2 },
   tilbudHint: { fontSize:12, color:"#64748B", marginTop:6, lineHeight:1.45 },
   notatFotoBtn: { flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff",

@@ -15,7 +15,13 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
+  /* 155 og ikke 145.
+     Luft mellem linjerne er den enkeltting, der hjælper en ordblind læser mest.
+     Ligger linjerne tæt, glider øjet ned i den forkerte linje på vej tilbage, og
+     så skal sætningen læses forfra. Forskellen er små to pixels pr. linje og
+     koster ingenting — hverken plads nok til at betyde noget på en telefon eller
+     læsbarhed for dem, der ikke har brug for den. */
+  font: 18px/155% var(--sans);
   letter-spacing: 0.18px;
   /* Kun lys. Der stod "light dark" — en rest fra Vites skabelon. Den fortæller
      browseren, at siden også findes i mørk udgave, og så tegner browseren alle
@@ -51,7 +57,19 @@ body {
   width: 1126px;
   max-width: 100%;
   margin: 0 auto;
-  text-align: center;
+  /* Venstrestillet — ikke centreret.
+     Der stod "center". Det er en rest fra Vites skabelon, og fordi text-align
+     arver, ramte den HELE appen: hvert eneste stykke tekst i Worklist regnede
+     sig frem til centreret, med mindre noget længere nede sagde andet. Målt i
+     browseren 18.9.2026, ikke gættet.
+     Centreret brødtekst er en af de værste ting for en ordblind læser: hver
+     linje begynder et nyt sted, så øjet skal lede efter starten på den næste i
+     stedet for bare at falde ned i den. Hjælpesiden satte selv "left" — resten
+     af appen gjorde ikke.
+     De steder, hvor noget SKAL stå på midten — kvitteringen med det grønne
+     flueben, "Ingen opgaver fredag", den lille tekst under logoet — siger det
+     selv i deres egen stil. De ændrer sig ikke af det her. */
+  text-align: left;
   border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;

@@ -33,8 +33,14 @@ self.addEventListener("message", (e) => {
 
 // Alle sider serveres fra index.html. Supabase og api holdes udenfor: opgavedata
 // haandteres i appen med sin egen kopi, og adgangsoplysninger maa ALDRIG i en cache.
+//
+// proev.html staar ogsaa udenfor. Den er oevelsesudgaven — en selvstaendig side,
+// der ikke har noget med appen at goere. Uden den her linje ville en telefon med
+// appen installeret svare med selve Worklist, naar nogen aabnede linket, og det
+// ville ligne at linket var i stykker. Filen bliver stadig gemt paa telefonen
+// som appens oevrige filer, saa oevelsen ogsaa kan tages uden daekning.
 registerRoute(new NavigationRoute(createHandlerBoundToURL("/index.html"), {
-  denylist: [/^\/api/, /supabase/],
+  denylist: [/^\/api/, /supabase/, /^\/proev\.html$/],
 }));
 
 // ── Push ────────────────────────────────────────────────────────────────────
