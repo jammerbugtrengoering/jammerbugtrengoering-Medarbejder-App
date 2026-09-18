@@ -307,6 +307,22 @@ function nulstil() {
 }
 nulstil();
 
+/* ── Vejen ud ───────────────────────────────────────────────────────────────
+   Øvelsen var en blindgyde: man kunne gennemføre dagen, trykke «Prøv igen» i en
+   uendelighed — og ikke komme tilbage til Worklist. Fundet 18.9.2026, første
+   gang filen blev åbnet på en telefon.
+
+   Filen ligger på samme adresse som appen (/proev.html), så forsiden ér
+   Worklist. Men den kan også være åbnet som en fil fra en mail eller en
+   usb-nøgle, og så findes der ingen forside at gå til. Derfor spørges der først,
+   hvor vi er — og knappen vises kun, når der faktisk er et sted at gå hen. */
+function kanVendeTilbage() {
+  return location.protocol === "http:" || location.protocol === "https:";
+}
+function tilbageTilWorklist() {
+  if (kanVendeTilbage()) location.href = "/";
+}
+
 const opg = (id) => OPGAVER.find((o) => o.id === id);
 const antalFaerdige = () => OPGAVER.filter((o) => tilstand[o.id].faerdig).length;
 
@@ -441,7 +457,8 @@ function tegn() {
    men fordi den fjerner den frygt, der ellers gør, at det første tryk aldrig
    bliver til noget. */
 function tegnVelkomst(r) {
-  r.appendChild(topbjaelke("Prøv Worklist", "Øvelse — intet af det her er rigtigt", null, null));
+  r.appendChild(topbjaelke("Prøv Worklist", "Øvelse — intet af det her er rigtigt",
+    kanVendeTilbage() ? "Luk" : null, tilbageTilWorklist));
   r.appendChild(el("div", { klasse: "indhold" },
     el("div", { klasse: "kvit", style: "padding-top:22px" },
       el("div", { klasse: "kvitcirkel", style: "background:#FFF6FA;border-color:#D6247A;color:#D6247A;font-size:38px" }, "✋"),
@@ -528,6 +545,13 @@ function tegnDag(r) {
   if (f === OPGAVER.length) {
     indhold.appendChild(el("button", { klasse: "knap knap-primaer", style: "margin-top:10px",
       tryk: () => { skaerm = "slut"; tegn(); } }, "Se hvordan det gik"));
+  }
+  // Man skal kunne stoppe midt i. Den, der har fået nok efter to opgaver, skal
+  // ikke være tvunget igennem de sidste to for at komme tilbage til sit arbejde.
+  if (kanVendeTilbage()) {
+    indhold.appendChild(el("div", { style: "height:14px" }));
+    indhold.appendChild(el("button", { klasse: "knap knap-anden",
+      tryk: tilbageTilWorklist }, "Afslut øvelsen og gå til Worklist"));
   }
   r.appendChild(indhold);
 }
@@ -770,14 +794,23 @@ function tegnSlut(r) {
     "På Nexus- og Ældrelov-opgaver står borgeren øverst. Firmanavnet nederst — kommunen eller Carelink — er den, der får regningen. Det er ikke et sted, du skal køre hen."));
 
   indhold.appendChild(el("div", { style: "height:18px" }));
-  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+  // Den grønne knap er den, man er færdig med. «Prøv igen» står under som noget,
+  // man vælger — ikke som den eneste vej videre.
+  if (kanVendeTilbage()) {
+    indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+      style: "background:#16A34A", tryk: tilbageTilWorklist }, "Tilbage til Worklist"));
+    indhold.appendChild(el("div", { style: "height:10px" }));
+  }
+  indhold.appendChild(el("button", { klasse: "knap knap-anden",
     tryk: () => { nulstil(); tegn(); } }, "Prøv igen"));
   indhold.appendChild(el("div", { style: "height:10px" }));
   indhold.appendChild(el("button", { klasse: "knap knap-anden",
     tryk: () => { skaerm = "ikoner"; tegn(); } }, "Se de fire ikoner igen"));
   indhold.appendChild(el("div", { style: "height:10px" }));
   indhold.appendChild(el("div", { klasse: "lille" },
-    "Du må tage øvelsen så mange gange, du vil. Ingen kan se, hvor mange gange."));
+    kanVendeTilbage()
+      ? "Du må tage øvelsen så mange gange, du vil. Ingen kan se, hvor mange gange."
+      : "Du må tage øvelsen så mange gange, du vil. Luk fanen, når du er færdig."));
   r.appendChild(indhold);
 }
 

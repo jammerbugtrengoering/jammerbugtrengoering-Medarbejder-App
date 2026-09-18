@@ -1768,7 +1768,12 @@ function HelpPage({ lang, onClose, onVisIgen }) {
               {da ? "Vis introduktionen igen" : "Show the intro again"}
             </button>
           )}
-          <a href="/proev.html" target="_blank" rel="noreferrer"
+          {/* Samme fane, ikke en ny.
+              Med target="_blank" endte hun med to faner: øvelsen foran og
+              Worklist bagved. Knappen «Tilbage til Worklist» inde i øvelsen går
+              til forsiden, og så ville hun stå med appen i BEGGE faner uden at
+              vide hvorfor. I samme fane er der kun én app og én vej tilbage. */}
+          <a href="/proev.html"
             style={{ flex:"1 1 46%", border:"1.5px solid #E2E8F0", background:"#FDFCF8",
                      borderRadius:11, padding:"13px 12px", fontSize:15, fontWeight:600,
                      color:"#334155", textDecoration:"none", minHeight:50,
