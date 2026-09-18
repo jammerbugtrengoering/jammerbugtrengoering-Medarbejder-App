@@ -1329,6 +1329,14 @@ const HELP_DA = [
     "Du må tage prøvedagen så mange gange, du vil. Ingen kan se, hvor mange gange du har gjort det.",
     "Er der noget, du ikke kan finde ud af, så ring til kontoret. Det er ikke dumt at spørge — appen er ny for alle.",
   ] },
+  { t: "De fire knapper i toppen", p: [
+    "Øverst til højre står fire knapper. De er der hele dagen, uanset hvor i appen du er.",
+    "T-shirten er arbejdstøj. Her bestiller du bukser, T-shirts og sko, og kontoret får besked.",
+    "Bilen er din kørsel. Kilometrene regnes ud af sig selv ud fra de opgaver, du melder færdige — du skal ikke skrive noget.",
+    "Spørgsmålstegnet er den her side.",
+    "Cirklen med dine bogstaver er dig selv: sprog, liste eller tidslinje, beskeder på telefonen, og log ud.",
+    "Der kan komme to knapper mere. Et gult udråbstegn betyder, at du mangler at registrere tid på en dag, der er gået — tallet siger hvor mange. En kalender vises kun, hvis du også planlægger.",
+  ] },
   { t: "Sådan finder du derhen", p: [
     "På hver opgave står adressen med det samme — du behøver ikke åbne opgaven for at se, hvor du skal hen.",
     "Er det en kommunal opgave, står borgerens navn øverst og adressen under. Firmanavnet nederst er den, der får regningen — ikke den du skal besøge.",
@@ -1515,6 +1523,14 @@ const HELP_EN = [
     "Next to it is «Practise on a test day». It is a full working day with four jobs where nothing is real: no citizens, no customers, and nothing is saved anywhere.",
     "Take the test day as many times as you like. Nobody can see how many times you have done it.",
     "If something is unclear, call the office. Asking is not silly — the app is new to everyone.",
+  ] },
+  { t: "The four buttons at the top", p: [
+    "There are four buttons in the top right. They stay there all day, wherever you are in the app.",
+    "The T-shirt is work clothing. Order trousers, T-shirts and shoes here, and the office is notified.",
+    "The car is your driving. The kilometres are worked out on their own from the jobs you finish — you do not have to write anything.",
+    "The question mark is this page.",
+    "The circle with your initials is you: language, list or timeline, notifications, and sign out.",
+    "Two more buttons can appear. A yellow warning sign means you have not registered time on a day that has passed — the number says how many. A calendar only shows if you are also a planner.",
   ] },
   { t: "Finding your way there", p: [
     "The address is shown on every job — you do not have to open the job to see where to go.",

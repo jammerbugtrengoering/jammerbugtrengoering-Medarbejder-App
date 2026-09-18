@@ -27,22 +27,28 @@
       der får regningen. Det er IKKE et sted, du skal hen.
   Den forveksling er værd at lave én gang her frem for første gang i en bil.
 
+  DET DER ÅBNER NOGET ANDET
+  Kortet og Nexus åbner rigtige programmer i den rigtige app. Her tegnes de i
+  stedet, og der står tydeligt, at det er en tegning. Pointen er ikke at vise
+  kortet — den er, at man ikke bliver bange, når skærmen pludselig skifter til
+  noget helt andet, og at man ved, at man kommer tilbage igen bagefter.
+
   SKRIFTEN
   Venstrestillet, luft mellem linjerne, ingen ord med store bogstaver og en
   anelse varme i papiret frem for skarp hvid. Det er de samme valg som i den
   rigtige app, og de er truffet med ordblinde brugere for øje.
 
   RETTELSER
-  Alt indhold står i OPGAVER nedenfor. Teksterne må gerne rettes — det er
-  meningen, at kontoret selv kan skrue på dem.
+  Alt indhold står i OPGAVER og IKONER nedenfor. Teksterne må gerne rettes — det
+  er meningen, at kontoret selv kan skrue på dem.
 -->
 <style>
   :root {
     /* Kun lys udgave.
-       Uden den her linje tegner telefonen knapper og felter moerkt, naar den
-       staar i moerk tilstand — og teksten forsvinder, fordi farverne herunder
-       regner med en lys baggrund. Det er den samme fejl, som allerede er rettet
-       i selve Worklist; den skal ikke laves om igen her. */
+       Uden den her linje tegner telefonen knapper og felter mørkt, når den står
+       i mørk tilstand — og teksten forsvinder, fordi farverne herunder regner
+       med en lys baggrund. Det er den samme fejl, som allerede er rettet i selve
+       Worklist; den skal ikke laves om igen her. */
     color-scheme: light;
     --pink: #D6247A;
     --pink-mork: #9C1B5D;
@@ -52,6 +58,7 @@
     --daempet: #64748B;
     --kant: #E2E8F0;
     --groen: #16A34A;
+    --blaa: #1A73E8;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -103,18 +110,30 @@
   .kort {
     background: var(--papir); border: 1px solid #F1F5F9; border-radius: 15px;
     box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 12px;
-    display: flex; overflow: hidden; cursor: pointer; width: 100%;
-    text-align: left; font-family: inherit; font-size: inherit; color: inherit;
-    padding: 0;
+    display: flex; overflow: hidden; width: 100%; position: relative;
+  }
+  .kortknap {
+    display: flex; flex: 1; min-width: 0; background: transparent; border: none;
+    padding: 0; cursor: pointer; text-align: left; font-family: inherit;
+    font-size: inherit; color: inherit;
   }
   .kort .stribe { width: 6px; flex-shrink: 0; background: #3B82F6; }
   .kort.faerdig .stribe { background: var(--groen); }
   .kort .krop { padding: 14px 15px; flex: 1; min-width: 0; }
   .kort .klok { font-size: 13.5px; color: var(--daempet); font-weight: 600; }
-  .kort .navn { font-size: 17px; font-weight: 700; margin: 2px 0 1px; }
+  .kort .navn { font-size: 17px; font-weight: 700; margin: 2px 0 1px; padding-right: 46px; }
   .kort .adr  { font-size: 15px; color: #475569; }
   .kort .fod  { font-size: 13.5px; color: #94A3B8; margin-top: 7px;
                 display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+
+  /* Navigationspilen. Ligger oven på kortet i højre hjørne, præcis som i appen.
+     44 px, fordi en finger skal kunne ramme den uden at åbne opgaven ved et uheld. */
+  .navpil {
+    position: absolute; top: 9px; right: 9px; width: 44px; height: 44px;
+    border-radius: 11px; border: 1.5px solid #DBEAFE; background: #EFF6FF;
+    color: var(--blaa); cursor: pointer; display: flex; align-items: center;
+    justify-content: center; padding: 0;
+  }
 
   .maerkat { font-size: 12px; font-weight: 700; border-radius: 7px; padding: 2px 8px; }
   .m-privat    { color:#9C1B5D; background:#FFF6FA; }
@@ -127,10 +146,13 @@
   .knap {
     width: 100%; border: none; border-radius: 14px; padding: 17px 16px;
     font-size: 17px; font-weight: 700; cursor: pointer; font-family: inherit;
-    min-height: 56px;
+    min-height: 56px; display: flex; align-items: center; justify-content: center; gap: 9px;
+    text-decoration: none;
   }
   .knap-primaer { background: var(--pink); color: #fff; }
   .knap-anden   { background: var(--papir); color: #334155; border: 1.5px solid var(--kant); }
+  .knap-blaa    { background: #EFF6FF; color: #1D4ED8; border: 1.5px solid #DBEAFE; }
+  .knap-lilla   { background: #EEF2FF; color: #4338CA; border: 1.5px solid #E0E7FF; }
   .knap:active { transform: translateY(1px); }
 
   .afsnit { font-size: 14px; font-weight: 700; color: #475569; margin: 22px 0 9px; }
@@ -170,7 +192,37 @@
               padding: 13px 15px; font-size: 15.5px; margin-bottom: 14px; }
 
   .lille { font-size: 14px; color: var(--daempet); }
-  .skjul { display: none !important; }
+
+  /* Ikonrækken — den samme, som står øverst i den rigtige app. */
+  .ikonbjaelke { background: #111; border-radius: 13px; padding: 13px 14px;
+                 display: flex; align-items: center; justify-content: space-between;
+                 gap: 8px; margin-bottom: 18px; }
+  .ikonbjaelke .titel { color: #fff; font-weight: 800; font-size: 15px; }
+  .ikonbjaelke .hoejre { display: flex; align-items: center; gap: 7px; }
+  .ikonrund { width: 34px; height: 34px; border-radius: 9px;
+              display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .i-toej  { background:#FCE4EF; color:#D6247A; }
+  .i-bil   { background:#EEF2FF; color:#4F46E5; }
+  .i-hjaelp{ background:#F1F5F9; color:#334155; }
+  .i-mig   { background:#D6247A; color:#fff; border-radius:50%; width:30px; height:30px;
+             font-size:12px; font-weight:700; }
+
+  .ikonlinje { display: flex; gap: 14px; align-items: flex-start;
+               padding: 14px 0; border-bottom: 1px solid #F1F5F9; }
+  .ikonlinje b { display: block; font-size: 16.5px; margin-bottom: 1px; }
+  .ikonlinje .txt { font-size: 15px; color: #475569; }
+
+  /* Kortet. Rammen er en telefon, der har åbnet noget andet end Worklist. */
+  .kortramme { border-radius: 16px; overflow: hidden; border: 1px solid var(--kant);
+               margin-bottom: 14px; background: #E8EDE4; }
+  .kortbjaelke { background: #fff; padding: 12px 14px; display: flex; align-items: center;
+                 justify-content: space-between; gap: 10px; border-top: 1px solid #EDEFF2; }
+  .kortbjaelke .stor { font-size: 19px; font-weight: 800; }
+  .kortbjaelke .sub { font-size: 13.5px; color: var(--daempet); }
+  .kortbjaelke .startknap { background: var(--blaa); color: #fff; border: none;
+                            border-radius: 999px; padding: 10px 18px; font-size: 15px;
+                            font-weight: 700; font-family: inherit; }
+  svg { display: block; }
 </style>
 </head>
 <body>
@@ -191,6 +243,7 @@ const OPGAVER = [
     id: 1, slags: "privat", maerkat: "Privat", klok: "08.00", minutter: 60,
     navn: "Ellen Bach", adresse: "Klitvejen 12, Blokhus",
     fod: "", betalerErIkkeStedet: false,
+    afstand: "4,2 km", koeretid: "7 min",
     adgang: "Nøglen ligger i boksen ved døren. Kode 1904.",
     tjek: ["Støvsugning i alle rum", "Gulvvask i køkken og bad", "Aftørring af flader"],
   },
@@ -198,6 +251,7 @@ const OPGAVER = [
     id: 2, slags: "erhverv", maerkat: "Erhverv", klok: "09.30", minutter: 90,
     navn: "Davidsen A/S", adresse: "Vesterhavsparken 2, Hune",
     fod: "Kontakt: Jens i receptionen", betalerErIkkeStedet: false,
+    afstand: "6,8 km", koeretid: "11 min",
     adgang: "Alarmen slås fra med brik. Hent den i receptionen.",
     tjek: ["Toiletter", "Frokoststue og køkken", "Kontorer — kun gulve", "Tøm skraldespande"],
   },
@@ -205,6 +259,7 @@ const OPGAVER = [
     id: 3, slags: "nexus", maerkat: "Nexus", klok: "11.30", minutter: 35,
     navn: "Karl Aage Sørensen", adresse: "Bøgevej 14, Kaas",
     fod: "Jammerbugt Kommune", betalerErIkkeStedet: true,
+    afstand: "12,4 km", koeretid: "16 min",
     adgang: "Ring på. Han lukker selv op.",
     tjek: ["Badeværelse", "Køkken", "Støvsugning"],
     nexus: true,
@@ -213,25 +268,42 @@ const OPGAVER = [
     id: 4, slags: "aeldrelov", maerkat: "Ældrelov", klok: "13.00", minutter: 40,
     navn: "Ruth Pedersen", adresse: "Passagen 26, Aabybro",
     fod: "Carelink Pleje Aalborg ApS", betalerErIkkeStedet: true,
+    afstand: "9,1 km", koeretid: "13 min",
     adgang: "Nøgleboks ved opgangsdøren. Kode 2277.",
     tjek: ["Støvsugning", "Gulvvask", "Skift af sengetøj"],
   },
+];
+
+/* De fire ikoner øverst i appen. Rækkefølgen er den samme som på skærmen.
+   Der findes to mere, men de dukker kun op, når der er noget: et udråbstegn,
+   når du mangler at registrere noget, og en kalender, hvis du er planlægger.
+   Dem nævner vi til sidst — ikke som en femte og sjette ting at huske. */
+const IKONER = [
+  { ikon: "toej",  klasse: "i-toej",   navn: "Arbejdstøj",
+    tekst: "Bestil bukser, T-shirts og sko. Kontoret får besked og bestiller hjem." },
+  { ikon: "bil",   klasse: "i-bil",    navn: "Min kørsel",
+    tekst: "Se hvor mange kilometer, du har kørt. Tallet regnes ud af sig selv ud fra de opgaver, du melder færdige — du skal ikke skrive noget." },
+  { ikon: "hjaelp",klasse: "i-hjaelp", navn: "Hjælp",
+    tekst: "Sådan bruger du appen, skrevet ned. Det er også her, du kan starte den her prøvedag forfra." },
+  { ikon: "mig",   klasse: "i-mig",    navn: "Dig selv",
+    tekst: "Dine indstillinger: sprog, om dagen vises som liste eller tidslinje, og beskeder på telefonen. Log ud står også her." },
 ];
 
 /* ── Tilstand ───────────────────────────────────────────────────────────────
    Alt ligger i hukommelsen. Lukker man fanen, begynder man forfra — og det er
    med vilje. Øvelsen skal kunne tages igen fra en ren tavle af den næste, der
    får telefonen i hånden. */
-let skaerm = "velkomst";     // velkomst | dag | opgave | tid | nexus | kvittering | slut
-let aaben = null;            // id på den opgave, der er åben
-let tilstand = {};           // id → { faerdig, tjek:Set, minutter, nexusSat }
+let skaerm = "velkomst";
+let aaben = null;      // id på den opgave, der er åben
+let retur = "dag";     // hvor kort- og Nexus-skærmen skal føre tilbage til
+let tilstand = {};
 
 function nulstil() {
   tilstand = {};
   OPGAVER.forEach((o) => {
     tilstand[o.id] = { faerdig: false, tjek: new Set(), minutter: o.minutter, nexusSat: false };
   });
-  skaerm = "velkomst"; aaben = null;
+  skaerm = "velkomst"; aaben = null; retur = "dag";
 }
 nulstil();
 
@@ -246,8 +318,8 @@ function tidTekst(m) {
 }
 
 /* Teksten bygges med DOM og ikke med innerHTML af strenge med navne i. Det er
-   en øvelsesfil, men vanen er den rigtige: et navn med et vinkelparentes i
-   skal ikke kunne blive til noget, browseren udfører. */
+   en øvelsesfil, men vanen er den rigtige: et navn med en vinkelparentes i skal
+   ikke kunne blive til noget, browseren udfører. */
 function el(tag, attr, ...boern) {
   const n = document.createElement(tag);
   for (const k in (attr || {})) {
@@ -263,11 +335,89 @@ function el(tag, attr, ...boern) {
   return n;
 }
 
-/* Hedder «topbjaelke» og ikke «top».
-   En funktion ved navn top i den yderste skal kolliderer med window.top — det
-   er browserens eget navn for det oeverste vindue, og det kan ikke overskrives.
-   Siden gik i staa foer foerste linje blev tegnet. Fundet af proeven, ikke i en
-   browser, og det er praecis den slags, der ellers naar helt ud til en telefon. */
+/* SVG skal laves med createElementNS. Med createElement bliver det et
+   almindeligt element med et svg-agtigt navn, og browseren tegner ingenting. */
+function svg(tag, attr, ...boern) {
+  const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const k in (attr || {})) n.setAttribute(k, attr[k]);
+  boern.flat().forEach((b) => b && n.appendChild(b));
+  return n;
+}
+
+/* ── Ikonerne ───────────────────────────────────────────────────────────────
+   Tegnet i hånden og ikke hentet fra et bibliotek: filen skal virke uden
+   internet. De skal kunne genkendes, ikke være pæne. */
+function tegnIkon(navn, stoerrelse) {
+  const st = stoerrelse || 18;
+  const f = { fill: "none", stroke: "currentColor", "stroke-width": 1.9,
+              "stroke-linecap": "round", "stroke-linejoin": "round" };
+  const rod = svg("svg", { viewBox: "0 0 24 24", width: st, height: st, "aria-hidden": "true" });
+
+  if (navn === "toej") {                       // T-shirt
+    rod.appendChild(svg("path", { ...f, d: "M9 3 L5 5 L3 9 L6 10.5 L6 21 L18 21 L18 10.5 L21 9 L19 5 L15 3 C15 5 9 5 9 3 Z" }));
+  } else if (navn === "bil") {                 // bil set fra siden
+    rod.appendChild(svg("path", { ...f, d: "M3 13 L4.5 8.5 C4.8 7.6 5.6 7 6.6 7 L17.4 7 C18.4 7 19.2 7.6 19.5 8.5 L21 13" }));
+    rod.appendChild(svg("path", { ...f, d: "M3 13 L21 13 L21 17 L3 17 Z" }));
+    rod.appendChild(svg("circle", { ...f, cx: 7, cy: 17, r: 1.9 }));
+    rod.appendChild(svg("circle", { ...f, cx: 17, cy: 17, r: 1.9 }));
+  } else if (navn === "hjaelp") {               // cirkel med spørgsmålstegn
+    rod.appendChild(svg("circle", { ...f, cx: 12, cy: 12, r: 9 }));
+    rod.appendChild(svg("path", { ...f, d: "M9.4 9.3 C9.6 8 10.7 7.2 12 7.2 C13.5 7.2 14.6 8.1 14.6 9.4 C14.6 11.2 12 11.5 12 13.6" }));
+    rod.appendChild(svg("circle", { cx: 12, cy: 16.6, r: 1, fill: "currentColor" }));
+  } else if (navn === "pil") {                  // navigationspilen
+    rod.appendChild(svg("path", { ...f, d: "M21 3 L14 21 L11.6 13.4 L4 11 Z" }));
+  }
+  return rod;
+}
+
+function tegnAvatar(bogstaver) {
+  return el("span", { klasse: "ikonrund i-mig" }, bogstaver || "AB");
+}
+
+/* ── Kortet ─────────────────────────────────────────────────────────────────
+   En tegning af et kort, ikke et rigtigt kort. Den skal kunne genkendes på et
+   halvt sekund: grønt land, blåt vand, hvide veje, en blå rute fra en prik til
+   en nål. Alt andet er pynt, der ville stjæle opmærksomhed. */
+function tegnKort() {
+  const k = svg("svg", { viewBox: "0 0 320 230", width: "100%",
+                         role: "img", "aria-label": "Tegning af et kort med en rute fra dig til adressen" });
+
+  k.appendChild(svg("rect", { x: 0, y: 0, width: 320, height: 230, fill: "#E9EEE3" }));
+  // Vand langs toppen.
+  k.appendChild(svg("path", { d: "M0 0 L320 0 L320 34 C240 52 150 48 78 34 C48 28 22 30 0 40 Z", fill: "#AFCBE8" }));
+  // Et par grønne områder, så det ikke er en tom flade.
+  k.appendChild(svg("rect", { x: 16, y: 148, width: 96, height: 66, rx: 10, fill: "#D6E3C8" }));
+  k.appendChild(svg("rect", { x: 214, y: 62, width: 94, height: 58, rx: 10, fill: "#D6E3C8" }));
+  k.appendChild(svg("rect", { x: 196, y: 164, width: 112, height: 52, rx: 10, fill: "#D6E3C8" }));
+
+  // Vejene. Grå kant under hvid bane — det er sådan et kort ser ud.
+  const veje = [
+    "M0 124 L320 124", "M70 230 L70 60", "M160 230 L160 40", "M240 210 L240 60",
+    "M20 176 L300 176",
+  ];
+  veje.forEach((d) => k.appendChild(svg("path", { d, stroke: "#C9CEC4", "stroke-width": 15, fill: "none", "stroke-linecap": "round" })));
+  veje.forEach((d) => k.appendChild(svg("path", { d, stroke: "#FFFFFF", "stroke-width": 11, fill: "none", "stroke-linecap": "round" })));
+
+  // Ruten. Bred, blå og med runde hjørner — den skal være det første, øjet ser.
+  const rute = "M70 198 L70 124 L160 124 L160 84 L240 84";
+  k.appendChild(svg("path", { d: rute, stroke: "#1557B0", "stroke-width": 11,
+                              fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
+  k.appendChild(svg("path", { d: rute, stroke: "#1A73E8", "stroke-width": 7,
+                              fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
+
+  // Du er her.
+  k.appendChild(svg("circle", { cx: 70, cy: 198, r: 12, fill: "#1A73E8", opacity: 0.18 }));
+  k.appendChild(svg("circle", { cx: 70, cy: 198, r: 7, fill: "#1A73E8", stroke: "#fff", "stroke-width": 3 }));
+
+  // Nålen, hvor du skal hen.
+  k.appendChild(svg("path", {
+    d: "M240 56 C231 56 224 63 224 72 C224 84 240 100 240 100 C240 100 256 84 256 72 C256 63 249 56 240 56 Z",
+    fill: "#D6247A", stroke: "#fff", "stroke-width": 2.5 }));
+  k.appendChild(svg("circle", { cx: 240, cy: 72, r: 5.5, fill: "#fff" }));
+
+  return k;
+}
+
 function topbjaelke(titel, under, lukTekst, lukHandling) {
   return el("div", { klasse: "top" },
     el("div", {},
@@ -279,10 +429,11 @@ function topbjaelke(titel, under, lukTekst, lukHandling) {
 function tegn() {
   const r = document.getElementById("ramme");
   r.innerHTML = "";
-  ({ velkomst: tegnVelkomst, dag: tegnDag, opgave: tegnOpgave,
-     tid: tegnTid, nexus: tegnNexus, kvittering: tegnKvittering,
-     slut: tegnSlut })[skaerm](r);
-  r.querySelector(".indhold") && (r.querySelector(".indhold").scrollTop = 0);
+  ({ velkomst: tegnVelkomst, ikoner: tegnIkoner, dag: tegnDag, kort: tegnKortSkaerm,
+     opgave: tegnOpgave, nexusapp: tegnNexusApp, tid: tegnTid, nexus: tegnNexus,
+     kvittering: tegnKvittering, slut: tegnSlut })[skaerm](r);
+  const i = r.querySelector(".indhold");
+  if (i) i.scrollTop = 0;
 }
 
 /* ── Velkomst ───────────────────────────────────────────────────────────────
@@ -300,8 +451,45 @@ function tegnVelkomst(r) {
     el("div", { klasse: "afsnit" }, "Sådan ser en dag ud"),
     el("div", { klasse: "lille", style: "margin-bottom:18px" },
       "Du har fire opgaver. For hver af dem skal du sætte flueben ved det, du har lavet, skrive hvor lang tid du brugte, og melde den færdig. Det er hele dagen."),
-    el("button", { klasse: "knap knap-primaer", tryk: () => { skaerm = "dag"; tegn(); } },
+    el("button", { klasse: "knap knap-primaer", tryk: () => { skaerm = "ikoner"; tegn(); } },
       "Start øvelsen")));
+}
+
+/* ── De fire ikoner ─────────────────────────────────────────────────────────
+   Kommer FØR dagen. Toppen af skærmen står der hele tiden, og fire ukendte
+   tegn i hjørnet er noget, man går udenom i stedet for at trykke på. */
+function tegnIkoner(r) {
+  r.appendChild(topbjaelke("Toppen af skærmen", "Fire knapper, du har hele dagen", "Spring over",
+    () => { skaerm = "dag"; tegn(); }));
+
+  const indhold = el("div", { klasse: "indhold" });
+  indhold.appendChild(el("div", { klasse: "vejled" },
+    "De fire knapper i højre hjørne står der altid. Her er, hvad de gør."));
+
+  // Bjælken selv, så de kan genkende den igen.
+  indhold.appendChild(el("div", { klasse: "ikonbjaelke" },
+    el("div", { klasse: "titel" }, "Worklist"),
+    el("div", { klasse: "hoejre" },
+      el("span", { klasse: "ikonrund i-toej" }, tegnIkon("toej")),
+      el("span", { klasse: "ikonrund i-bil" }, tegnIkon("bil")),
+      el("span", { klasse: "ikonrund i-hjaelp" }, tegnIkon("hjaelp")),
+      tegnAvatar("EB"))));
+
+  IKONER.forEach((i) => {
+    indhold.appendChild(el("div", { klasse: "ikonlinje" },
+      el("span", { klasse: "ikonrund " + i.klasse },
+        i.ikon === "mig" ? "EB" : tegnIkon(i.ikon)),
+      el("div", {},
+        el("b", {}, i.navn),
+        el("div", { klasse: "txt" }, i.tekst))));
+  });
+
+  indhold.appendChild(el("div", { klasse: "lille", style: "margin:18px 0 20px" },
+    "Der kan dukke to knapper mere op. Et gult udråbstegn betyder, at du mangler at registrere tid på en dag, der er gået. En kalender vises kun, hvis du også planlægger. Dem skal du ikke lære udenad — de kommer, når der er noget."));
+
+  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+    tryk: () => { skaerm = "dag"; tegn(); } }, "Videre til dagen"));
+  r.appendChild(indhold);
 }
 
 /* ── Dagen ──────────────────────────────────────────────────────────────── */
@@ -311,7 +499,7 @@ function tegnDag(r) {
 
   const indhold = el("div", { klasse: "indhold" });
   indhold.appendChild(el("div", { klasse: "vejled" },
-    f === 0 ? "Tryk på den første opgave for at åbne den."
+    f === 0 ? "Tryk på den første opgave for at åbne den. Pilen til højre åbner kortet."
             : f < OPGAVER.length ? "Godt. Tag den næste."
             : "Alle fire er meldt færdige."));
   indhold.appendChild(el("div", { klasse: "fremdrift" }, f + " af " + OPGAVER.length + " meldt færdig"));
@@ -320,24 +508,61 @@ function tegnDag(r) {
     const t = tilstand[o.id];
     // På nexus og ældrelov står borgeren øverst og betaleren nederst. Det er
     // den forskel, hele øvelsen handler om at få ind under huden.
-    const kort = el("button", { klasse: "kort" + (t.faerdig ? " faerdig" : ""),
-                                tryk: () => { aaben = o.id; skaerm = "opgave"; tegn(); } },
-      el("div", { klasse: "stribe" }),
-      el("div", { klasse: "krop" },
-        el("div", { klasse: "klok" }, o.klok + " · " + tidTekst(o.minutter)),
-        el("div", { klasse: "navn" }, o.navn),
-        el("div", { klasse: "adr" }, o.adresse),
-        el("div", { klasse: "fod" },
-          el("span", { klasse: "maerkat m-" + o.slags }, o.maerkat),
-          o.fod ? el("span", {}, o.fod) : null,
-          t.faerdig ? el("span", { klasse: "flueben-gr" }, "✓ Færdig") : null)));
-    indhold.appendChild(kort);
+    indhold.appendChild(el("div", { klasse: "kort" + (t.faerdig ? " faerdig" : "") },
+      el("button", { klasse: "kortknap",
+                     tryk: () => { aaben = o.id; skaerm = "opgave"; tegn(); } },
+        el("div", { klasse: "stribe" }),
+        el("div", { klasse: "krop" },
+          el("div", { klasse: "klok" }, o.klok + " · " + tidTekst(o.minutter)),
+          el("div", { klasse: "navn" }, o.navn),
+          el("div", { klasse: "adr" }, o.adresse),
+          el("div", { klasse: "fod" },
+            el("span", { klasse: "maerkat m-" + o.slags }, o.maerkat),
+            o.fod ? el("span", {}, o.fod) : null,
+            t.faerdig ? el("span", { klasse: "flueben-gr" }, "✓ Færdig") : null))),
+      el("button", { klasse: "navpil", "aria-label": "Kør derhen — " + o.adresse,
+                     tryk: () => { aaben = o.id; retur = "dag"; skaerm = "kort"; tegn(); } },
+        tegnIkon("pil", 21))));
   });
 
   if (f === OPGAVER.length) {
     indhold.appendChild(el("button", { klasse: "knap knap-primaer", style: "margin-top:10px",
       tryk: () => { skaerm = "slut"; tegn(); } }, "Se hvordan det gik"));
   }
+  r.appendChild(indhold);
+}
+
+/* ── Kortet ─────────────────────────────────────────────────────────────────
+   Det, der sker, når man trykker på pilen. I den rigtige app forlader man
+   Worklist og lander i telefonens eget kort. Det er lige præcis dét, der gør
+   folk utrygge — skærmen skifter til noget helt andet — så det står der med
+   rene ord, at man kommer tilbage bagefter. */
+function tegnKortSkaerm(r) {
+  const o = opg(aaben);
+  r.appendChild(topbjaelke("Kort", o.adresse, "Tilbage",
+    () => { skaerm = retur; tegn(); }));
+
+  const indhold = el("div", { klasse: "indhold" });
+  indhold.appendChild(el("div", { klasse: "vejled" },
+    "Sådan her ser det ud, når du trykker på pilen."));
+
+  indhold.appendChild(el("div", { klasse: "kortramme" },
+    tegnKort(),
+    el("div", { klasse: "kortbjaelke" },
+      el("div", {},
+        el("div", { klasse: "stor" }, o.koeretid),
+        el("div", { klasse: "sub" }, o.afstand + " · " + o.adresse)),
+      el("div", { klasse: "startknap" }, "Start"))));
+
+  indhold.appendChild(el("div", { klasse: "advarsel" },
+    "Det her er en tegning. I den rigtige app åbner telefonens eget kort — Google Maps eller Apple Kort — med ruten lagt ind."));
+
+  indhold.appendChild(el("div", { klasse: "info" },
+    el("div", { klasse: "lbl" }, "Det vigtige"),
+    el("div", {}, "Du bliver ikke logget ud af Worklist, og du mister ingenting. Kortet er bare et andet program oven på. Når du er fremme, skifter du tilbage til Worklist — den ligger, hvor du slap.")));
+
+  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+    tryk: () => { skaerm = retur; tegn(); } }, "Tilbage til Worklist"));
   r.appendChild(indhold);
 }
 
@@ -358,6 +583,17 @@ function tegnOpgave(r) {
     indhold.appendChild(el("div", { klasse: "advarsel" },
       "Du skal hjem til " + o.navn + " på " + o.adresse + ". " +
       o.fod + " nederst er den, der får regningen — ikke et sted, du skal hen."));
+  }
+
+  indhold.appendChild(el("button", { klasse: "knap knap-blaa",
+    tryk: () => { retur = "opgave"; skaerm = "kort"; tegn(); } },
+    tegnIkon("pil", 19), "Kør derhen"));
+  indhold.appendChild(el("div", { style: "height:13px" }));
+
+  if (o.nexus) {
+    indhold.appendChild(el("button", { klasse: "knap knap-lilla",
+      tryk: () => { retur = "opgave"; skaerm = "nexusapp"; tegn(); } }, "Åbn Nexus"));
+    indhold.appendChild(el("div", { style: "height:13px" }));
   }
 
   indhold.appendChild(el("div", { klasse: "info" },
@@ -386,6 +622,39 @@ function tegnOpgave(r) {
   r.appendChild(indhold);
 }
 
+/* ── Nexus åbnes ────────────────────────────────────────────────────────────
+   Samme pointe som kortet: skærmen skifter til et helt andet program, og det
+   skal man vide, før det sker. Vi tegner ikke Nexus — vi kender ikke deres
+   skærm, og et forkert billede ville være værre end ingen. */
+function tegnNexusApp(r) {
+  const o = opg(aaben);
+  // Tilbage til DET sted, knappen blev trykket. Aabner man Nexus fra
+  // afslutningen, er man i gang med at melde faerdig — og skal ikke kastes
+  // tilbage til toppen af opgaven og tro, at man skal begynde forfra.
+  r.appendChild(topbjaelke("Nexus", o.navn, "Tilbage", () => { skaerm = retur; tegn(); }));
+
+  const indhold = el("div", { klasse: "indhold" });
+  indhold.appendChild(el("div", { klasse: "kvit", style: "padding:34px 12px 22px" },
+    el("div", { klasse: "kvitcirkel", style: "background:#EEF2FF;border-color:#4F46E5;color:#4F46E5;font-size:34px" }, "↗"),
+    el("h2", {}, "Nexus åbnes"),
+    el("p", {}, "Kommunens egen app starter op.")));
+
+  indhold.appendChild(el("div", { klasse: "advarsel" },
+    "Det her er en tegning. I den rigtige app åbner KMD Nexus på din telefon. Har du den ikke installeret, siger appen det og hjælper dig videre."));
+
+  indhold.appendChild(el("div", { klasse: "info" },
+    el("div", { klasse: "lbl" }, "Hvorfor du skal ind i Nexus"),
+    el("div", {}, "Kommunen betaler efter det, der står i Nexus — ikke efter det, du skriver i Worklist. Derfor skal du begge steder på en kommunal opgave.")));
+
+  indhold.appendChild(el("div", { klasse: "info" },
+    el("div", { klasse: "lbl" }, "Bagefter"),
+    el("div", {}, "Du skifter selv tilbage til Worklist. Den ligger, hvor du slap — også fluebenene.")));
+
+  indhold.appendChild(el("button", { klasse: "knap knap-primaer",
+    tryk: () => { skaerm = retur; tegn(); } }, "Tilbage til Worklist"));
+  r.appendChild(indhold);
+}
+
 /* ── Trin 1: tiden ──────────────────────────────────────────────────────── */
 function tegnTid(r) {
   const o = opg(aaben), t = tilstand[aaben];
@@ -410,7 +679,7 @@ function tegnTid(r) {
   }
 
   indhold.appendChild(el("button", { klasse: "knap knap-primaer",
-    tryk: () => { skaerm = o.nexus ? "nexus" : "kvittering"; if (!o.nexus) meldFaerdig(); tegn(); } },
+    tryk: () => { if (!o.nexus) meldFaerdig(); skaerm = o.nexus ? "nexus" : "kvittering"; tegn(); } },
     "Videre"));
   r.appendChild(indhold);
 }
@@ -425,6 +694,10 @@ function tegnNexus(r) {
     "På Nexus-opgaver skal du også kvittere i kommunens egen app."));
   indhold.appendChild(el("div", { klasse: "advarsel" },
     "Kommunen betaler efter det, der står i Nexus — ikke efter det, du skriver her."));
+
+  indhold.appendChild(el("button", { klasse: "knap knap-lilla",
+    tryk: () => { retur = "nexus"; skaerm = "nexusapp"; tegn(); } }, "Åbn Nexus"));
+  indhold.appendChild(el("div", { style: "height:16px" }));
 
   indhold.appendChild(el("button", { klasse: "tjek" + (t.nexusSat ? " sat" : ""),
     tryk: () => { t.nexusSat = !t.nexusSat; tegn(); } },
@@ -484,6 +757,7 @@ function tegnSlut(r) {
   indhold.appendChild(el("div", { klasse: "afsnit" }, "Det du har prøvet"));
   [
     "Åbne en opgave og se, hvor du skal hen",
+    "Åbne kortet med pilen og komme tilbage igen",
     "Sætte flueben ved det, du har lavet",
     "Skrive hvor lang tid du brugte",
     "Melde opgaven færdig",
@@ -498,6 +772,9 @@ function tegnSlut(r) {
   indhold.appendChild(el("div", { style: "height:18px" }));
   indhold.appendChild(el("button", { klasse: "knap knap-primaer",
     tryk: () => { nulstil(); tegn(); } }, "Prøv igen"));
+  indhold.appendChild(el("div", { style: "height:10px" }));
+  indhold.appendChild(el("button", { klasse: "knap knap-anden",
+    tryk: () => { skaerm = "ikoner"; tegn(); } }, "Se de fire ikoner igen"));
   indhold.appendChild(el("div", { style: "height:10px" }));
   indhold.appendChild(el("div", { klasse: "lille" },
     "Du må tage øvelsen så mange gange, du vil. Ingen kan se, hvor mange gange."));
