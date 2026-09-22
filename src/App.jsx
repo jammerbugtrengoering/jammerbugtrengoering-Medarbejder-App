@@ -1073,15 +1073,22 @@ function opgaveIdentitet(t) {
   const type = t.contractType || t.contract_type || "privat";
 
   if (BETALER_ER_IKKE_STEDET.includes(type)) {
-    // 22.9.2026, endnu en runde: adressen laa foerst i sekundaer, som kun vises
-    // naar kortet i tidslinjen er hoejt nok (visLinje2). Er opgaven kort, forsvandt
-    // linjen helt — og med "Nexus" alene paa linje 1 kunne hun ikke se HVILKEN af
-    // de 548 ens opgaver hun kiggede paa. Adressen skal derfor med paa linje 1,
-    // ikke kun linje 2, saa den altid er der, ogsaa paa et lavt kort.
+    // 22.9.2026, fjerde runde: navnet skal med paa linje 1, ikke kun linje 2.
+    // Linje 2 (sekundaer) tegnes kun naar kortet i tidslinjen er hoejt nok
+    // (visLinje2, som kraever et opgave paa over ca. et halvt time) — akkurat
+    // samme faelde som adressen sad i for to rettelser siden. En kort Nexus-
+    // opgave (den slags der typisk ER kort) ville ellers igen vise "Nexus ·
+    // adresse" uden navn, og hun er lige saa langt igen.
+    //
+    // Raekkefoelgen paa linjen er med vilje maerke, saa navn, saa adresse. Er
+    // linjen for lang til skaermen, klipper ellipsen fra HOEJRE — det er derfor
+    // adressen, der forsvinder foerst, ikke navnet. Adressen mister hun ikke
+    // noget ved: Navigér-knappen paa selve opgaven bruger den fulde adresse,
+    // uanset om den blev klippet af her.
     const maerke = KONTRAKTTYPE_LABEL[type] || "";
-    const primaer = adresse ? (maerke ? `${maerke} · ${adresse}` : adresse) : maerke;
     const visReference = type === "nexus" ? reference.replace(CPR_PRAEFIKS, "").trim() : reference;
-    return { primaer, sekundaer: visReference, kunde: visReference, kundeDaempet: true, adresse };
+    const primaer = [maerke, visReference, adresse].filter(Boolean).join(" · ");
+    return { primaer, sekundaer: "", kunde: visReference, kundeDaempet: true, adresse };
   }
   // Kunden er stedet. Referencen kan vaere en kontaktperson og staar under adressen.
   return { primaer: kunde || adresse, sekundaer: adresse,
