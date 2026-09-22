@@ -1069,11 +1069,14 @@ function opgaveIdentitet(t) {
   const type = t.contractType || t.contract_type || "privat";
 
   if (BETALER_ER_IKKE_STEDET.includes(type)) {
-    // Kontrakttypen foerst, adressen under — ikke borgerens navn/cpr fra
-    // referencen. Mangler adressen (sker ikke i praksis), baerer maerket
-    // opgaven alene.
-    return { primaer: KONTRAKTTYPE_LABEL[type] || adresse, sekundaer: adresse,
-             kunde, kundeDaempet: true, adresse };
+    // 22.9.2026, endnu en runde: adressen laa foerst i sekundaer, som kun vises
+    // naar kortet i tidslinjen er hoejt nok (visLinje2). Er opgaven kort, forsvandt
+    // linjen helt — og med "Nexus" alene paa linje 1 kunne hun ikke se HVILKEN af
+    // de 548 ens opgaver hun kiggede paa. Adressen skal derfor med paa linje 1,
+    // ikke kun linje 2, saa den altid er der, ogsaa paa et lavt kort.
+    const maerke = KONTRAKTTYPE_LABEL[type] || "";
+    const primaer = adresse ? (maerke ? `${maerke} · ${adresse}` : adresse) : maerke;
+    return { primaer, sekundaer: "", kunde, kundeDaempet: true, adresse };
   }
   // Kunden er stedet. Referencen kan vaere en kontaktperson og staar under adressen.
   return { primaer: kunde || adresse, sekundaer: adresse,
