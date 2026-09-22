@@ -3547,6 +3547,11 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
   if (!task) return null;
   // Brug oversat version hvis tilgængeligt, ellers original
   const t = translatedTask || task;
+  // Samme udledning som paa kortene: for nexus/aeldrelov er ident.kunde borgerens
+  // navn (cpr-nummeret klippet af), ikke betaleren. Bruges i Kunde-sektionen
+  // nedenfor, saa hun ogsaa kan se navnet naar hun har aabnet opgaven, ikke kun
+  // paa kortet i listen/tidslinjen.
+  const ident = opgaveIdentitet(t);
   const myLogged = (task.timeLog || []).filter((l) => l.empId === employee.id).reduce((s, l) => s + (l.minutes || 0), 0);
   const totalLogged = (task.timeLog || []).reduce((s, l) => s + (l.minutes || 0), 0);
   // Er hun med for at laere paa netop denne opgave? Det er kontoret der saetter det,
@@ -3611,6 +3616,14 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
             <div style={s.sheetSection}>
               <div style={s.sheetSectionTitle}><Building2 size={14} /> {tr.customer}</div>
               {t.customerName && <div style={s.sheetCustomer}>{t.customerName}</div>}
+              {/* 22.9.2026: paa nexus/aeldrelov staar borgerens navn (ikke betaleren,
+                  som allerede staar ovenfor) — samme navn som paa kortet, samme
+                  rensning for cpr-nummer paa nexus. */}
+              {BETALER_ER_IKKE_STEDET.includes(t.contractType) && ident.kunde && (
+                <div style={{ ...s.sheetCustomer, fontWeight: 600, fontSize: 14, marginTop: t.customerName ? 2 : 0 }}>
+                  {ident.kunde}
+                </div>
+              )}
               {t.address && (
                 <div style={s.sheetAddress}>
                   <MapPin size={13} color="#94A3B8" style={{ flexShrink: 0, marginTop: 2 }} />
