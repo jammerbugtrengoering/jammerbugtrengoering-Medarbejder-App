@@ -1047,13 +1047,20 @@ function computeDaySchedule(dayTasks, settings, employee) {
 //                     staar paa doeren. Navnet oeverst, adressen under.
 //
 //   nexus, aeldrelov  Kunden er den der faar REGNINGEN. Arbejdet foregaar hjemme
-//                     hos en borger, hvis navn staar i referencen, mens kundenavnet
-//                     er "Jammerbugt Kommune" paa alle 548 opgaver. Stod kommunen
-//                     oeverst, ville hvert kort se ens ud, og det ene felt hun skal
-//                     bruge for at finde derhen stod med graat nedenunder.
+//                     hos en borger, mens kundenavnet er "Jammerbugt Kommune" paa
+//                     alle 548 opgaver. Stod kommunen oeverst, ville hvert kort se
+//                     ens ud, og det ene felt hun skal bruge for at finde derhen
+//                     stod med graat nedenunder.
 //
-// Ét sted, saa dagsliste og tidslinje ikke kan komme til at vise forskelligt.
+// 22.9.2026: referencen paa nexus/aeldrelov-opgaver baerer borgerens fulde navn
+// og i praksis ogsaa cpr-nummeret — det staar der KUN til brug for fakturaen i
+// Dinero. Det hoerte aldrig hjemme paa en medarbejders skaerm, og slet ikke hos
+// en kollega der bare "kigger med" via Se plan for. Her viser vi derfor kun
+// kontrakttypen og adressen — det hun rent faktisk skal bruge for at finde
+// derhen. Referencen laeses stadig ind (se App.jsx's mapping), den bliver bare
+// aldrig tegnet paa skaermen i den her app.
 const BETALER_ER_IKKE_STEDET = ["nexus", "aeldrelov"];
+const KONTRAKTTYPE_LABEL = { nexus: "Nexus", aeldrelov: "Ældrelov" };
 
 function opgaveIdentitet(t) {
   const kunde = (t.customerName || t.customer_name || "").trim();
@@ -1062,9 +1069,10 @@ function opgaveIdentitet(t) {
   const type = t.contractType || t.contract_type || "privat";
 
   if (BETALER_ER_IKKE_STEDET.includes(type)) {
-    // Borgeren foerst. Mangler referencen, baerer adressen opgaven alene — det er
-    // stadig bedre end kommunens navn, som ikke fortaeller hende noget.
-    return { primaer: reference || adresse, sekundaer: reference ? adresse : "",
+    // Kontrakttypen foerst, adressen under — ikke borgerens navn/cpr fra
+    // referencen. Mangler adressen (sker ikke i praksis), baerer maerket
+    // opgaven alene.
+    return { primaer: KONTRAKTTYPE_LABEL[type] || adresse, sekundaer: adresse,
              kunde, kundeDaempet: true, adresse };
   }
   // Kunden er stedet. Referencen kan vaere en kontaktperson og staar under adressen.
