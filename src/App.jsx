@@ -1053,14 +1053,18 @@ function computeDaySchedule(dayTasks, settings, employee) {
 //                     stod med graat nedenunder.
 //
 // 22.9.2026: referencen paa nexus/aeldrelov-opgaver baerer borgerens fulde navn
-// og i praksis ogsaa cpr-nummeret — det staar der KUN til brug for fakturaen i
-// Dinero. Det hoerte aldrig hjemme paa en medarbejders skaerm, og slet ikke hos
-// en kollega der bare "kigger med" via Se plan for. Her viser vi derfor kun
-// kontrakttypen og adressen — det hun rent faktisk skal bruge for at finde
-// derhen. Referencen laeses stadig ind (se App.jsx's mapping), den bliver bare
-// aldrig tegnet paa skaermen i den her app.
+// og paa nexus i praksis ogsaa cpr-nummeret FOERST i teksten — det staar der KUN
+// til brug for fakturaen i Dinero, og cpr-nummeret hoerer aldrig hjemme paa en
+// medarbejders skaerm. Navnet derimod skal hun bruge: adressen er ikke altid nok
+// til at se HVILKEN af de mange ens Nexus/Ældrelov-opgaver hun kigger paa (flere
+// borgere paa samme adresse, eller en akut tilkaldt opgave uden fast tid). Derfor
+// vises referencen igen, men renset for nexus og som den er for aeldrelov (der
+// staar aldrig et cpr-nummer i den).
 const BETALER_ER_IKKE_STEDET = ["nexus", "aeldrelov"];
 const KONTRAKTTYPE_LABEL = { nexus: "Nexus", aeldrelov: "Ældrelov" };
+// Nexus-referencen er formet "DDMMYY-XXXX Fornavn Efternavn" af Dinero-eksporten.
+// Kun det, der staar EFTER cpr-nummeret, maa vises.
+const CPR_PRAEFIKS = /^\d{6}-\d{4}\s*/;
 
 function opgaveIdentitet(t) {
   const kunde = (t.customerName || t.customer_name || "").trim();
@@ -1076,7 +1080,8 @@ function opgaveIdentitet(t) {
     // ikke kun linje 2, saa den altid er der, ogsaa paa et lavt kort.
     const maerke = KONTRAKTTYPE_LABEL[type] || "";
     const primaer = adresse ? (maerke ? `${maerke} · ${adresse}` : adresse) : maerke;
-    return { primaer, sekundaer: "", kunde, kundeDaempet: true, adresse };
+    const visReference = type === "nexus" ? reference.replace(CPR_PRAEFIKS, "").trim() : reference;
+    return { primaer, sekundaer: visReference, kunde: visReference, kundeDaempet: true, adresse };
   }
   // Kunden er stedet. Referencen kan vaere en kontaktperson og staar under adressen.
   return { primaer: kunde || adresse, sekundaer: adresse,
@@ -3628,12 +3633,16 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
               Kontaktoplysningerne (telefon/kontaktperson) staar allerede paa opgaven —
               de er ikke beskyttet som noeglekoden. Men de vises foerst HER, samtidig
               med koden, saa det ene tryk daekker begge: kontoret kan se i loggen at
-              hun ogsaa har set kontaktoplysningerne, ikke kun koden. */}
+              hun ogsaa har set kontaktoplysningerne, ikke kun koden.
+              22.9.2026: KUN paa privat/erhverv. Paa nexus/aeldrelov staar kontaktpersonen
+              fra Dinero-opslaget ikke hos borgeren, men hos kommunen — det er ikke den,
+              hun skal ringe til, hvis noget er anderledes ude paa besoeget, og at vise det
+              her ville se ud som om det var det. */}
           <div style={s.sheetSection}>
             <div style={s.sheetSectionTitle}><Lock size={14} /> {tr.access}</div>
             {adgangTekst !== null ? (
               <>
-                {(t.kontaktperson || t.telefon) && (
+                {(t.kontaktperson || t.telefon) && !BETALER_ER_IKKE_STEDET.includes(t.contractType) && (
                   <div style={{ ...s.sheetAccessText, marginBottom: 8 }}>
                     {t.kontaktperson && (
                       <div>{(lang === "da" ? "Kontaktperson: " : "Contact: ") + t.kontaktperson}</div>
