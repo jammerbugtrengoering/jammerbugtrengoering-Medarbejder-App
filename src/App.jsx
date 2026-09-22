@@ -307,7 +307,7 @@ const T = {
     travelToHome: "Kørsel hjem",
     accessShow: "Vis adgangsoplysninger",
     accessOpening: "Henter…",
-    accessHint: "Nøglebokskoder og alarmkoder er skjult. Når du åbner dem, registreres det med dit navn og tidspunkt.",
+    accessHint: "Nøglebokskoder, alarmkoder og kontaktoplysninger er skjult. Når du åbner dem, registreres det med dit navn og tidspunkt.",
     accessLogged: "Åbningen er registreret.",
     accessNone: "Der er ingen adgangsoplysninger på denne opgave.",
     accessFailed: "Kunne ikke hente adgangsoplysningerne. Tjek forbindelsen og prøv igen.",
@@ -487,7 +487,7 @@ const T = {
     travelToHome: "Travel home",
     accessShow: "Show access details",
     accessOpening: "Loading…",
-    accessHint: "Key box and alarm codes are hidden. When you open them, it is recorded with your name and the time.",
+    accessHint: "Key box codes, alarm codes and contact details are hidden. When you open them, it is recorded with your name and the time.",
     accessLogged: "This opening has been recorded.",
     accessNone: "There are no access details on this job.",
     accessFailed: "Could not load the access details. Check your connection and try again.",
@@ -3613,11 +3613,25 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
 
           {/* Adgang. Teksten ligger ikke i appen — den hentes naar hun trykker, og hver
               aabning registreres. Derfor staar det ogsaa paa knappen: hun skal vide det
-              foer hun trykker, ikke opdage det bagefter. */}
+              foer hun trykker, ikke opdage det bagefter.
+              Kontaktoplysningerne (telefon/kontaktperson) staar allerede paa opgaven —
+              de er ikke beskyttet som noeglekoden. Men de vises foerst HER, samtidig
+              med koden, saa det ene tryk daekker begge: kontoret kan se i loggen at
+              hun ogsaa har set kontaktoplysningerne, ikke kun koden. */}
           <div style={s.sheetSection}>
             <div style={s.sheetSectionTitle}><Lock size={14} /> {tr.access}</div>
             {adgangTekst !== null ? (
               <>
+                {(t.kontaktperson || t.telefon) && (
+                  <div style={{ ...s.sheetAccessText, marginBottom: 8 }}>
+                    {t.kontaktperson && (
+                      <div>{(lang === "da" ? "Kontaktperson: " : "Contact: ") + t.kontaktperson}</div>
+                    )}
+                    {t.telefon && (
+                      <div>{(lang === "da" ? "Telefon: " : "Phone: ") + t.telefon}</div>
+                    )}
+                  </div>
+                )}
                 <div style={s.sheetAccessText}>{adgangTekst || tr.accessNone}</div>
                 <div style={s.adgangLogget}>
                   {adgangFraKopi ? tr.accessFromCopy : tr.accessLogged}
