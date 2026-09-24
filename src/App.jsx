@@ -1064,7 +1064,15 @@ const BETALER_ER_IKKE_STEDET = ["nexus", "aeldrelov"];
 const KONTRAKTTYPE_LABEL = { nexus: "Nexus", aeldrelov: "Ældrelov" };
 // Nexus-referencen er formet "DDMMYY-XXXX Fornavn Efternavn" af Dinero-eksporten.
 // Kun det, der staar EFTER cpr-nummeret, maa vises.
-const CPR_PRAEFIKS = /^\d{6}-\d{4}\s*/;
+//
+// 23.9.2026: renses nu ALLEREDE der, hvor opgaverne hentes ind (se «reference:» i
+// hentningen), og ikke kun her. Vaernet her afhang af, at kontrakttypen var «nexus» —
+// og en Nexus-aftale fra ruteplanerne stod som «privat». Paa privat/erhverv vises
+// referencen urenset under adressen, saa borgerens fulde cpr-nummer stod paa
+// medarbejderens telefon paa 32 opgaver. Et vaern, der afhaenger af, at et andet felt
+// er rigtigt, er kun lige saa godt som det felt.
+// Bindestregen er valgfri: et cpr-nummer skrevet i haanden har den ikke altid.
+const CPR_PRAEFIKS = /^\d{6}-?\d{4}\s*/;
 
 function opgaveIdentitet(t) {
   const kunde = (t.customerName || t.customer_name || "").trim();
@@ -1515,13 +1523,14 @@ const HELP_DA = [
       "Om dig selv: dit navn, din arbejdsmail, dit sprogvalg, hvornår du normalt møder, dine kompetencer og hvilke områder du dækker.",
       "Din hjemmeadresse, hvis du er på en ordning hvor kørsel hjemmefra tæller med. Den bruges kun til at regne afstanden til dagens første opgave — ikke til andet.",
       "Om dit arbejde: hvilke opgaver du er sat på, hvornår du har registreret tid, hvor lang tid, og de beskeder du sender til kontoret.",
+      "Hver gang du åbner adgangsoplysningerne på en opgave — nøglekoden, kundens kontaktperson og telefonnummer — gemmes det, hvornår du gjorde det, og på hvilken opgave. Det er for at kunne svare kunden, hvis de spørger, hvem der har haft deres kode.",
       "Om din løn: din timeløn og tidligere satser, bonus og kilometersats, om du har weekendtillæg og SH-betaling, og dit medarbejdernummer i Danløn.",
       "Fravær registreres som fravær. Der står aldrig hvorfor du var væk.",
       "Slår du beskeder til, gemmes en teknisk adresse på din telefon, så beskeden kan finde frem.",
     ] },
   { t: "Det appen ikke gemmer", p: [
       "Appen følger dig ikke. Der er ingen GPS og ingen positionsmåling — hverken i arbejdstiden eller udenfor. Kørslen regnes ud fra adresserne på dine opgaver, ikke fra hvor telefonen har været.",
-      "Der ligger intet CPR-nummer i systemet. Lønfilen bruger dit Danløn-nummer.",
+      "Dit CPR-nummer ligger ikke i systemet. Lønfilen bruger dit Danløn-nummer.",
       "Der ligger ingen bankoplysninger og intet kontonummer.",
       "Der ligger ingen helbredsoplysninger, diagnoser eller sygdomsårsager.",
     ] },
@@ -1707,13 +1716,14 @@ const HELP_EN = [
       "About you: your name, your work email, your language choice, your usual start time, your skills and the areas you cover.",
       "Your home address, if you are on an arrangement where travel from home counts as working time. It is used only to calculate the distance to the first job of the day — nothing else.",
       "About your work: which jobs you are assigned, when you logged time, how long, and the messages you send to the office.",
+      "Every time you open the access details on a job — the key code, the customer's contact person and phone number — the time and the job are stored. This is so we can answer a customer who asks who has had their code.",
       "About your pay: your hourly rate and previous rates, bonus and mileage rate, whether you have the weekend supplement and holiday pay, and your employee number in Danløn.",
       "Absence is recorded as absence. It never says why you were away.",
       "If you turn notifications on, a technical address for your phone is stored so the message can reach you.",
     ] },
   { t: "What the app does not store", p: [
       "The app does not track you. There is no GPS and no location tracking — neither during working hours nor outside them. Mileage is calculated from the addresses of your jobs, not from where your phone has been.",
-      "There is no civil registration number anywhere in the system. The payroll file uses your Danløn number.",
+      "Your civil registration number is not stored anywhere in the system. The payroll file uses your Danløn number.",
       "There are no bank details and no account number.",
       "There is no health information, no diagnoses and no reasons for sickness.",
     ] },
@@ -4825,7 +4835,10 @@ useEffect(() => {
             // Referencen. Paa kommunale opgaver staar BORGERENS navn her, mens
             // customer_name er kommunen der faar regningen. Det er borgeren og
             // adressen medarbejderen skal bruge — kommunen er kun bogholderi.
-            reference: i.po_number || "",
+            // Cpr-nummeret skaeres fra, FOER referencen naar noget andet i appen.
+            // Worklist skriver aldrig po_number tilbage (kun tjekliste, tid og
+            // Nexus-kvittering), saa fakturaens udgave i databasen roeres ikke.
+            reference: (i.po_number || "").replace(CPR_PRAEFIKS, "").trim(),
             // accessInstructions hentes IKKE med her laengere. Kolonnen staar tom, og
             // teksten ligger i en tabel appen ikke kan laese. Den hentes kun naar
             // medarbejderen selv trykker, gennem hent_adgangsinfo, som logger opslaget.
