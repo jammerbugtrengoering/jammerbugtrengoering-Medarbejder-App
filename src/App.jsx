@@ -3,6 +3,10 @@ import { supabase } from "./supabaseClient";
 import { weekInfoWithOffset, ugerFraNu } from "./uger";
 import { skiftTid, saetTimer, saetMinutter } from "./tidsfelt";
 import {
+  afstandMeter, brugerStartStop, vurderStart, autoStartKandidat, maaltMin,
+  kraeverBegrundelse, stolPaaOpslag, erFaerdig, formatAfstand,
+} from "./startstop";
+import {
   Clock, CheckCircle2, Video, Lock, ListChecks, Check,
   Navigation, Building2, Car, ChevronLeft, ChevronRight,
   X, MapPin, Key,
@@ -160,6 +164,35 @@ async function udfoerKoePost(klient, post) {
       return klient.from("reschedule_requests").upsert(a.raekke, { onConflict: "id" });
     case "udlevering":
       return klient.rpc("bekraeft_udlevering", { p_instance_id: a.opgaveId });
+    // Start/stop. Telefonens tidspunkt sendes med, fordi posten kan have ventet i
+    // koeen; databasen bruger det aldrig senere end nu og aldrig over 12 timer tilbage,
+    // og markerer posten «sendt senere». start_tid er gratis at gentage.
+    case "start":
+      return klient.rpc("start_tid", {
+        p_instance_id: a.opgaveId, p_klient_id: a.noegle, p_start_ms: a.tidMs,
+        p_afstand_m: a.afstand ?? null, p_noejagtighed_m: a.noejagtighed ?? null,
+        p_automatisk: !!a.automatisk,
+      });
+    case "fortryd":
+      return klient.rpc("fortryd_start", { p_instance_id: a.opgaveId });
+    case "afslut": {
+      const args = {
+        p_instance_id: a.opgaveId, p_minutes: a.minutter, p_note: a.note ?? null,
+        p_klient_id: a.noegle, p_stop_ms: a.tidMs,
+        p_afstand_m: a.afstand ?? null, p_noejagtighed_m: a.noejagtighed ?? null,
+        p_fra_koe: true,
+      };
+      const svar = await klient.rpc("afslut_tid", args);
+      // Maalte serveren noget andet end telefonen — fordi starten ogsaa laa i koeen og
+      // fik et andet tidspunkt — kraever den en begrundelse. Den maa ALDRIG kaste
+      // tiden vaek af den grund: det er loen og faktura. Saa sendes den igen med en
+      // note, der siger hvad der skete, og Kundetimer viser forskellen.
+      if (svar.error && svar.error.code === "22023") {
+        return klient.rpc("afslut_tid", { ...args,
+          p_note: (a.note ? a.note + " · " : "") + "(sendt senere — målingen afveg ved afsendelse)" });
+      }
+      return svar;
+    }
     default:
       // Ukendt art — fjern den hellere end at blokere resten af koeen for evigt.
       return { error: null };
@@ -200,6 +233,79 @@ async function toemKoe(klient, empId) {
     }
   }
   return (await koeAlle()).length;
+}
+
+// ── Position og adressepunkter (start/stop) ─────────────────────────────────
+// Bruges KUN for medarbejdere med start/stop. Telefonens position forlader aldrig
+// telefonen: den sammenlignes her med adressens punkt, og det eneste der sendes, er
+// afstanden i hele meter. Adressens punkt er offentligt (Danmarks Adresseregister)
+// og maa gerne huskes paa telefonen.
+const punktCache = new Map();
+
+function laesPunktLager() {
+  try { return JSON.parse(localStorage.getItem("wl_punkter") || "{}"); } catch { return {}; }
+}
+
+async function adressePunkt(adresse) {
+  const noegle = String(adresse || "").trim();
+  if (!noegle) return null;
+  if (punktCache.has(noegle)) return punktCache.get(noegle);
+  const lager = laesPunktLager();
+  if (noegle in lager) { punktCache.set(noegle, lager[noegle]); return lager[noegle]; }
+  try {
+    const res = await fetch("https://api.dataforsyningen.dk/adresser/autocomplete?per_side=1&q="
+      + encodeURIComponent(noegle));
+    if (!res.ok) return null;          // proeves igen naeste gang
+    const d = await res.json();
+    const fund = Array.isArray(d) && d[0] ? (d[0].adresse || d[0].data) : null;
+    // Et bud, der ikke er DEN adresse, er vaerre end intet bud: det ville spaerre
+    // Start ved den rigtige doer. Saa gemmes null, og positionen er «ukendt».
+    const punkt = fund && stolPaaOpslag(noegle, fund) && Number.isFinite(fund.x) && Number.isFinite(fund.y)
+      ? { lat: fund.y, lon: fund.x } : null;
+    punktCache.set(noegle, punkt);
+    try { localStorage.setItem("wl_punkter", JSON.stringify({ ...laesPunktLager(), [noegle]: punkt })); } catch { /* fuldt */ }
+    return punkt;
+  } catch {
+    return null;
+  }
+}
+
+// Én position, hvis telefonen kan give den inden for tidsfristen. Ellers null —
+// aldrig en fejl. En afvist tilladelse er et helt gyldigt svar.
+function hentPosition(frist = 10000) {
+  return new Promise((ok) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) { ok(null); return; }
+    let faerdig = false;
+    const stop = setTimeout(() => { if (!faerdig) { faerdig = true; ok(null); } }, frist + 500);
+    navigator.geolocation.getCurrentPosition(
+      (p) => { if (faerdig) return; faerdig = true; clearTimeout(stop);
+               ok({ lat: p.coords.latitude, lon: p.coords.longitude,
+                    noejagtighed: Math.round(p.coords.accuracy || 0), tid: Date.now() }); },
+      () => { if (faerdig) return; faerdig = true; clearTimeout(stop); ok(null); },
+      { enableHighAccuracy: true, timeout: frist, maximumAge: 30000 });
+  });
+}
+
+// Opgaver hun har fortrudt starten paa i dag. De startes ikke automatisk igen —
+// ellers kunne hun aldrig slippe for en automatisk start, der ramte forkert.
+function fortrudteIDag() {
+  try {
+    const g = JSON.parse(localStorage.getItem("wl_fortrudt") || "{}");
+    return new Set(g.dag === new Date().toISOString().slice(0, 10) ? g.ider || [] : []);
+  } catch { return new Set(); }
+}
+function husFortrudt(id) {
+  const saet = fortrudteIDag();
+  saet.add(id);
+  try {
+    localStorage.setItem("wl_fortrudt", JSON.stringify({ dag: new Date().toISOString().slice(0, 10), ider: [...saet] }));
+  } catch { /* fuldt lager */ }
+}
+
+// En position er kun frisk i to minutter. En gammel position fra forrige kunde maa
+// ikke afgoere, om hun kan starte her.
+function friskPosition(pos) {
+  return pos && Date.now() - pos.tid < 2 * 60 * 1000 ? pos : null;
 }
 
 // ── Adgangsoplysninger hentet paa forhaand ───────────────────────────────────
@@ -440,6 +546,23 @@ const T = {
     reportNoEntryPlaceholder: "F.eks. ingen svarede, og nøglen passede ikke",
     reportNewDateOptional: "Ny dato (valgfrit)",
     reportSentNoEntry: "Kontoret har fået besked. De afgør om opgaven skal faktureres.",
+    // Start/stop (24.9.2026). Kun medarbejdere, der har faaet det slaaet til, ser dem.
+    ssStart: "▶ Start tiden",
+    ssStarting: "Starter …",
+    ssRunning: (kl, min) => `Tiden kører · startet ${kl} · ${min}`,
+    ssUndo: "Fortryd start",
+    ssAway: (afst) => `Du er ${afst} fra adressen. Start, når du er fremme.`,
+    ssNoPosition: "Telefonen kender ikke din position. Du kan godt starte — det bliver noteret.",
+    ssFinding: "Finder din position …",
+    ssAutoStarted: (navn) => `Tiden er startet hos ${navn}`,
+    ssAutoHint: "Du er ved adressen, så tiden startede af sig selv.",
+    ssMeasured: (tid) => `Målt fra Start til nu: ${tid}`,
+    ssNotStarted: "Tiden blev ikke startet. Skriv den tid, du brugte.",
+    ssWhyChanged: (tid) => `Du har rettet den målte tid (${tid}). Skriv hvorfor — så kan kontoret forklare det til kunden.`,
+    ssWhyBoth: "Skriv hvorfor tiden er en anden end målt og planlagt.",
+    ssChangedRequired: "Skriv en kort begrundelse, før du går videre.",
+    ssServerMeasured: (min) => `Serveren målte ${min} min. Tallet er rettet til det.`,
+    ssStartFailed: "Tiden kunne ikke startes. Prøv igen.",
   },
   en: {
     appName: "Worklist",
@@ -620,6 +743,22 @@ const T = {
     reportNoEntryPlaceholder: "E.g. nobody answered and the key did not fit",
     reportNewDateOptional: "New date (optional)",
     reportSentNoEntry: "The office has been notified. They decide whether the task is invoiced.",
+    ssStart: "▶ Start time",
+    ssStarting: "Starting …",
+    ssRunning: (kl, min) => `Time is running · started ${kl} · ${min}`,
+    ssUndo: "Undo start",
+    ssAway: (afst) => `You are ${afst} from the address. Start when you arrive.`,
+    ssNoPosition: "Your phone does not know your position. You can still start — it will be noted.",
+    ssFinding: "Finding your position …",
+    ssAutoStarted: (navn) => `Time started at ${navn}`,
+    ssAutoHint: "You are at the address, so the time started by itself.",
+    ssMeasured: (tid) => `Measured from Start until now: ${tid}`,
+    ssNotStarted: "The time was not started. Enter the time you spent.",
+    ssWhyChanged: (tid) => `You changed the measured time (${tid}). Write why — so the office can explain it to the customer.`,
+    ssWhyBoth: "Write why the time differs from what was measured and planned.",
+    ssChangedRequired: "Write a short reason before you continue.",
+    ssServerMeasured: (min) => `The server measured ${min} min. The number has been corrected.`,
+    ssStartFailed: "The time could not be started. Try again.",
   },
 };
 
@@ -1450,6 +1589,15 @@ const HELP_DA = [
       "Det store tal foroven er det du registrerer i alt. Under det står om det passer med det planlagte.",
       "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden.",
       "Har du fortrudt en afslutning og åbner opgaven igen — fx for at tilføje et billede — står der 0, og det er helt i orden. Din tid er registreret i forvejen, og du skal ikke taste mere for at komme videre." ] },
+  { t: "Start og Afslut på store opgaver", p: [
+      "Nogle medarbejdere har Start og Afslut på de store opgaver. Har du ikke, ser du ingenting af det her — så registrerer du tid som beskrevet ovenfor.",
+      "Har du det, står der en grøn knap «▶ Start tiden» på store opgaver. Tryk på den, når du står hos kunden. Når du er færdig, trykker du «Afslut opgave» som altid.",
+      "Har du Worklist åben, når du kommer frem, kan tiden starte af sig selv. Så kommer der en grøn linje øverst. Var det forkert, tryk «Fortryd start».",
+      "Ved Afslut står den målte tid klar. Passer den, trykker du bare «Videre». Retter du den med mere end 2 minutter, skal du skrive hvorfor — fx at kunden bad om noget ekstra.",
+      "Start virker ikke, hvis telefonen kan se, at du er et helt andet sted end kunden. Kan telefonen ikke finde din position, kan du godt starte — det bliver bare noteret.",
+      "Worklist spørger om lov til at bruge din position. Den bruges kun, mens appen er åben, og kun afstanden til kundens adresse gemmes — aldrig hvor du er.",
+      "Har du glemt at trykke Afslut, får du en besked på telefonen et kvarter efter, at opgaven skulle være færdig.",
+      "Glemte du at trykke Start, kan du stadig afslutte. Så skriver du tiden som før." ] },
   { t: "Produkter til kunden", p: [
       "Produkter henter du på kontoret. Planlæggeren skriver ned hvad du har fået med, og til hvilken kunde. Du skal ikke selv vælge noget i appen.",
       "Har du varer med til en kunde, kommer der et ekstra trin når du afslutter en opgave hos netop den kunde. Der står hvad du fik med, og du svarer ja eller nej til om kunden har fået det.",
@@ -1646,6 +1794,15 @@ const HELP_EN = [
       "The large number at the top is the total you are registering. Below it you can see whether it matches the plan.",
       "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer.",
       "If you undid a completion and open the job again — for example to add a photo — it says 0, and that is fine. Your time is already registered, and you do not need to enter more to continue." ] },
+  { t: "Start and Finish on large jobs", p: [
+      "Some employees have Start and Finish on large jobs. If you do not, you will not see any of this — you log time as described above.",
+      "If you do, a green «▶ Start time» button appears on large jobs. Tap it when you are at the customer. When you are done, tap «Complete job» as always.",
+      "If Worklist is open when you arrive, the time can start by itself. A green line then appears at the top. If that was wrong, tap «Undo start».",
+      "When you finish, the measured time is filled in. If it is right, just tap «Next». If you change it by more than 2 minutes, you must write why — for example that the customer asked for something extra.",
+      "Start does not work if the phone can see that you are somewhere else entirely. If the phone cannot find your position, you can still start — it will just be noted.",
+      "Worklist asks for permission to use your position. It is only used while the app is open, and only the distance to the customer's address is stored — never where you are.",
+      "If you forget to tap Complete job, you get a message on your phone a quarter of an hour after the job should have been done.",
+      "If you forgot to tap Start, you can still complete the job. Then you enter the time as before." ] },
   { t: "Products for the customer", p: [
       "You pick up products at the office. The planner records what you were given, and for which customer. You do not select anything in the app yourself.",
       "If you are carrying items for a customer, an extra step appears when you complete a job for that customer. It shows what you were given, and you answer yes or no to whether the customer received it.",
@@ -2927,7 +3084,7 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
 // Flowet kan gennemloebes flere gange paa samme opgave. Tiden laegges oveni det der
 // allerede staar, saa en pause midt i arbejdet eller to medarbejdere paa samme
 // opgave fungerer praecis som foer.
-function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLogMinutes, onSetStatus, onAfbryd, onFaerdig }) {
+function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLogMinutes, onSetStatus, onAfbryd, onFaerdig, startStop = null }) {
   const synlig = useSynligHoejde();
   const erNexus = task.contractType === "nexus";
 
@@ -3012,7 +3169,16 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
   // Startvaerdien rundes IKKE laengere til naermeste fem. Er der 18 minutter tilbage
   // af det planlagte, skal der staa 18 - ikke 20. Afrundingen var der, fordi
   // vaelgeren kun kunne det, og nu kan den mere.
-  const [samletMin, setSamletMin] = useState(Math.max(0, Math.round(minEgenTid - migLoggede)));
+  //
+  // Start/stop: tiden stoppede, da hun trykkede Afslut — ikke naar hun er faerdig med
+  // billeder og kommentar. Det tidspunkt sendes med, saa databasen maaler det samme
+  // som telefonen. Den maalte tid staar klar; det er den, der er svaret.
+  const [stopMs] = useState(() => Date.now());
+  const startMs = startStop?.startet?.startMs ?? null;
+  const [maalt, setMaalt] = useState(() => maaltMin(startMs, stopMs));
+  const [samletMin, setSamletMin] = useState(() => (maalt !== null
+    ? maalt
+    : Math.max(0, Math.round(minEgenTid - migLoggede))));
   const timer = Math.floor(samletMin / 60);
   const minutter = samletMin % 60;
   const [begrundelse, setBegrundelse] = useState("");
@@ -3045,6 +3211,10 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
   // Og tilfoejer hun ingen tid, er der heller ikke noget nyt at forklare — den tid
   // der allerede staar, er begrundet dengang den blev registreret.
   const overskrider = planlagt > 0 && afvigelse > 0 && minutterIAlt > 0;
+  // Rettet fra det maalte med mere end to minutter? Saa skal hun skrive hvorfor —
+  // i begge retninger. Én begrundelse daekker baade rettelsen og overskridelsen.
+  const rettet = !!startStop && kraeverBegrundelse(minutterIAlt, maalt);
+  const skalBegrundes = overskrider || rettet;
 
   // Loftet paa 12 timer er det samme som i den gamle timevaelger. Nedad stopper vi
   // ved 0 — en registrering paa nul minutter afvises alligevel af naeste trin.
@@ -3062,7 +3232,7 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
       // tilfoeje et billede efter at have fortrudt en afslutning — er tiden allerede
       // registreret, og at kraeve mere ville faa timerne til at vokse uden grund.
       if (minutterIAlt <= 0 && alleredeLogget <= 0) { setFejl(tr.finishNeedTime); return; }
-      if (overskrider && !begrundelse.trim()) { setBegrundelseFejl(true); return; }
+      if (skalBegrundes && !begrundelse.trim()) { setBegrundelseFejl(true); return; }
     }
     // Der er ikke noget forvalgt ja. Varer der faktureres til en kunde som aldrig fik
     // dem, er en regning der skal krediteres — saa hun skal svare, ikke bare trykke
@@ -3086,7 +3256,27 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
     setGemmer(true);
     setFejl("");
     try {
-      if (minutterIAlt > 0 && !tidErGemt.current) {
+      if (startStop && minutterIAlt > 0 && !tidErGemt.current) {
+        // Afstanden ved afslut noteres, men spaerrer aldrig. Svarer telefonen ikke
+        // hurtigt, gemmes tiden uden.
+        const pos = friskPosition(startStop.position) || await hentPosition(6000);
+        const afstand = pos && startStop.punkt ? afstandMeter(pos, startStop.punkt) : null;
+        const svar = await startStop.onAfslutTid(task.id, minutterIAlt,
+          skalBegrundes ? begrundelse.trim() : null, tidNoegle, stopMs, afstand, pos?.noejagtighed ?? null);
+        if (!svar.ok && svar.serverMaalt !== undefined && svar.serverMaalt !== null) {
+          // Databasen maalte noget andet end telefonen (uret gik forkert). Den har ret.
+          setMaalt(svar.serverMaalt);
+          setTrinNr(0);
+          setBegrundelseFejl(true);
+          throw new Error(tr.ssServerMeasured(svar.serverMaalt));
+        }
+        if (!svar.ok) throw new Error(tr.finishSaveFailed);
+        tidErGemt.current = true;
+      } else if (startStop && minutterIAlt === 0 && startMs && !tidErGemt.current) {
+        // Ingen ny tid (den er registreret foer), men uret koerer stadig. Stop det.
+        await startStop.onFortryd();
+        tidErGemt.current = true;
+      } else if (minutterIAlt > 0 && !tidErGemt.current) {
         const ok = await onLogMinutes(task.id, minutterIAlt,
           overskrider ? begrundelse.trim() : null, tidNoegle);
         if (ok === false) throw new Error(tr.finishSaveFailed);
@@ -3289,6 +3479,12 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
                 {tr.finishTimePlanned(fmtMin(minEgenTid))}
                 {antalPaa > 1 && ` ${tr.finishPerPerson(antalPaa, fmtMin(planlagt))}`}
               </div>
+              {startStop && (
+                <div style={{ ...s.trinAllerede, background: maalt !== null ? "#ECFDF5" : "#FFFBEB",
+                              color: maalt !== null ? "#065F46" : "#92400E" }}>
+                  ⏱ {maalt !== null ? tr.ssMeasured(fmtMin(maalt)) : tr.ssNotStarted}
+                </div>
+              )}
               {/* Er der registreret tid i forvejen, skal det staa her. Ellers ser
                   maerkatet under det store tal ud som ren volapyk: "0t 30m" og
                   lige under "1t mere end planlagt". */}
@@ -3346,15 +3542,19 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
                 </div>
               </div>
 
-              {overskrider && (
+              {skalBegrundes && (
                 <div style={s.overrunBox}>
-                  <div style={s.overrunTitle}>{tr.overrunTitle}</div>
-                  <div style={s.overrunBody}>{tr.finishWhyMore}</div>
+                  <div style={s.overrunTitle}>{rettet ? "⏱" : tr.overrunTitle}</div>
+                  <div style={s.overrunBody}>
+                    {rettet && overskrider ? tr.ssWhyBoth
+                      : rettet ? tr.ssWhyChanged(fmtMin(maalt))
+                      : tr.finishWhyMore}
+                  </div>
                   <textarea rows={2} value={begrundelse}
                     onChange={(e) => { setBegrundelse(e.target.value); if (e.target.value.trim()) setBegrundelseFejl(false); }}
                     placeholder={tr.overrunPlaceholder}
                     style={{ ...s.overrunInput, borderColor: begrundelseFejl ? "#DC2626" : "#F59E0B" }} />
-                  {begrundelseFejl && <div style={s.overrunError}>{tr.overrunRequired}</div>}
+                  {begrundelseFejl && <div style={s.overrunError}>{rettet ? tr.ssChangedRequired : tr.overrunRequired}</div>}
                 </div>
               )}
             </>
@@ -3450,8 +3650,50 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
 }
 
 // ── Task detail modal ─────────────────────────────────────────────────────────
-function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient }) {
+function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSetStatus, onToggleChecklist, supabaseClient, startStop = null }) {
   const tr = T[lang];
+  // ── Start/stop ── Kun naar startStop er sat. Ellers ser skaermen ud praecis som foer.
+  const [punkt, setPunkt] = useState(undefined);  // undefined = ikke slaaet op endnu
+  const [starter, setStarter] = useState(false);
+  const [startBesked, setStartBesked] = useState("");
+  const [, setTik] = useState(0);
+  const gaelderStartStop = !!startStop;
+  const koerer = startStop?.startet || null;
+  useEffect(() => {
+    if (!gaelderStartStop || !task?.address) return;
+    let afbrudt = false;
+    adressePunkt(task.address).then((p) => { if (!afbrudt) setPunkt(p); });
+    return () => { afbrudt = true; };
+  }, [gaelderStartStop, task?.address]);
+  // Uret paa skaermen opdateres hvert halve minut. Det er nok til minutter.
+  useEffect(() => {
+    if (!koerer) return;
+    const ur = setInterval(() => setTik((n) => n + 1), 30000);
+    return () => clearInterval(ur);
+  }, [koerer]);
+  const nuPos = friskPosition(startStop?.position);
+  const nuAfstand = nuPos && punkt ? afstandMeter(nuPos, punkt) : null;
+  const nuVurdering = nuPos && punkt ? vurderStart(nuAfstand, nuPos.noejagtighed) : null;
+
+  async function trykStart() {
+    if (!startStop || starter) return;
+    setStarter(true);
+    setStartBesked(tr.ssFinding);
+    // Brug den position, der allerede er — ellers spoerg telefonen. Svarer den ikke,
+    // maa hun starte alligevel. Det er kun «tydeligt et andet sted», der spaerrer.
+    const pos = friskPosition(startStop.position) || await hentPosition(8000);
+    const p = punkt === undefined ? await adressePunkt(task.address) : punkt;
+    const afstand = pos && p ? afstandMeter(pos, p) : null;
+    const vurdering = vurderStart(afstand, pos?.noejagtighed);
+    if (vurdering === "vaek") {
+      setStartBesked(tr.ssAway(formatAfstand(afstand)));
+      setStarter(false);
+      return;
+    }
+    const ok = await startStop.onStart({ afstand, noejagtighed: pos?.noejagtighed ?? null });
+    setStartBesked(ok ? (vurdering === "ukendt" ? tr.ssNoPosition : "") : tr.ssStartFailed);
+    setStarter(false);
+  }
   const [translatedTask, setTranslatedTask] = useState(null);
   const [translating, setTranslating] = useState(false);
   // De to veje ud af denne skaerm: afslut opgaven, eller meld et problem.
@@ -3814,7 +4056,33 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
             </button>
           ) : (
             <>
-              <button style={s.primaerStor} onClick={() => setVisAfslut(true)}>
+              {/* Start/stop: Start foerst, saa Afslut. Afslut kan ALTID trykkes — ogsaa
+                  uden start. Saa gemmes tiden som hidtil, og det staar paa posten. */}
+              {gaelderStartStop && koerer && (
+                <div style={s.ssKoerer}>
+                  <span>⏱ {tr.ssRunning(
+                    new Date(koerer.startMs).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }),
+                    fmtMin(maaltMin(koerer.startMs, Date.now())))}</span>
+                  <button style={s.ssFortryd} onClick={() => startStop.onFortryd()}>{tr.ssUndo}</button>
+                </div>
+              )}
+              {gaelderStartStop && !koerer && (
+                <>
+                  <button
+                    style={{ ...s.primaerStor, background: "#047857", marginBottom: 8,
+                             opacity: (starter || nuVurdering === "vaek") ? 0.5 : 1 }}
+                    disabled={starter}
+                    onClick={trykStart}>
+                    {starter ? tr.ssStarting : tr.ssStart}
+                  </button>
+                  {(startBesked || nuVurdering === "vaek") && (
+                    <div style={s.ssBesked}>
+                      {nuVurdering === "vaek" && !starter ? tr.ssAway(formatAfstand(nuAfstand)) : startBesked}
+                    </div>
+                  )}
+                </>
+              )}
+              <button style={gaelderStartStop && !koerer ? s.sekundaerStor : s.primaerStor} onClick={() => setVisAfslut(true)}>
                 {tr.finishOpen}
               </button>
               {problemSendt ? (
@@ -3836,6 +4104,7 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
           task={task} employee={employee} lang={lang} tr={tr} supabaseClient={supabaseClient}
           onLogMinutes={onLogMinutes} onSetStatus={onSetStatus}
           fraListe={fraListe}
+          startStop={startStop ? { ...startStop, punkt } : null}
           onAfbryd={() => setVisAfslut(false)}
           onFaerdig={() => { setVisAfslut(false); onClose(); }}
         />
@@ -5093,7 +5362,208 @@ useEffect(() => {
     rydKopier();
     rydAdgang();
     try { localStorage.removeItem("wl_sidste_emp"); } catch { /* ingenting at goere */ }
+    // Start/stop-tilstanden hoerer til HENDE, ikke til telefonen.
+    try { ["wl_tidsregel", "wl_startede", "wl_fortrudt"].forEach((k) => localStorage.removeItem(k)); } catch { /* ingenting */ }
+    setTidsregel(null); setStartede({});
     setEmployee(null); setInstances([]); setKopiHentet(null);
+  }
+
+  // ── Start/stop ────────────────────────────────────────────────────────────
+  // Reglen for DEN medarbejder: har hun start/stop, og fra hvilken varighed. Uden
+  // regel (ikke hentet, eller en planlaegger der kigger i en kollegas plan) gaelder
+  // den gamle maade overalt. brugerStartStop() i src/startstop.js er den eneste port.
+  const [tidsregelRaa, setTidsregel] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wl_tidsregel") || "null"); } catch { return null; }
+  });
+  const tidsregel = viewingOther ? null : tidsregelRaa;
+  // Tider hun har startet og ikke afsluttet: { [opgaveId]: { startMs, afstand, automatisk, iKoe } }.
+  // Gemmes paa telefonen, saa uret ikke forsvinder, hvis appen lukkes uden daekning.
+  const [startede, setStartede] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wl_startede") || "{}"); } catch { return {}; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("wl_startede", JSON.stringify(startede)); } catch { /* fuldt lager */ }
+  }, [startede]);
+  const [position, setPosition] = useState(null);
+  const [punkter, setPunkter] = useState({});
+  const [autoBesked, setAutoBesked] = useState(null);
+  const autoIGang = useRef(false);
+
+  useEffect(() => {
+    if (!employee?.id || viewingOther) return;
+    let afbrudt = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("min_tidsregel");
+      if (afbrudt || error || !data) return;
+      setTidsregel(data);
+      try { localStorage.setItem("wl_tidsregel", JSON.stringify(data)); } catch { /* fuldt lager */ }
+      // Databasen er sandheden om hvilke tider der koerer — ogsaa hvis hun har
+      // startet paa en anden telefon. Starter, der stadig ligger i koeen, beholdes.
+      const { data: raekker, error: e2 } = await supabase.from("tidsstart")
+        .select("instance_id, startet, afstand_m, automatisk").eq("employee_id", employee.id);
+      if (afbrudt || e2) return;
+      setStartede((prev) => {
+        const ny = {};
+        for (const r of raekker || []) {
+          ny[r.instance_id] = { startMs: new Date(r.startet).getTime(), afstand: r.afstand_m, automatisk: r.automatisk };
+        }
+        for (const [id, v] of Object.entries(prev)) if (v.iKoe && !ny[id]) ny[id] = v;
+        return ny;
+      });
+    })();
+    return () => { afbrudt = true; };
+  }, [employee?.id, viewingOther, genhent]);
+
+  // Dagens opgaver med start/stop, som hun ikke er faerdig med. Kun i DENNE uge —
+  // bladrer hun frem, er der ingen «i dag» at starte noget paa.
+  const denneUge = weekInfoWithOffset(0);
+  const erDenneUge = !!indlaestUge && indlaestUge.uge === denneUge.week && indlaestUge.aar === denneUge.year;
+  const dagensStartStop = (tidsregel?.startStop && erDenneUge && employee)
+    ? instances.filter((t) => t.day === todayKey() && t.type !== "aktivitet"
+        && brugerStartStop(tidsregel, t, employee.id) && !erFaerdig(t, employee.id))
+    : [];
+  const foelgPosition = dagensStartStop.length > 0;
+
+  // Positionen foelges KUN mens appen er fremme, og kun naar der er en start/stop-
+  // opgave tilbage i dag. En hjemmeside kan ikke foelge med i baggrunden — hverken
+  // paa iPhone eller Android — og det er ogsaa meningen.
+  useEffect(() => {
+    if (!foelgPosition || typeof navigator === "undefined" || !navigator.geolocation) return;
+    let id = null;
+    function taend() {
+      if (id !== null || document.visibilityState !== "visible") return;
+      id = navigator.geolocation.watchPosition(
+        (p) => setPosition({ lat: p.coords.latitude, lon: p.coords.longitude,
+                             noejagtighed: Math.round(p.coords.accuracy || 0), tid: Date.now() }),
+        () => { /* afvist eller ingen position: start er stadig tilladt */ },
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 30000 });
+    }
+    function sluk() { if (id !== null) { navigator.geolocation.clearWatch(id); id = null; } }
+    function skift() { if (document.visibilityState === "visible") taend(); else sluk(); }
+    taend();
+    document.addEventListener("visibilitychange", skift);
+    return () => { sluk(); document.removeEventListener("visibilitychange", skift); };
+  }, [foelgPosition]);
+
+  // Adressernes punkter for dagens start/stop-opgaver.
+  const dagensAdresser = [...new Set(dagensStartStop.map((t) => t.address).filter(Boolean))].join("|");
+  useEffect(() => {
+    if (!dagensAdresser) return;
+    let afbrudt = false;
+    (async () => {
+      for (const a of dagensAdresser.split("|")) {
+        const punkt = await adressePunkt(a);
+        if (afbrudt) return;
+        setPunkter((prev) => (a in prev ? prev : { ...prev, [a]: punkt }));
+      }
+    })();
+    return () => { afbrudt = true; };
+  }, [dagensAdresser]);
+
+  async function startTid(task, { afstand = null, noejagtighed = null, automatisk = false } = {}) {
+    if (viewingOther || !employee) return false;
+    const noegle = nytId("ts");
+    const tidMs = Date.now();
+    const { data, error } = await supabase.rpc("start_tid", {
+      p_instance_id: task.id, p_klient_id: noegle, p_afstand_m: afstand,
+      p_noejagtighed_m: afstand === null ? null : noejagtighed, p_automatisk: automatisk,
+    });
+    if (error) {
+      if (!erNetvaerksfejl(error)) { console.error("start_tid:", error.message); return false; }
+      await koeTilfoej({ art: "start", args: { opgaveId: task.id, noegle, tidMs, afstand,
+        noejagtighed: afstand === null ? null : noejagtighed, automatisk } });
+      opdaterKoeAntal();
+      setStartede((p) => ({ ...p, [task.id]: { startMs: tidMs, afstand, automatisk, iKoe: true } }));
+      return true;
+    }
+    // Var den allerede startet (paa en anden telefon), er det DEN start der gaelder.
+    const startMs = data && data.klient_id !== noegle && data.startet ? new Date(data.startet).getTime() : tidMs;
+    setStartede((p) => ({ ...p, [task.id]: { startMs, afstand, automatisk } }));
+    return true;
+  }
+
+  async function fortrydStart(taskId) {
+    if (viewingOther) return;
+    husFortrudt(taskId);
+    setStartede((p) => { const n = { ...p }; delete n[taskId]; return n; });
+    setAutoBesked((b) => (b?.opgaveId === taskId ? null : b));
+    const { error } = await supabase.rpc("fortryd_start", { p_instance_id: taskId });
+    if (error && erNetvaerksfejl(error)) {
+      await koeTilfoej({ art: "fortryd", args: { opgaveId: taskId } });
+      opdaterKoeAntal();
+    }
+  }
+
+  // Svarer { ok } — eller { ok: false, serverMaalt } naar databasen maalte noget andet
+  // end telefonen og vil have en begrundelse.
+  async function afslutTid(taskId, minutes, note, noegle, stopMs, afstand, noejagtighed) {
+    if (viewingOther || !employee) return { ok: false };
+    const m = Number(minutes);
+    if (!m || m <= 0) return { ok: false };
+    const args = {
+      p_instance_id: taskId, p_minutes: m, p_note: note || null, p_klient_id: noegle,
+      p_stop_ms: stopMs, p_afstand_m: afstand, p_noejagtighed_m: afstand === null ? null : noejagtighed,
+    };
+    const { data, error } = await supabase.rpc("afslut_tid", args);
+    const fjernStart = () => setStartede((p) => { const n = { ...p }; delete n[taskId]; return n; });
+    if (error) {
+      if (error.code === "22023") {
+        const mm = String(error.message || "").match(/(\d+) min/);
+        return { ok: false, serverMaalt: mm ? Number(mm[1]) : null };
+      }
+      if (erNetvaerksfejl(error)) {
+        await koeTilfoej({ art: "afslut", args: { opgaveId: taskId, minutter: m, note: note || null,
+          noegle, tidMs: stopMs, afstand, noejagtighed: afstand === null ? null : noejagtighed } });
+        setInstances((prev) => prev.map((t) => t.id === taskId
+          ? { ...t, timeLog: [...(t.timeLog || []), { minutes: m, empId: employee.id, ts: Date.now(), kid: noegle, startStop: true }] }
+          : t));
+        fjernStart();
+        opdaterKoeAntal();
+        return { ok: true };
+      }
+      console.error("afslut_tid:", error.message);
+      return { ok: false };
+    }
+    setInstances((prev) => prev.map((t) => t.id === taskId ? { ...t, timeLog: data, time_log: data } : t));
+    fjernStart();
+    return { ok: true };
+  }
+
+  // Automatisk start: hun staar ved adressen, der er praecis én opgave, der passer,
+  // og hun har ikke noget andet koerende. Starter, der er over 16 timer gamle, er
+  // glemt og maa ikke spaerre for dagens.
+  useEffect(() => {
+    const pos = friskPosition(position);
+    if (!pos || !employee || dagensStartStop.length === 0 || autoIGang.current) return;
+    const nyligeStartede = Object.fromEntries(Object.entries(startede)
+      .filter(([, v]) => Date.now() - v.startMs < 16 * 3600 * 1000));
+    const afstande = {};
+    for (const t of dagensStartStop) {
+      const punkt = punkter[t.address];
+      afstande[t.id] = { afstand: punkt ? afstandMeter(pos, punkt) : null, noejagtighed: pos.noejagtighed };
+    }
+    const kandidat = autoStartKandidat({
+      opgaver: dagensStartStop, empId: employee.id, regel: tidsregel,
+      startede: nyligeStartede, afstande, nu: new Date(), allerede: fortrudteIDag(),
+    });
+    if (!kandidat) return;
+    autoIGang.current = true;
+    startTid(kandidat, { ...afstande[kandidat.id], automatisk: true }).then((ok) => {
+      autoIGang.current = false;
+      if (ok) setAutoBesked({ opgaveId: kandidat.id, navn: kandidat.customerName || kandidat.title });
+    });
+  }, [position, punkter, startede, instances, tidsregel, indlaestUge]);
+
+  // Til opgaveskaermen. null = den gamle maade.
+  function startStopFor(task) {
+    if (!task || !employee || !brugerStartStop(tidsregel, task, employee.id)) return null;
+    return {
+      startet: startede[task.id] || null,
+      position,
+      onStart: (maal) => startTid(task, maal),
+      onFortryd: () => fortrydStart(task.id),
+      onAfslutTid: afslutTid,
+    };
   }
 
   if (authLoading) return <div style={s.loading}>{T[lang].loading}</div>;
@@ -5174,6 +5644,33 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
 
       {/* Koeen skal vaere synlig. Det vaerste ville vaere at hun troede alt var sendt,
           lukkede appen, og foerst opdagede dagen efter at tiden manglede. */}
+      {/* Automatisk start skal kunne ses og fortrydes med ét tryk. Ramte den forkert,
+          maa den aldrig blive staaende i det skjulte. */}
+      {autoBesked && startede[autoBesked.opgaveId] && (
+        <div style={{ background: "#ECFDF5", borderBottom: "1px solid #A7F3D0", padding: "10px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#065F46" }}>
+                ⏱ {tr.ssAutoStarted(autoBesked.navn)}
+              </div>
+              <div style={{ fontSize: 12, color: "#047857", marginTop: 1, lineHeight: 1.4 }}>{tr.ssAutoHint}</div>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              <button onClick={() => fortrydStart(autoBesked.opgaveId)}
+                style={{ border: "1.5px solid #047857", borderRadius: 8, background: "#fff", color: "#047857",
+                         padding: "8px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                {tr.ssUndo}
+              </button>
+              <button onClick={() => setAutoBesked(null)} aria-label="OK"
+                style={{ border: "none", borderRadius: 8, background: "#047857", color: "#fff",
+                         padding: "8px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {koeAntal > 0 && (
         <div style={{ background: "#FFFBEB", borderBottom: "1px solid #FDE68A", padding: "10px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
@@ -5544,6 +6041,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           onSetStatus={setStatus}
           onToggleChecklist={toggleChecklistItem}
           supabaseClient={supabase}
+          startStop={startStopFor(instances.find((t) => t.id === openTask.id) || openTask)}
         />
       )}
 
@@ -5773,6 +6271,13 @@ const s = {
   stepperFelt: { flex:1, width:"100%", minWidth:0, textAlign:"center", fontSize:26, fontWeight:600,
     color:"#111111", border:"1.5px solid transparent", borderRadius:12, background:"#F8FAFC",
     padding:"10px 0", fontFamily:"inherit", MozAppearance:"textfield" },
+  ssKoerer: { display:"flex", alignItems:"center", justifyContent:"space-between", gap:8,
+    background:"#ECFDF5", border:"1px solid #A7F3D0", color:"#065F46", borderRadius:10,
+    padding:"9px 12px", marginBottom:8, fontSize:14, fontWeight:600 },
+  ssFortryd: { border:"none", background:"transparent", color:"#047857", fontSize:13, fontWeight:700,
+    textDecoration:"underline", cursor:"pointer", fontFamily:"inherit", flexShrink:0, padding:4 },
+  ssBesked: { fontSize:13, color:"#92400E", background:"#FFFBEB", border:"1px solid #FDE68A",
+    borderRadius:8, padding:"8px 10px", marginBottom:8, lineHeight:1.4 },
   primaerStor: { width:"100%", padding:"16px 0", borderRadius:12, border:"none", background:"#D6247A",
     color:"#fff", fontWeight:700, fontSize:16, cursor:"pointer", fontFamily:"inherit" },
   sekundaerStor: { width:"100%", padding:"15px 0", borderRadius:12, border:"1.5px solid #E2E8F0",

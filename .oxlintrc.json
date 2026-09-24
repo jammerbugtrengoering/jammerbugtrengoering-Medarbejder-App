@@ -14,7 +14,8 @@
     "netlify/**",
     "tjek-tdz.mjs",
     "ugespring.test.mjs",
-    "tidsfelt.test.mjs"
+    "tidsfelt.test.mjs",
+    "startstop.test.mjs"
   ],
   "rules": {
     "no-undef": "error",
