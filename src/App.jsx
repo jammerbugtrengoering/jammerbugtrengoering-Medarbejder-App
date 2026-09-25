@@ -561,6 +561,10 @@ const T = {
     ssWhyChanged: (tid) => `Du har rettet den målte tid (${tid}). Skriv hvorfor — så kan kontoret forklare det til kunden.`,
     ssWhyBoth: "Skriv hvorfor tiden er en anden end målt og planlagt.",
     ssChangedRequired: "Skriv en kort begrundelse, før du går videre.",
+    ssAsMeasured: "som målt",
+    ssMoreThanMeasured: (t) => `${t} mere end målt`,
+    ssLessThanMeasured: (t) => `${t} mindre end målt`,
+    ssWhyPlaceholder: "Fx: kunden bad om ekstra, eller jeg glemte at trykke Start",
     ssServerMeasured: (min) => `Serveren målte ${min} min. Tallet er rettet til det.`,
     ssStartFailed: "Tiden kunne ikke startes. Prøv igen.",
   },
@@ -757,6 +761,10 @@ const T = {
     ssWhyChanged: (tid) => `You changed the measured time (${tid}). Write why — so the office can explain it to the customer.`,
     ssWhyBoth: "Write why the time differs from what was measured and planned.",
     ssChangedRequired: "Write a short reason before you continue.",
+    ssAsMeasured: "as measured",
+    ssMoreThanMeasured: (t) => `${t} more than measured`,
+    ssLessThanMeasured: (t) => `${t} less than measured`,
+    ssWhyPlaceholder: "E.g. the customer asked for extra, or I forgot to tap Start",
     ssServerMeasured: (min) => `The server measured ${min} min. The number has been corrected.`,
     ssStartFailed: "The time could not be started. Try again.",
   },
@@ -848,11 +856,23 @@ function useSynligHoejde() {
     const vv = window.visualViewport;
     if (!vv) return;                      // Aeldre browsere: alt som foer.
     const opdater = () => setMaal({ hoejde: vv.height, top: vv.offsetTop });
+    // Naar tastaturet kommer op, krymper arket — og feltet hun trykkede paa, kan
+    // ende under kanten. Saa staar hun og skriver i noget, hun ikke kan se. 25.9.2026
+    // paa begrundelsen i afslutningen: skaermen viste tallet og Videre, men ikke
+    // feltet. Derfor rulles det aktive felt frem, efter arket har faaet sin nye hoejde.
+    const visFelt = () => {
+      const el = document.activeElement;
+      if (!el || !/^(TEXTAREA|INPUT)$/.test(el.tagName)) return;
+      setTimeout(() => {
+        if (document.activeElement === el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 60);
+    };
+    const vedResize = () => { opdater(); visFelt(); };
     opdater();
-    vv.addEventListener("resize", opdater);
+    vv.addEventListener("resize", vedResize);
     vv.addEventListener("scroll", opdater);
     return () => {
-      vv.removeEventListener("resize", opdater);
+      vv.removeEventListener("resize", vedResize);
       vv.removeEventListener("scroll", opdater);
     };
   }, []);
@@ -3501,7 +3521,16 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
                 <div style={s.storTid}>
                   {timer}<span style={s.storTidEnhed}>t</span> {String(minutter).padStart(2, "0")}<span style={s.storTidEnhed}>m</span>
                 </div>
-                {planlagt > 0 && (
+                {/* Med start/stop er det den maalte tid, tallet sammenlignes med. Stod der
+                    «som planlagt» mens tallet var rettet fra 22 til 60 minutter, sagde
+                    maerket det modsatte af boksen nedenunder. */}
+                {startStop && maalt !== null ? (
+                  <div style={!rettet ? s.maerkeOk : minutterIAlt > maalt ? s.maerkeOver : s.maerkeUnder}>
+                    {!rettet ? tr.ssAsMeasured
+                      : minutterIAlt > maalt ? tr.ssMoreThanMeasured(fmtMin(minutterIAlt - maalt))
+                      : tr.ssLessThanMeasured(fmtMin(maalt - minutterIAlt))}
+                  </div>
+                ) : planlagt > 0 && (
                   <div style={afvigelse === 0 ? s.maerkeOk : overskrider ? s.maerkeOver : s.maerkeUnder}>
                     {afvigelse === 0 ? tr.finishAsPlanned
                       : overskrider ? tr.finishMoreThan(fmtMin(afvigelse))
@@ -3551,8 +3580,9 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
                       : tr.finishWhyMore}
                   </div>
                   <textarea rows={2} value={begrundelse}
+                    onFocus={(e) => { const el = e.target; setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 350); }}
                     onChange={(e) => { setBegrundelse(e.target.value); if (e.target.value.trim()) setBegrundelseFejl(false); }}
-                    placeholder={tr.overrunPlaceholder}
+                    placeholder={rettet ? tr.ssWhyPlaceholder : tr.overrunPlaceholder}
                     style={{ ...s.overrunInput, borderColor: begrundelseFejl ? "#DC2626" : "#F59E0B" }} />
                   {begrundelseFejl && <div style={s.overrunError}>{rettet ? tr.ssChangedRequired : tr.overrunRequired}</div>}
                 </div>
