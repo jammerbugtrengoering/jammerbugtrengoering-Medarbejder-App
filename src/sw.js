@@ -85,6 +85,11 @@ self.addEventListener("notificationclick", (e) => {
   const maal = (e.notification.data && e.notification.data.url) || "/";
 
   e.waitUntil((async () => {
+    // Beskeder til planlaeggerne peger paa planlaegningsappen (et andet domaene).
+    // De maa ikke flytte Worklist-vinduet derhen — saa aabnes et nyt vindue.
+    let fremmed = false;
+    try { fremmed = new URL(maal, self.location.origin).origin !== self.location.origin; } catch { /* relativ */ }
+    if (fremmed && self.clients.openWindow) return self.clients.openWindow(maal);
     const vinduer = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const v of vinduer) {
       if ("focus" in v) {
