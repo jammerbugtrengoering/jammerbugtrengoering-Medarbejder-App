@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 // VITE_UDGAVE=kunde saettes paa de Netlify-sites, der koerer mod kundedatabasen. Saa er
 // udgangspunktet neutralt (foer login ved vi ikke, hvilket firma det er). Uden variablen
 // er det Jammerbugt Rengoering, praecis som foer.
-const KUNDEUDGAVE = import.meta.env?.VITE_UDGAVE === "kunde";
+export const KUNDEUDGAVE = import.meta.env?.VITE_UDGAVE === "kunde";
 
 const STANDARD = KUNDEUDGAVE ? {
   navn: "Planlægning",
@@ -134,6 +134,31 @@ export function hentFirma(supabase) {
     return FIRMA;
   })();
   return hentet;
+}
+
+// Foer login i kundeudgaven: det korte navn i adressen (/hansen) giver firmaets navn,
+// logo og farve paa login-skaermen. Efter login overtager firma_offentlig.
+export async function hentFirmaEfterSlug(supabase, slug) {
+  if (!KUNDEUDGAVE || !slug) return;
+  try {
+    const { data } = await supabase.rpc("firma_efter_slug", { p_slug: slug });
+    const raekke = Array.isArray(data) ? data[0] : data;
+    if (raekke) opdaterFirma(raekke);
+  } catch { /* det neutrale udseende bliver staaende */ }
+}
+
+// Det korte navn = foerste led i adressen, hvis det ligner et.
+export function slugFraAdresse() {
+  if (typeof window === "undefined") return "";
+  const m = window.location.pathname.match(/^\/([a-z0-9][a-z0-9-]{1,38}[a-z0-9])\/?$/);
+  return m ? m[1] : "";
+}
+
+// Efter login: hent igen. Foer login kender kundedatabasen ikke firmaet, saa det foerste
+// svar var tomt.
+export function genhentFirma(supabase) {
+  hentet = null;
+  return hentFirma(supabase);
 }
 
 // Kaldes ogsaa, naar Firma-siden er gemt, saa alt skifter med det samme.

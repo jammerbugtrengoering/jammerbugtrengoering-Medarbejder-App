@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
-import { FIRMA, useFirma, farveHex, harModul } from "./firma";
+import { FIRMA, useFirma, farveHex, harModul, hentFirmaEfterSlug, slugFraAdresse, genhentFirma } from "./firma";
 import { weekInfoWithOffset, ugerFraNu } from "./uger";
 import { skiftTid, saetTimer, saetMinutter } from "./tidsfelt";
 import {
@@ -2143,6 +2143,7 @@ function LangToggle({ lang, setLang }) {
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 function LoginScreen({ lang, setLang, initialError }) {
+  const firma = useFirma(null);
   const t = T[lang];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -2175,7 +2176,7 @@ function LoginScreen({ lang, setLang, initialError }) {
       <LangToggle lang={lang} setLang={setLang} />
       <div style={s.loginCard}>
         <div style={s.brand}>
-          <img src="/app-icon.png" alt="Worklist" style={s.brandIcon} />
+          <img src={firma.logo_url || "/app-icon.png"} alt="" style={{ ...s.brandIcon, background: "#000" }} />
           <div>
             <div style={s.brandTitle}>{t.appName}</div>
             <div style={s.brandSub}>{t.appSub}</div>
@@ -2211,6 +2212,7 @@ function LoginScreen({ lang, setLang, initialError }) {
 
 // ── Set new password (after clicking reset link) ─────────────────────────────
 function SetNewPasswordScreen({ lang, setLang, onDone }) {
+  const firma = useFirma(null);
   const t = T[lang];
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
@@ -2233,7 +2235,7 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
       <LangToggle lang={lang} setLang={setLang} />
       <div style={s.loginCard}>
         <div style={s.brand}>
-          <img src="/app-icon.png" alt="Worklist" style={s.brandIcon} />
+          <img src={firma.logo_url || "/app-icon.png"} alt="" style={{ ...s.brandIcon, background: "#000" }} />
           <div>
             <div style={s.brandTitle}>{t.appName}</div>
             <div style={s.brandSub}>{t.newPasswordTitle}</div>
@@ -4284,7 +4286,9 @@ const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || "https://jammerbugtrengoer
 // faar ingenting — Apple tillader det ikke. Derfor spoerger vi ikke om lov, foer vi
 // har set at appen koerer installeret; ellers bruger medarbejderen sit ene "nej"
 // paa en dialog der alligevel ikke kunne virke, og saa er den svaer at faa frem igen.
-const VAPID_OFFENTLIG = "BPhgmi5n1jTwEiLyFJDPBSaVA2WgXpW3fmFM8m_r6Uy4sYCCDYImC-W0pzcEKQFfTm-c0eU-6WhWUdHnotJB1Yc";
+// Kundeudgaven har sit eget noeglepar (VITE_VAPID_OFFENTLIG paa kunde-worklist). Uden
+// variablen er det Jammerbugt Rengoerings, praecis som foer.
+const VAPID_OFFENTLIG = import.meta.env.VITE_VAPID_OFFENTLIG || "BPhgmi5n1jTwEiLyFJDPBSaVA2WgXpW3fmFM8m_r6Uy4sYCCDYImC-W0pzcEKQFfTm-c0eU-6WhWUdHnotJB1Yc";
 
 function base64TilBytes(b64) {
   const pad = "=".repeat((4 - (b64.length % 4)) % 4);
@@ -4827,6 +4831,12 @@ export default function MedarbejderApp() {
   }
 
   const [session, setSession] = useState(null);
+  // Kundeudgaven: foer login viser /hansen firmaets logo og farve; efter login hentes
+  // firmaet paa login'et.
+  useEffect(() => {
+    if (session?.user?.id) genhentFirma(supabase);
+    else hentFirmaEfterSlug(supabase, slugFraAdresse());
+  }, [session?.user?.id]);
   const [authLoading, setAuthLoading] = useState(true);
   // Saettes naar profilopslaget fejler paa grund af manglende forbindelse — ikke
   // fordi profilen mangler. De to skal se helt forskellige ud for medarbejderen.
