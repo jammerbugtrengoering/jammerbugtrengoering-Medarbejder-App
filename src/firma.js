@@ -31,7 +31,8 @@ const STANDARD = KUNDEUDGAVE ? {
   modul_start_stop: true,
   modul_lager: true,
   modul_tilbud: true,
-  modul_kundeportal: true,
+  // Kundeudgaven tilbyder ingen portal til firmaets egne kunder (Jonn 29.9.2026).
+  modul_kundeportal: false,
   modul_dinero: false,
   modul_nexus: false,
 } : {
