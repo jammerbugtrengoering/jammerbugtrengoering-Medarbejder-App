@@ -1618,6 +1618,9 @@ const HELP_DA = [
       "Start virker ikke, hvis telefonen kan se, at du er et helt andet sted end kunden. Kan telefonen ikke finde din position, kan du godt starte — det bliver bare noteret.",
       "Worklist spørger om lov til at bruge din position. Den bruges kun, mens appen er åben, og kun afstanden til kundens adresse gemmes — aldrig hvor du er.",
       "Har du glemt at trykke Afslut, får du en besked på telefonen et kvarter efter, at opgaven skulle være færdig.",
+      "Har du ikke trykket Start 5 minutter efter det planlagte tidspunkt, får du en besked: «Husk at trykke Start». Tryk på den — står du ved adressen, starter tiden af sig selv.",
+      "Er tiden stadig ikke startet 10 minutter efter, starter systemet den for dig fra det planlagte tidspunkt. Der står «startet af systemet» ved tiden. Passer det ikke, tryk «Fortryd start» og tryk selv Start.",
+      "Er tiden startet af systemet, skal du ikke skrive en forklaring, hvis du retter tiden ved Afslut.",
       "Glemte du at trykke Start, kan du stadig afslutte. Så skriver du tiden som før." ] },
   { t: "Produkter til kunden", p: [
       "Produkter henter du på kontoret. Planlæggeren skriver ned hvad du har fået med, og til hvilken kunde. Du skal ikke selv vælge noget i appen.",
@@ -3236,7 +3239,9 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
   const overskrider = planlagt > 0 && afvigelse > 0 && minutterIAlt > 0;
   // Rettet fra det maalte med mere end to minutter? Saa skal hun skrive hvorfor —
   // i begge retninger. Én begrundelse daekker baade rettelsen og overskridelsen.
-  const rettet = !!startStop && kraeverBegrundelse(minutterIAlt, maalt);
+  // En systemstart er et skoen, ikke en maaling (29.9.2026): retter hun den, skal hun
+  // ikke forklare det. Databasen (afslut_tid) goer det samme.
+  const rettet = !!startStop && !startStop?.startet?.system && kraeverBegrundelse(minutterIAlt, maalt);
   const skalBegrundes = overskrider || rettet;
 
   // Loftet paa 12 timer er det samme som i den gamle timevaelger. Nedad stopper vi
@@ -4095,7 +4100,7 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
                 <div style={s.ssKoerer}>
                   <span>⏱ {tr.ssRunning(
                     new Date(koerer.startMs).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }),
-                    fmtMin(maaltMin(koerer.startMs, Date.now())))}</span>
+                    fmtMin(maaltMin(koerer.startMs, Date.now())))}{koerer.system ? " · startet af systemet" : ""}</span>
                   <button style={s.ssFortryd} onClick={() => startStop.onFortryd()}>{tr.ssUndo}</button>
                 </div>
               )}
@@ -5444,12 +5449,12 @@ useEffect(() => {
       // Databasen er sandheden om hvilke tider der koerer — ogsaa hvis hun har
       // startet paa en anden telefon. Starter, der stadig ligger i koeen, beholdes.
       const { data: raekker, error: e2 } = await supabase.from("tidsstart")
-        .select("instance_id, startet, afstand_m, automatisk").eq("employee_id", employee.id);
+        .select("instance_id, startet, afstand_m, automatisk, kilde").eq("employee_id", employee.id);
       if (afbrudt || e2) return;
       setStartede((prev) => {
         const ny = {};
         for (const r of raekker || []) {
-          ny[r.instance_id] = { startMs: new Date(r.startet).getTime(), afstand: r.afstand_m, automatisk: r.automatisk };
+          ny[r.instance_id] = { startMs: new Date(r.startet).getTime(), afstand: r.afstand_m, automatisk: r.automatisk, system: r.kilde === "system" };
         }
         for (const [id, v] of Object.entries(prev)) if (v.iKoe && !ny[id]) ny[id] = v;
         return ny;
