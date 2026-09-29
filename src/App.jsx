@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
+import { FIRMA, useFirma, farveHex } from "./firma";
 import { weekInfoWithOffset, ugerFraNu } from "./uger";
 import { skiftTid, saetTimer, saetMinutter } from "./tidsfelt";
 import {
@@ -1384,7 +1385,7 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
           const tjekIalt  = (t.checklist || []).length;
           const maerke = t.contractType === "nexus" ? { tekst: "Nexus", farve: "#4F46E5", bag: "#EEF2FF" }
                        : t.contractType === "aeldrelov" ? { tekst: "Ældrelov", farve: "#C2410C", bag: "#FFF7ED" }
-                       : t.contractType === "privat" ? { tekst: da ? "Privat" : "Private", farve: "#9C1B5D", bag: "#FFF6FA" }
+                       : t.contractType === "privat" ? { tekst: da ? "Privat" : "Private", farve: "var(--farve-moerk)", bag: "var(--farve-bleg)" }
                        : null;
           // Hvor meget der er plads til. En kvarters opgave er 34 px hoej — der er
           // kun plads til én linje, og saa skal det vaere klokkeslaet og hvem.
@@ -1497,9 +1498,9 @@ function Tidslinje({ schedule, employee, lang, erIDag, onVaelg }) {
         {erIDag && nu >= fra && nu <= tilTime * 60 && (
           <div style={{ position: "absolute", left: -4, right: 0,
                         top: (nu - fra) * PX_PR_MIN, height: 0,
-                        borderTop: "2px solid #D6247A", zIndex: 2 }}>
+                        borderTop: "2px solid var(--farve)", zIndex: 2 }}>
             <div style={{ position: "absolute", left: -3, top: -4, width: 8, height: 8,
-                          borderRadius: "50%", background: "#D6247A" }} />
+                          borderRadius: "50%", background: "var(--farve)" }} />
           </div>
         )}
       </div>
@@ -1687,7 +1688,7 @@ const HELP_DA = [
   // ud fra de felter, der faktisk findes i databasen — ikke ud fra en skabelon. Aendrer
   // vi, hvad appen gemmer, skal den her tekst rettes i samme ombaering.
   { t: "Dine personoplysninger", p: [
-      "Jammerbugt Rengøring er ansvarlig for de oplysninger, appen gemmer om dig. Her står præcis hvad det er.",
+      `${FIRMA.juridisk_navn || FIRMA.navn} er ansvarlig for de oplysninger, appen gemmer om dig. Her står præcis hvad det er.`,
       "Om dig selv: dit navn, din arbejdsmail, dit sprogvalg, hvornår du normalt møder, dine kompetencer og hvilke områder du dækker.",
       "Din hjemmeadresse, hvis du er på en ordning hvor kørsel hjemmefra tæller med. Den bruges kun til at regne afstanden til dagens første opgave — ikke til andet.",
       "Om dit arbejde: hvilke opgaver du er sat på, hvornår du har registreret tid, hvor lang tid, og de beskeder du sender til kontoret.",
@@ -1889,7 +1890,7 @@ const HELP_EN = [
       "A job is missing? Contact the office — they can move it.",
       "App stuck? Close the page and open it again." ] },
   { t: "Your personal data", p: [
-      "Jammerbugt Rengøring is responsible for the information the app stores about you. This is exactly what it is.",
+      `${FIRMA.juridisk_navn || FIRMA.navn} is responsible for the information the app stores about you. This is exactly what it is.`,
       "About you: your name, your work email, your language choice, your usual start time, your skills and the areas you cover.",
       "Your home address, if you are on an arrangement where travel from home counts as working time. It is used only to calculate the distance to the first job of the day — nothing else.",
       "About your work: which jobs you are assigned, when you logged time, how long, and the messages you send to the office.",
@@ -1932,7 +1933,7 @@ function udskrivVejledning(sections, da) {
   w.document.write(
     `<!doctype html><html lang="${da ? "da" : "en"}"><head><meta charset="utf-8"><title>${esc(titel)}</title><style>` +
     `body{font-family:Inter,-apple-system,system-ui,sans-serif;color:#111;line-height:1.55;max-width:700px;margin:0 auto;padding:26px 24px}` +
-    `h1{color:#D6247A;font-size:24px;margin:0 0 4px}.dato{color:#94A3B8;font-size:12px;margin:0 0 24px}` +
+    `h1{color:${farveHex()};font-size:24px;margin:0 0 4px}.dato{color:#94A3B8;font-size:12px;margin:0 0 24px}` +
     `h2{font-size:16px;margin:22px 0 6px;page-break-after:avoid}p{font-size:13.5px;margin:4px 0}@page{margin:16mm}` +
     `</style></head><body><h1>Worklist</h1><p class="dato">${esc(titel)} · ${da ? "udskrevet" : "printed"} ${esc(idag)}</p>${krop}</body></html>`
   );
@@ -1959,8 +1960,8 @@ function HelpPage({ lang, onClose, onVisIgen }) {
       <div style={{ flex:1, overflowY:"auto", WebkitOverflowScrolling:"touch",
                     padding:"14px 16px calc(32px + env(safe-area-inset-bottom))",
                     textAlign:"left", maxWidth:640, margin:"0 auto", width:"100%", boxSizing:"border-box" }}>
-        <div style={{ background:"#FCE4EF", borderRadius:10, padding:"12px 14px", marginBottom:16,
-                      fontSize:14.5, lineHeight:1.5, color:"#9C1B5D", fontWeight:700 }}>
+        <div style={{ background:"var(--farve-lys)", borderRadius:10, padding:"12px 14px", marginBottom:16,
+                      fontSize:14.5, lineHeight:1.5, color:"var(--farve-moerk)", fontWeight:700 }}>
           {da ? "Hver dag: åbn appen → tryk på opgaven → sæt flueben → registrér tid → marker som udført."
               : "Every day: open the app → tap the job → tick off tasks → register time → mark as done."}
         </div>
@@ -2116,13 +2117,13 @@ function Velkomst({ lang, navn, onLuk }) {
         <div style={{ display:"flex", justifyContent:"center", gap:8, marginBottom:16 }}>
           {trin.map((_, i) => (
             <div key={i} style={{ width: i === nr ? 22 : 8, height:8, borderRadius:4,
-                                  background: i === nr ? "#D6247A" : "#E2E8F0" }} />
+                                  background: i === nr ? "var(--farve)" : "#E2E8F0" }} />
           ))}
         </div>
         <button
           onClick={() => (sidste ? luk() : setNr(nr + 1))}
           style={{ width:"100%", padding:"17px 0", borderRadius:14, border:"none",
-                   background:"#D6247A", color:"#fff", fontWeight:700, fontSize:17,
+                   background:"var(--farve)", color:"#fff", fontWeight:700, fontSize:17,
                    cursor:"pointer", fontFamily:"inherit", minHeight:56 }}>
           {sidste ? (da ? "Så er jeg klar" : "I am ready") : (da ? "Videre" : "Next")}
         </button>
@@ -2199,7 +2200,7 @@ function LoginScreen({ lang, setLang, initialError }) {
             type="button"
             onClick={requestPasswordReset}
             disabled={loading || !email.trim()}
-            style={{ width:"100%",padding:"10px 0",marginTop:10,border:"none",background:"transparent",color:"#D6247A",fontWeight:600,fontSize:13,cursor:"pointer",textAlign:"center" }}>
+            style={{ width:"100%",padding:"10px 0",marginTop:10,border:"none",background:"transparent",color:"var(--farve)",fontWeight:600,fontSize:13,cursor:"pointer",textAlign:"center" }}>
             {t.forgotPassword}
           </button>
           {resetSent && <div style={{ fontSize:13,color:"#16A34A",marginTop:8,padding:"10px 12px",background:"#ECFDF5",borderRadius:10 }}>{t.resetSentMsg(email.trim())}</div>}
@@ -2606,11 +2607,11 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
       body: {
         email: (f.kunde_email || "").trim(),
         name: (f.kontaktperson || "").trim() || (f.kunde_navn || "").trim(),
-        subject: "Tilbud fra Jammerbugt Rengøring",
+        subject: `Tilbud fra ${FIRMA.navn}`,
         html: `<p>Hej ${(f.kontaktperson || "").trim()}</p>`
           + `<p>Her er vores tilbud på ${(f.titel || "rengøring").trim()}.</p>`
           + `<p><a href="${link}">Åbn tilbuddet og accepter her</a></p>`
-          + `<p>Med venlig hilsen<br/>Jammerbugt Rengøring</p>`,
+          + `<p>Med venlig hilsen<br/>${FIRMA.navn}</p>`,
       },
     });
     setGemmer(false);
@@ -2736,9 +2737,9 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
                 }
               }}
                 style={{ flex: 1, padding: "12px 10px", borderRadius: 10, fontSize: 14, fontWeight: 700,
-                         border: f.pricing_type === k ? "2px solid #D6247A" : "1.5px solid #E2E8F0",
-                         background: f.pricing_type === k ? "#FCE4EF" : "#fff",
-                         color: f.pricing_type === k ? "#9C1B5D" : "#475569" }}>{l}</button>
+                         border: f.pricing_type === k ? "2px solid var(--farve)" : "1.5px solid #E2E8F0",
+                         background: f.pricing_type === k ? "var(--farve-lys)" : "#fff",
+                         color: f.pricing_type === k ? "var(--farve-moerk)" : "#475569" }}>{l}</button>
             ))}
           </div>
 
@@ -2813,7 +2814,7 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
             {gemmer ? "Gemmer…" : laast ? "Luk" : "Gem og luk"}
           </button>
           {!laast && (
-            <button style={{ ...s.doneLarge, flex: 1, background: "#D6247A", color: "#fff", borderColor: "#D6247A", fontWeight: 700 }}
+            <button style={{ ...s.doneLarge, flex: 1, background: "var(--farve)", color: "#fff", borderColor: "var(--farve)", fontWeight: 700 }}
               onClick={dannOgSend} disabled={gemmer}>
               {tilbud.status === "sendt" ? "Send igen" : "Send til kunden"}
             </button>
@@ -2876,7 +2877,7 @@ function NytMoedeSkaerm({ supabaseClient, employee, onLuk, onOprettet }) {
         </div>
         <div style={{ padding: 14, borderTop: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
           <button style={{ ...s.sekundaerStor, flex: 1 }} onClick={onLuk}>Annullér</button>
-          <button style={{ ...s.doneLarge, flex: 1, background: "#D6247A", color: "#fff", borderColor: "#D6247A", fontWeight: 700 }}
+          <button style={{ ...s.doneLarge, flex: 1, background: "var(--farve)", color: "#fff", borderColor: "var(--farve)", fontWeight: 700 }}
             onClick={opret} disabled={arbejder}>
             {arbejder ? "Opretter…" : "Opret møde"}
           </button>
@@ -3855,14 +3856,14 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
 
           {/* Status + contractType + title */}
           <div style={s.sheetStatusRow}>
-            <span style={{ ...s.statusBadge, background: done ? "#ECFDF5" : "#FFF6FA", color: done ? "#16A34A" : "#9C1B5D" }}>
+            <span style={{ ...s.statusBadge, background: done ? "#ECFDF5" : "var(--farve-bleg)", color: done ? "#16A34A" : "var(--farve-moerk)" }}>
               {done ? "✓ " + tr.status["udført"] : task.status === "i_gang" ? "⚡ " + tr.status["i_gang"] : "⏳ " + tr.status["planlagt"]}
             </span>
             {task.contractType === "nexus" && (
               <span style={{ ...s.statusBadge, background: "#EEF2FF", color: "#4F46E5" }}>🏢 Nexus</span>
             )}
             {task.contractType === "privat" && (
-              <span style={{ ...s.statusBadge, background: "#FFF6FA", color: "#9C1B5D" }}>🏠 {lang === "da" ? "Privat" : "Private"}</span>
+              <span style={{ ...s.statusBadge, background: "var(--farve-bleg)", color: "var(--farve-moerk)" }}>🏠 {lang === "da" ? "Privat" : "Private"}</span>
             )}
             {task.contractType === "aeldrelov" && (
               <span style={{ ...s.statusBadge, background: "#FFF7ED", color: "#C2410C" }}>👴 Ældrelov</span>
@@ -4187,7 +4188,7 @@ function TaskCard({ seg, employee, lang, onClick }) {
   const ident = opgaveIdentitet(t);
   return (
     <div style={{ ...s.taskCard, opacity: done ? 0.7 : 1 }} onClick={onClick}>
-      <div style={{ ...s.taskAccent, background: done ? "#22C55E" : inProgress ? "#F59E0B" : "#D6247A" }} />
+      <div style={{ ...s.taskAccent, background: done ? "#22C55E" : inProgress ? "#F59E0B" : "var(--farve)" }} />
       <div style={s.taskBody}>
         <div style={s.taskTime}>{fmtClock(seg.start)}</div>
         <div style={s.taskTitle}>{translatedTitle}</div>
@@ -4196,7 +4197,7 @@ function TaskCard({ seg, employee, lang, onClick }) {
             se opgaveIdentitet(). */}
         {ident.primaer && (
           <div style={s.taskHvor}>
-            <MapPin size={14} color="#D6247A" style={{ flexShrink: 0, marginTop: 1 }} />
+            <MapPin size={14} color="currentColor" style={{ flexShrink: 0, marginTop: 1, color: "var(--farve)" }} />
             <div style={{ minWidth: 0 }}>
               <div style={s.taskReference}>{ident.primaer}</div>
               {ident.sekundaer && <div style={s.taskAdresseTekst}>{ident.sekundaer}</div>}
@@ -4226,7 +4227,7 @@ function TaskCard({ seg, employee, lang, onClick }) {
               </span>
             )}
             {t.contractType === "nexus" && <span style={{ fontSize:9.5, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>Nexus</span>}
-            {t.contractType === "privat" && <span style={{ fontSize:9.5, fontWeight:700, color:"#9C1B5D", background:"#FFF6FA", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>{lang === "da" ? "Privat" : "Private"}</span>}
+            {t.contractType === "privat" && <span style={{ fontSize:9.5, fontWeight:700, color:"var(--farve-moerk)", background:"var(--farve-bleg)", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>{lang === "da" ? "Privat" : "Private"}</span>}
             {t.contractType === "aeldrelov" && <span style={{ fontSize:9.5, fontWeight:700, color:"#C2410C", background:"#FFF7ED", borderRadius:6, padding:"1px 5px", marginLeft:3, flexShrink:0 }}>Ældrelov</span>}
           </div>
         )}
@@ -4360,20 +4361,20 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
                    border: "1px solid #E2E8F0", background: "#fff", color: "#111111",
                    borderRadius: 12, padding: "12px 16px", minHeight: 48,
                    fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-          <ChevronLeft size={19} color="#D6247A" /> {da ? "Tilbage" : "Back"}
+          <ChevronLeft size={19} color="currentColor" style={{ color: "var(--farve)" }} /> {da ? "Tilbage" : "Back"}
         </button>
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 12 }}>{navn}</div>
         {punkter.map(([k, l, forklaring]) => (
           <button key={k} onClick={() => { vaelg(k); setUnderside(null); }}
             style={{ ...raekke, marginBottom: 8,
-                     border: valgt === k ? "2px solid #D6247A" : "1px solid #E2E8F0",
-                     background: valgt === k ? "#FCE4EF" : "#fff" }}>
+                     border: valgt === k ? "2px solid var(--farve)" : "1px solid #E2E8F0",
+                     background: valgt === k ? "var(--farve-lys)" : "#fff" }}>
             <span style={{ minWidth: 0 }}>
-              <span style={{ ...titel, display: "block", color: valgt === k ? "#9C1B5D" : "#111111" }}>{l}</span>
+              <span style={{ ...titel, display: "block", color: valgt === k ? "var(--farve-moerk)" : "#111111" }}>{l}</span>
               {forklaring && <span style={{ ...svar, display: "block",
-                                            color: valgt === k ? "#9C1B5D" : "#64748B" }}>{forklaring}</span>}
+                                            color: valgt === k ? "var(--farve-moerk)" : "#64748B" }}>{forklaring}</span>}
             </span>
-            {valgt === k && <Check size={19} color="#D6247A" style={{ flexShrink: 0 }} />}
+            {valgt === k && <Check size={19} color="currentColor" style={{ flexShrink: 0, color: "var(--farve)" }} />}
           </button>
         ))}
       </div>
@@ -4390,7 +4391,7 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
                     gap: 10, background: "#111", color: "#fff",
                     padding: "calc(12px + env(safe-area-inset-top)) 14px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#D6247A",
+          <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--farve)",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{initialer}</div>
           <div style={{ minWidth: 0 }}>
@@ -4590,18 +4591,18 @@ function BeskedBanner({ lang, employee }) {
   if (status !== "fra") return null;
 
   return (
-    <div style={{ background: "#FCE4EF", border: "1.5px solid #F0A9C8", borderRadius: 12,
+    <div style={{ background: "var(--farve-lys)", border: "1.5px solid #F0A9C8", borderRadius: 12,
                   padding: "12px 14px", marginBottom: 12 }}>
-      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#9C1B5D", marginBottom: 2 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--farve-moerk)", marginBottom: 2 }}>
         🔔 {da ? "Få besked på telefonen" : "Get notified on your phone"}
       </div>
-      <div style={{ fontSize: 12.5, color: "#9C1B5D", lineHeight: 1.5, marginBottom: 10 }}>
+      <div style={{ fontSize: 12.5, color: "var(--farve-moerk)", lineHeight: 1.5, marginBottom: 10 }}>
         {da ? "Når din plan ændres, når kontoret svarer, og hvis du mangler at registrere tid."
             : "When your schedule changes, when the office replies, and if time entries are missing."}
       </div>
       <button onClick={slaaTil} disabled={arbejder}
         style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                 background: "#D6247A", color: "#fff", fontWeight: 700, fontSize: 14,
+                 background: "var(--farve)", color: "#fff", fontWeight: 700, fontSize: 14,
                  cursor: "pointer", minHeight: 44 }}>
         {arbejder ? "…" : (da ? "Slå beskeder til" : "Turn on notifications")}
       </button>
@@ -4749,6 +4750,9 @@ function IngenProfil({ s, tr, onSignOut }) {
 }
 
 export default function MedarbejderApp() {
+  // Firmaets logo og farve (Opsaetning -> Firma i planlaegningsappen). Worklist hedder
+  // stadig Worklist; det er kun farven og logoet, der foelger firmaet.
+  const firma = useFirma(supabase);
   // Sproget foelger TELEFONEN, indtil hun selv vaelger noget andet.
   //
   // Appen taler dansk og engelsk. Er telefonen sat til dansk, faar hun dansk; er den
@@ -5597,7 +5601,7 @@ useEffect(() => {
   }
 
   if (authLoading) return <div style={s.loading}>{T[lang].loading}</div>;
-if (recoveryToken) return React.createElement("div", { style: { display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#FFF0F5",fontFamily:"system-ui" } }, React.createElement("div", { style: { background:"#fff",borderRadius:16,padding:28,width:320,textAlign:"center",boxShadow:"0 4px 24px rgba(0,0,0,0.08)" } }, React.createElement("div", { style: { fontWeight:700,fontSize:16,marginBottom:8 } }, "Nulstil adgangskode"), React.createElement("div", { style: { fontSize:13,color:"#666",marginBottom:16 } }, "Klik for at fortsætte."), React.createElement("button", { onClick: confirmRecovery, disabled: recoveryLoading, style: { width:"100%",padding:"12px 0",borderRadius:10,border:"none",background:"#D6247A",color:"#fff",fontWeight:700 } }, recoveryLoading ? "Bekræfter…" : "Fortsæt")));
+if (recoveryToken) return React.createElement("div", { style: { display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#FFF0F5",fontFamily:"system-ui" } }, React.createElement("div", { style: { background:"#fff",borderRadius:16,padding:28,width:320,textAlign:"center",boxShadow:"0 4px 24px rgba(0,0,0,0.08)" } }, React.createElement("div", { style: { fontWeight:700,fontSize:16,marginBottom:8 } }, "Nulstil adgangskode"), React.createElement("div", { style: { fontSize:13,color:"#666",marginBottom:16 } }, "Klik for at fortsætte."), React.createElement("button", { onClick: confirmRecovery, disabled: recoveryLoading, style: { width:"100%",padding:"12px 0",borderRadius:10,border:"none",background:"var(--farve)",color:"#fff",fontWeight:700 } }, recoveryLoading ? "Bekræfter…" : "Fortsæt")));
   if (passwordRecovery) return <SetNewPasswordScreen lang={lang} setLang={setLang} onDone={() => { setPasswordRecovery(false); window.history.replaceState(null, "", window.location.pathname); }} />;
         if (!session) return <LoginScreen lang={lang} setLang={setLang} initialError={recoveryError} />;
   if (dataLoading) return <div style={s.loading}>{T[lang].fetchingTasks}</div>;
@@ -5763,7 +5767,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
       {/* Header */}
       <div style={s.header}>
         <div style={s.headerLeft}>
-          <img src="/app-icon.png" alt="Worklist" style={s.headerIcon} />
+          <img src={firma.logo_url || "/app-icon.png"} alt={firma.navn} style={{ ...s.headerIcon, background: "#000" }} />
           <div style={{ minWidth: 0 }}>
             <div style={{ ...s.headerTitle, whiteSpace: "nowrap" }}>{tr.appName}</div>
             {/* Versionen stod her foer. Den er flyttet til Indstillinger, fordi
@@ -5818,7 +5822,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             </button>
           )}
           <button
-            style={{ border:"none", background:"#FCE4EF", color:"#D6247A", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
+            style={{ border:"none", background:"var(--farve-lys)", color:"var(--farve)", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
             onClick={() => setShowShop(true)}
             aria-label={lang === "da" ? "Bestil medarbejderprodukter" : "Order staff products"}
             title={lang === "da" ? "Bestil medarbejderprodukter" : "Order staff products"}>
@@ -5841,7 +5845,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           <button
             style={{ ...s.signOutBtn, display:"flex", alignItems:"center", gap:6, color:"#E2E8F0", fontSize:13, fontWeight:600 }}
             onClick={() => setShowProfile((v) => !v)}>
-            <span style={{ width:28, height:28, borderRadius:"50%", background:"#D6247A", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>
+            <span style={{ width:28, height:28, borderRadius:"50%", background:"var(--farve)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>
               {avatarTegn(employee.name, employee.id)}
             </span>
           </button>
@@ -5905,7 +5909,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
           <button style={s.todayBtn} onClick={() => setWeekOffset(0)}>{tr.today}</button>
         )}
         <button
-          style={{ ...s.todayBtn, background: showWeekend ? "#D6247A" : "#F1F5F9", color: showWeekend ? "#fff" : "#475569", marginLeft: 4 }}
+          style={{ ...s.todayBtn, background: showWeekend ? "var(--farve)" : "#F1F5F9", color: showWeekend ? "#fff" : "#475569", marginLeft: 4 }}
           onClick={() => setShowWeekend((v) => !v)}
           title="Vis/skjul weekend">
           {showWeekend ? "Man–Søn" : "+ Weekend"}
@@ -5941,7 +5945,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
               }
               onClick={() => setDay(d.key)}>
               <span>{d.short} <span style={{ fontWeight: isToday ? 800 : "inherit" }}>{dateNum}</span></span>
-              {isToday && d.key !== day && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#D6247A", display: "block", margin: "0 auto" }} />}
+              {isToday && d.key !== day && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--farve)", display: "block", margin: "0 auto" }} />}
               {count > 0 && <span style={d.key === day ? s.dayCountActive : s.dayCount}>{count}</span>}
             </button>
           );
@@ -6099,9 +6103,9 @@ const PAPIR = "#FDFCF8";
 
 const s = {
   app: { fontFamily:"'Inter',-apple-system,system-ui,sans-serif", background:"#F8FAFC", minHeight:"100svh", color:"#111111", display:"flex", flexDirection:"column" },
-  loading: { display:"flex", alignItems:"center", justifyContent:"center", height:"100svh", fontSize:15, color:"#9C1B5D" },
+  loading: { display:"flex", alignItems:"center", justifyContent:"center", height:"100svh", fontSize:15, color:"var(--farve-moerk)" },
 
-  loginWrap: { display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100svh", padding:20, background:"#FFF6FA" },
+  loginWrap: { display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100svh", padding:20, background:"var(--farve-bleg)" },
   loginCard: { background:"#fff", borderRadius:20, padding:28, width:"100%", maxWidth:360, boxShadow:"0 8px 32px rgba(0,0,0,0.10)" },
   brand: { display:"flex", alignItems:"center", gap:12, marginBottom:28 },
   brandIcon: { width:44, height:44, borderRadius:12, objectFit:"cover" },
@@ -6109,7 +6113,7 @@ const s = {
   brandSub: { fontSize:12, color:"#94A3B8" },
   loginLabel: { fontSize:13, fontWeight:600, color:"#475569", marginBottom:6 },
   loginInput: { width:"100%", padding:"12px 14px", borderRadius:10, border:"1.5px solid #E2E8F0", fontSize:15, color:"#111111", background:"#fff", boxSizing:"border-box", marginBottom:12 },
-  loginBtn: { width:"100%", padding:"14px 0", borderRadius:12, border:"none", background:"#D6247A", color:"#fff", fontWeight:700, fontSize:15, cursor:"pointer", marginTop:4 },
+  loginBtn: { width:"100%", padding:"14px 0", borderRadius:12, border:"none", background:"var(--farve)", color:"#fff", fontWeight:700, fontSize:15, cursor:"pointer", marginTop:4 },
   errorBox: { fontSize:13, color:"#B91C1C", padding:"10px 12px", background:"#FEF2F2", borderRadius:10, marginBottom:12 },
 
   langRow: { display:"flex", gap:8, marginBottom:16 },
@@ -6130,8 +6134,8 @@ const s = {
   weekBar: { display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"10px 16px", background:"#fff", borderBottom:"1px solid #F1F5F9" },
   weekBtn: { border:"none", background:"#F1F5F9", borderRadius:8, padding:"6px 8px", cursor:"pointer", display:"flex", color:"#475569" },
   weekLabel: { fontSize:14, fontWeight:700, color:"#111111", minWidth:120, textAlign:"center", display:"flex", alignItems:"center", justifyContent:"center", gap:6 },
-  thisWeekTag: { fontSize:11, fontWeight:700, color:"#D6247A", background:"#FCE4EF", padding:"2px 7px", borderRadius:99 },
-  todayBtn: { border:"none", background:"#FCE4EF", color:"#D6247A", borderRadius:8, padding:"6px 12px", fontSize:12.5, fontWeight:700, cursor:"pointer" },
+  thisWeekTag: { fontSize:11, fontWeight:700, color:"var(--farve)", background:"var(--farve-lys)", padding:"2px 7px", borderRadius:99 },
+  todayBtn: { border:"none", background:"var(--farve-lys)", color:"var(--farve)", borderRadius:8, padding:"6px 12px", fontSize:12.5, fontWeight:700, cursor:"pointer" },
 
   dayBar: { display:"flex", background:"#fff", borderBottom:"1px solid #F1F5F9", padding:"0 8px" },
     // Samme stregtykkelse som den valgte dag, blot gennemsigtig. Uden den er den
@@ -6139,9 +6143,9 @@ const s = {
   // skubbet ned netop dér — hvilket ser ud som en graa streg der stopper ved den
   // valgte dag.
   dayTab: { flex:1, display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 0", border:"none", borderBottom:"2.5px solid transparent", background:"transparent", cursor:"pointer", fontSize:12.5, fontWeight:600, color:"#94A3B8", gap:3 },
-  dayTabActive: { flex:1, display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 0", border:"none", background:"transparent", cursor:"pointer", fontSize:12.5, fontWeight:700, color:"#D6247A", borderBottom:"2.5px solid #D6247A", gap:3 },
+  dayTabActive: { flex:1, display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 0", border:"none", background:"transparent", cursor:"pointer", fontSize:12.5, fontWeight:700, color:"var(--farve)", borderBottom:"2.5px solid var(--farve)", gap:3 },
   dayCount: { fontSize:10, fontWeight:700, color:"#fff", background:"#CBD5E1", borderRadius:99, padding:"1px 6px", minWidth:16, textAlign:"center" },
-  dayCountActive: { fontSize:10, fontWeight:700, color:"#fff", background:"#D6247A", borderRadius:99, padding:"1px 6px", minWidth:16, textAlign:"center" },
+  dayCountActive: { fontSize:10, fontWeight:700, color:"#fff", background:"var(--farve)", borderRadius:99, padding:"1px 6px", minWidth:16, textAlign:"center" },
 
   list: { flex:1, display:"flex", flexDirection:"column", gap:8, padding:"12px 12px 40px" },
   empty: { textAlign:"center", padding:"60px 20px", color:"#94A3B8" },
@@ -6150,13 +6154,13 @@ const s = {
   transportIcon: { flexShrink:0 },
   transportInfo: { flex:1, display:"flex", alignItems:"center", justifyContent:"space-between" },
   transportTime: { fontSize:12.5, color:"#475569", fontWeight:500 },
-  transportNav: { display:"flex", alignItems:"center", gap:4, fontSize:12, fontWeight:700, color:"#D6247A", textDecoration:"none" },
+  transportNav: { display:"flex", alignItems:"center", gap:4, fontSize:12, fontWeight:700, color:"var(--farve)", textDecoration:"none" },
 
   taskCard: { display:"flex", alignItems:"stretch", background:PAPIR, borderRadius:14, boxShadow:"0 1px 3px rgba(0,0,0,0.06)", cursor:"pointer", overflow:"hidden", border:"1px solid #F1F5F9" },
   taskAccent: { width:4, flexShrink:0 },
   taskBody: { flex:1, padding:"13px 12px", minWidth:0 },
   taskRight: { display:"flex", alignItems:"center", paddingRight:12 },
-  taskTime: { fontSize:11.5, fontWeight:700, color:"#D6247A", marginBottom:3 },
+  taskTime: { fontSize:11.5, fontWeight:700, color:"var(--farve)", marginBottom:3 },
   taskTitle: { fontWeight:700, fontSize:15.5, color:"#111111", lineHeight:1.25, marginBottom:5 },
   // Kunden er nedtonet med vilje — se kommentaren i TaskCard. Den er bogholderi,
   // ikke navigation.
@@ -6165,13 +6169,13 @@ const s = {
   taskReference: { fontSize:14, fontWeight:700, color:"#111111", lineHeight:1.3 },
   taskAdresseTekst: { fontSize:13.5, fontWeight:600, color:"#334155", lineHeight:1.35 },
   taskNavKnap: { display:"inline-flex", alignItems:"center", gap:5, fontSize:12, fontWeight:700,
-                 color:"#D6247A", background:"#FFF6FA", border:"1px solid #F5C8DC", borderRadius:8,
+                 color:"var(--farve)", background:"var(--farve-bleg)", border:"1px solid #F5C8DC", borderRadius:8,
                  padding:"7px 11px", textDecoration:"none", marginBottom:7, minHeight:34 },
   taskAddress: { display:"flex", alignItems:"center", gap:5, fontSize:11.5, color:"#94A3B8", fontWeight:500, marginBottom:6, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
   taskMeta: { display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" },
   taskDuration: { fontSize:12, color:"#64748B", fontWeight:500 },
   taskChecklist: { display:"flex", alignItems:"center", gap:3, fontSize:12, color:"#64748B" },
-  taskLogged: { display:"flex", alignItems:"center", gap:3, fontSize:12, color:"#9C1B5D", fontWeight:600 },
+  taskLogged: { display:"flex", alignItems:"center", gap:3, fontSize:12, color:"var(--farve-moerk)", fontWeight:600 },
 
   overlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:1000, display:"flex", alignItems:"stretch" },
   sheet: { width:"100%", height:"100%", maxHeight:"100%", background:PAPIR, borderRadius:0, display:"flex", flexDirection:"column", position:"relative" },
@@ -6194,10 +6198,10 @@ const s = {
   sheetSectionTitle: { display:"flex", alignItems:"center", gap:6, fontSize:13, fontWeight:700, color:"#475569", letterSpacing:"0.01em", marginBottom:10 },
   sheetCustomer: { fontWeight:700, fontSize:16, color:"#111111", marginBottom:4 },
   sheetAddress: { display:"flex", alignItems:"flex-start", gap:6, fontSize:13.5, color:"#475569", marginBottom:12 },
-  sheetAccessText: { fontSize:14, color:"#111111", lineHeight:1.6, background:"#FCE4EF", padding:"12px 14px", borderRadius:10 },
-  navBtnLarge: { display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontSize:15, fontWeight:700, color:"#fff", background:"#D6247A", borderRadius:12, padding:"14px 0", textDecoration:"none", width:"100%" },
+  sheetAccessText: { fontSize:14, color:"#111111", lineHeight:1.6, background:"var(--farve-lys)", padding:"12px 14px", borderRadius:10 },
+  navBtnLarge: { display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontSize:15, fontWeight:700, color:"#fff", background:"var(--farve)", borderRadius:12, padding:"14px 0", textDecoration:"none", width:"100%" },
   videoBtnLarge: { display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontSize:14, fontWeight:600, color:"#111111", background:"#F1F5F9", borderRadius:12, padding:"13px 0", textDecoration:"none", width:"100%" },
-  progPill: { marginLeft:"auto", fontSize:12, fontWeight:700, color:"#D6247A", background:"#FCE4EF", padding:"2px 10px", borderRadius:99 },
+  progPill: { marginLeft:"auto", fontSize:12, fontWeight:700, color:"var(--farve)", background:"var(--farve-lys)", padding:"2px 10px", borderRadius:99 },
   checklistWrap: { display:"flex", flexDirection:"column", gap:2 },
   checklistItem: { borderRadius:10, overflow:"hidden" },
   checklistBtn: { display:"flex", alignItems:"flex-start", gap:12, width:"100%", border:"none", background:"transparent", padding:"10px 0", cursor:"pointer", textAlign:"left" },
@@ -6206,10 +6210,10 @@ const s = {
   checklistContent: { flex:1, display:"flex", flexDirection:"column", gap:3 },
   checklistText: { fontSize:14.5, lineHeight:1.4, fontWeight:500 },
   checklistDesc: { fontSize:12.5, color:"#64748B", lineHeight:1.5, fontStyle:"italic" },
-  taskVideoBtn: { display:"inline-flex", alignItems:"center", gap:5, fontSize:12, fontWeight:600, color:"#9C1B5D", background:"#FCE4EF", borderRadius:8, padding:"5px 10px", textDecoration:"none", marginLeft:34, marginBottom:6 },
+  taskVideoBtn: { display:"inline-flex", alignItems:"center", gap:5, fontSize:12, fontWeight:600, color:"var(--farve-moerk)", background:"var(--farve-lys)", borderRadius:8, padding:"5px 10px", textDecoration:"none", marginLeft:34, marginBottom:6 },
   timeProgress: { marginBottom:14 },
   timeBar: { height:6, background:"#F1F5F9", borderRadius:99, overflow:"hidden", marginBottom:6 },
-  timeBarFill: { height:"100%", background:"#D6247A", borderRadius:99, transition:"width 0.3s" },
+  timeBarFill: { height:"100%", background:"var(--farve)", borderRadius:99, transition:"width 0.3s" },
   timeMeta: { display:"flex", gap:6, fontSize:13, fontWeight:600, color:"#111111" },
   timeMeta2: { fontSize:12, color:"#94A3B8", marginTop:2 },
   // Advarsel + begrundelsesfelt naar registreret tid overskrider planlagt tid
@@ -6245,7 +6249,7 @@ const s = {
   afslutTilbage: { border:"none", background:"none", color:"#fff", fontSize:13, display:"flex",
     alignItems:"center", gap:4, cursor:"pointer", padding:0, fontFamily:"inherit" },
   fremdriftSpor: { height:4, background:"#E2E8F0", flexShrink:0 },
-  fremdriftFyld: { height:4, background:"#D6247A", transition:"width 160ms ease-out" },
+  fremdriftFyld: { height:4, background:"var(--farve)", transition:"width 160ms ease-out" },
   // Bunden er en fast bjaelke, saa den handling der foerer videre altid er synlig.
   // Foer laa afslut-knappen nederst efter alt indhold, og paa en opgave med en lang
   // tjekliste skulle man scrolle forbi hele skaermen for at komme til den.
@@ -6256,7 +6260,7 @@ const s = {
   trinFod: { fontSize:12.5, color:"#94A3B8", marginTop:12, textAlign:"center", lineHeight:1.5 },
   springBtn: { width:"100%", border:"none", background:"none", fontSize:13.5, color:"#64748B",
     textDecoration:"underline", padding:"10px 0", marginTop:6, cursor:"pointer", fontFamily:"inherit" },
-  trinAllerede: { fontSize:13, color:"#9C1B5D", background:"#FFF6FA", borderRadius:8,
+  trinAllerede: { fontSize:13, color:"var(--farve-moerk)", background:"var(--farve-bleg)", borderRadius:8,
     padding:"8px 11px", marginTop:10, lineHeight:1.45 },
 
   // Adgang og noegle
@@ -6308,7 +6312,7 @@ const s = {
     textDecoration:"underline", cursor:"pointer", fontFamily:"inherit", flexShrink:0, padding:4 },
   ssBesked: { fontSize:13, color:"#92400E", background:"#FFFBEB", border:"1px solid #FDE68A",
     borderRadius:8, padding:"8px 10px", marginBottom:8, lineHeight:1.4 },
-  primaerStor: { width:"100%", padding:"16px 0", borderRadius:12, border:"none", background:"#D6247A",
+  primaerStor: { width:"100%", padding:"16px 0", borderRadius:12, border:"none", background:"var(--farve)",
     color:"#fff", fontWeight:700, fontSize:16, cursor:"pointer", fontFamily:"inherit" },
   sekundaerStor: { width:"100%", padding:"15px 0", borderRadius:12, border:"1.5px solid #E2E8F0",
     background:"#fff", color:"#111111", fontWeight:600, fontSize:15, cursor:"pointer", fontFamily:"inherit" },
@@ -6339,7 +6343,7 @@ const s = {
   notatFejl: { fontSize:13, fontWeight:600, color:"#DC2626", marginTop:8 },
   // Samme grund som sheetSectionTitle: ingen kapitæler.
   tilbudAfsnit: { fontSize:12.5, fontWeight:800, letterSpacing:".01em",
-    color:"#9C1B5D", marginTop:20, marginBottom:2 },
+    color:"var(--farve-moerk)", marginTop:20, marginBottom:2 },
   tilbudHint: { fontSize:12, color:"#64748B", marginTop:6, lineHeight:1.45 },
   notatFotoBtn: { flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #E2E8F0", background:"#fff",
     fontSize:15, fontWeight:600, color:"#111111", cursor:"pointer", fontFamily:"inherit" },
@@ -6431,7 +6435,7 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
               <h2>Ny bestilling</h2>
               <p><strong>${employee.name}</strong> har bestilt:</p>
               <p>${itemsList}</p>
-              <p>Godkend udleveringen i Rengøringsplan under Lager, så lageret opdateres.</p>
+              <p>Godkend udleveringen i ${FIRMA.app_navn} under Lager, så lageret opdateres.</p>
             `,
           },
         }).catch((e) => console.error("notify admin failed", e))
@@ -6463,7 +6467,7 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
         <div style={{ display: "flex", padding: "10px 20px 0", gap: 8, borderBottom: "1px solid #F1F5F9" }}>
           {[["shop", lang === "da" ? "Bestil" : "Order"], ["history", lang === "da" ? "Historik" : "History"]].map(([k, l]) => (
             <button key={k} onClick={() => setView(k)}
-              style={{ padding: "8px 16px", border: "none", background: "transparent", fontWeight: view === k ? 700 : 500, color: view === k ? "#D6247A" : "#94A3B8", borderBottom: view === k ? "2.5px solid #D6247A" : "2.5px solid transparent", cursor: "pointer", fontSize: 14 }}>
+              style={{ padding: "8px 16px", border: "none", background: "transparent", fontWeight: view === k ? 700 : 500, color: view === k ? "var(--farve)" : "#94A3B8", borderBottom: view === k ? "2.5px solid var(--farve)" : "2.5px solid transparent", cursor: "pointer", fontSize: 14 }}>
               {l}
             </button>
           ))}
@@ -6482,7 +6486,7 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
                   const qty = selected[item.id] || "";
                   const hasQty = Number(qty) > 0;
                   return (
-                    <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #F1F5F9", background: hasQty ? "#FFF6FA" : "transparent", borderRadius: hasQty ? 10 : 0, paddingLeft: hasQty ? 10 : 0 }}>
+                    <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #F1F5F9", background: hasQty ? "var(--farve-bleg)" : "transparent", borderRadius: hasQty ? 10 : 0, paddingLeft: hasQty ? 10 : 0 }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 15, fontWeight: hasQty ? 700 : 500, color: "#111111" }}>{item.inventory_categories?.icon} {item.name}</div>
                         <div style={{ fontSize: 12, color: "#94A3B8" }}>{lang === "da" ? "Lager" : "Stock"}: {item.stock} {item.unit}</div>
@@ -6491,9 +6495,9 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
                         <button style={{ width:32,height:32,borderRadius:"50%",border:"1.5px solid #E2E8F0",background:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#475569" }}
                           onClick={() => setSelected((prev) => ({ ...prev, [item.id]: Math.max(0,(Number(prev[item.id])||0)-1)||"" }))}>-</button>
                         <input type="number" min={0} max={item.stock} step={1} inputMode="numeric" pattern="[0-9]*"
-                          style={{ width:52,padding:"7px 4px",borderRadius:8,border:hasQty?"2px solid #D6247A":"1.5px solid #E2E8F0",fontSize:15,textAlign:"center",color:"#111111",background:"#fff",fontWeight:hasQty?700:400 }}
+                          style={{ width:52,padding:"7px 4px",borderRadius:8,border:hasQty?"2px solid var(--farve)":"1.5px solid #E2E8F0",fontSize:15,textAlign:"center",color:"#111111",background:"#fff",fontWeight:hasQty?700:400 }}
                           value={qty} onChange={(e) => setSelected((prev) => ({ ...prev, [item.id]: e.target.value.replace(/[^0-9]/g, "") }))} />
-                        <button style={{ width:32,height:32,borderRadius:"50%",border:"1.5px solid #D6247A",background:"#FCE4EF",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#D6247A" }}
+                        <button style={{ width:32,height:32,borderRadius:"50%",border:"1.5px solid var(--farve)",background:"var(--farve-lys)",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--farve)" }}
                           onClick={() => setSelected((prev) => ({ ...prev, [item.id]: (Number(prev[item.id])||0)+1 }))}>+</button>
                       </div>
                     </div>
@@ -6526,7 +6530,7 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
         {view === "shop" && (
           <div style={{ padding:"12px 20px 32px",borderTop:"1px solid #F1F5F9" }}>
             <button
-              style={{ ...s.doneLarge,background:saved?"#ECFDF5":orderCount>0?"#D6247A":"#fff",color:saved?"#16A34A":orderCount>0?"#fff":"#475569",borderColor:saved?"#22C55E":orderCount>0?"#D6247A":"#E2E8F0",fontWeight:700 }}
+              style={{ ...s.doneLarge,background:saved?"#ECFDF5":orderCount>0?"var(--farve)":"#fff",color:saved?"#16A34A":orderCount>0?"#fff":"#475569",borderColor:saved?"#22C55E":orderCount>0?"var(--farve)":"#E2E8F0",fontWeight:700 }}
               onClick={submitOrder} disabled={saving||orderCount===0}>
               {saved?("\u2713 "+(lang==="da"?"Bestilling sendt":"Order sent")):saving?"...":(orderCount>0?(lang==="da"?"Bestil ":"Order ")+orderCount+" "+(lang==="da"?"produkter":"products"):(lang==="da"?"Vaelg produkter":"Select products"))}
             </button>
@@ -6827,8 +6831,8 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
             style={{ padding: "10px 0", marginRight: 22, border: "none", background: "transparent",
                      fontSize: 14, fontFamily: "inherit", cursor: "pointer",
                      fontWeight: fane === k ? 700 : 500,
-                     color: fane === k ? "#D6247A" : "#94A3B8",
-                     borderBottom: fane === k ? "2.5px solid #D6247A" : "2.5px solid transparent" }}>
+                     color: fane === k ? "var(--farve)" : "#94A3B8",
+                     borderBottom: fane === k ? "2.5px solid var(--farve)" : "2.5px solid transparent" }}>
             {l}
           </button>
         ))}
