@@ -23,8 +23,20 @@ const STANDARD = {
   logo_url: null,
   hovedfarve: "#D6247A",
   menu_tema: "moerk",
+  // Hos Jammerbugt Rengoering er alle moduler med. Hos en kunde er det de koebte.
+  modul_start_stop: true,
+  modul_lager: true,
+  modul_tilbud: true,
+  modul_kundeportal: true,
+  modul_dinero: true,
   modul_nexus: true,
 };
+
+// Er modulet med? Ukendt = med, saa intet forsvinder, foer indstillingerne er hentet.
+// Databasen haandhaever det alligevel: det her styrer kun, hvad der VISES.
+export function harModul(navn) {
+  return FIRMA["modul_" + navn] !== false;
+}
 
 const NOEGLE = "firma_v1";
 

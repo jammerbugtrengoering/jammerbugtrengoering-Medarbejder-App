@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
-import { FIRMA, useFirma, farveHex } from "./firma";
+import { FIRMA, useFirma, farveHex, harModul } from "./firma";
 import { weekInfoWithOffset, ugerFraNu } from "./uger";
 import { skiftTid, saetTimer, saetMinutter } from "./tidsfelt";
 import {
@@ -5821,6 +5821,8 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
               </span>
             </button>
           )}
+          {/* Arbejdstoej hoerer til modulet Lager (fase 2). Uden det: ingen knap. */}
+          {harModul("lager") && firma && (
           <button
             style={{ border:"none", background:"var(--farve-lys)", color:"var(--farve)", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
             onClick={() => setShowShop(true)}
@@ -5828,6 +5830,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
             title={lang === "da" ? "Bestil medarbejderprodukter" : "Order staff products"}>
             <Shirt size={17} />
           </button>
+          )}
           <button
             style={{ border:"none", background:"#EEF2FF", color:"#4F46E5", borderRadius:8, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}
             onClick={() => setShowKm(true)}
