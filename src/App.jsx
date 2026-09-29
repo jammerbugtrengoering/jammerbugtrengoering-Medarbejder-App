@@ -4953,7 +4953,29 @@ export default function MedarbejderApp() {
   }, []);
 
 useEffect(() => {
-    if (window.location.hash.includes("type=recovery")) { setPasswordRecovery(true); return; }
+    // Links fra mail og fra kundeportalen (29.9.2026) kommer tilbage med login'et i
+    // adressens #-del: #access_token=...&refresh_token=...&type=recovery|magiclink.
+    // Klienten er sat til IKKE at laese den selv (detectSessionInUrl: false), saa det
+    // goeres her. Uden det landede man paa login-skaermen, selvom linket virkede.
+    const h = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const rydAdresse = () => window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (h.get("access_token") && h.get("refresh_token")) {
+      const gendan = h.get("type") === "recovery";
+      supabase.auth.setSession({ access_token: h.get("access_token"), refresh_token: h.get("refresh_token") })
+        .then(({ error }) => {
+          rydAdresse();
+          if (error) { setRecoveryError("Linket er udløbet eller allerede brugt. Bed om et nyt."); return; }
+          if (gendan) setPasswordRecovery(true);
+        });
+      return;
+    }
+    if (h.get("error_code") || h.get("error")) {
+      rydAdresse();
+      setRecoveryError(h.get("error_code") === "otp_expired"
+        ? "Linket er udløbet eller allerede brugt. Bed om et nyt."
+        : "Linket virkede ikke. Bed om et nyt.");
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
       const tokenHash = params.get("token_hash");
       const type = params.get("type");
