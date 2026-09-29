@@ -2602,7 +2602,7 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
       .invoke("tilbud-pdf", { body: { tilbudId: tilbud.id } });
     if (pdfFejl || pdfSvar?.error) { setGemmer(false); setFejl(pdfSvar?.error || pdfFejl.message); return; }
 
-    const link = `https://jammerbugtrengoering-kundeportal.netlify.app/tilbud/${n}`;
+    const link = `${PORTAL_URL}/tilbud/${n}`;
     const { error: mailFejl } = await supabaseClient.functions.invoke("send-email", {
       body: {
         email: (f.kunde_email || "").trim(),
@@ -4273,7 +4273,7 @@ function weekMeta(weekNo, year) {
 // Det sker i praksis for en KUNDE. Bruger hun samme mailadresse til kundeportalen —
 // eller har hun engang vaeret medarbejder — lander hun her og tror hun er lukket ude.
 // Derfor slaas det op om hun er portalbruger, og saa peges der derhen.
-const PORTAL_URL = "https://jammerbugtrengoering-kundeportal.netlify.app";
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || "https://jammerbugtrengoering-kundeportal.netlify.app";
 
 // ── Beskeder paa telefonen ──────────────────────────────────────────────────
 //

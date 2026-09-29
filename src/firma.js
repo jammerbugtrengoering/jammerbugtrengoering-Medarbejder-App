@@ -13,7 +13,28 @@
 
 import { useEffect, useState } from "react";
 
-const STANDARD = {
+// VITE_UDGAVE=kunde saettes paa de Netlify-sites, der koerer mod kundedatabasen. Saa er
+// udgangspunktet neutralt (foer login ved vi ikke, hvilket firma det er). Uden variablen
+// er det Jammerbugt Rengoering, praecis som foer.
+const KUNDEUDGAVE = import.meta.env?.VITE_UDGAVE === "kunde";
+
+const STANDARD = KUNDEUDGAVE ? {
+  navn: "Planlægning",
+  undertekst: "",
+  app_navn: "Planlægning",
+  juridisk_navn: "",
+  cvr: "",
+  telefon: null,
+  logo_url: null,
+  hovedfarve: "#2563EB",
+  menu_tema: "lys",
+  modul_start_stop: true,
+  modul_lager: true,
+  modul_tilbud: true,
+  modul_kundeportal: true,
+  modul_dinero: false,
+  modul_nexus: false,
+} : {
   navn: "Jammerbugt Rengøring",
   undertekst: "Planlægning og fakturering",
   app_navn: "Rengøringsplan",
@@ -38,7 +59,9 @@ export function harModul(navn) {
   return FIRMA["modul_" + navn] !== false;
 }
 
-const NOEGLE = "firma_v1";
+// Kundeudgaven har sin egen noegle, saa en browser, der har vaeret paa begge, ikke
+// blander dem sammen.
+const NOEGLE = KUNDEUDGAVE ? "firma_kunde_v1" : "firma_v1";
 
 function laesCache() {
   try { return JSON.parse(localStorage.getItem(NOEGLE) || "null") || {}; } catch { return {}; }
