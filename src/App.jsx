@@ -1620,6 +1620,7 @@ const HELP_DA = [
       "Har du glemt at trykke Afslut, får du en besked på telefonen et kvarter efter, at opgaven skulle være færdig.",
       "Har du ikke trykket Start 5 minutter efter det planlagte tidspunkt, får du en besked: «Husk at trykke Start». Tryk på den — står du ved adressen, starter tiden af sig selv.",
       "Er tiden stadig ikke startet 10 minutter efter, starter systemet den for dig fra det planlagte tidspunkt. Der står «startet af systemet» ved tiden. Passer det ikke, tryk «Fortryd start» og tryk selv Start.",
+      "Systemet starter aldrig tiden, mens du stadig mangler at melde en tidligere opgave færdig samme dag.",
       "Er tiden startet af systemet, skal du ikke skrive en forklaring, hvis du retter tiden ved Afslut.",
       "Glemte du at trykke Start, kan du stadig afslutte. Så skriver du tiden som før." ] },
   { t: "Produkter til kunden", p: [
