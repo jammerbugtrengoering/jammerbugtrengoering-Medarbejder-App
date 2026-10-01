@@ -1528,6 +1528,14 @@ const HELP_DA = [
     "Cirklen med dine bogstaver er dig selv: sprog, liste eller tidslinje, beskeder på telefonen, og log ud.",
     "Der kan komme to knapper mere. Et gult udråbstegn betyder, at du mangler at registrere tid på en dag, der er gået — tallet siger hvor mange. En kalender vises kun, hvis du også planlægger.",
   ] },
+  { t: "Glemmer du at afslutte en opgave", p: [
+    "Har kontoret slået det til, lukker systemet en opgave, du ikke har afsluttet, 2 timer efter den planlagte sluttid. Du får en besked en time før.",
+    "Opgaven lukkes med den planlagte tid. Det er den tid, du får løn for, og den tid kunden betaler.",
+    "Har du brugt mere tid, så ret det under «Min tid» (tryk på bilen, fanen Timer): tryk «Ret tid» på opgaven, skriv tiden og hvorfor. Mere tid gælder med det samme. Mindre tid skal kontoret godkende.",
+    "Du kan rette indtil lønperioden lukker — den 20. kl. 23.59. Du får en besked 3 dage og 1 dag før, hvis du har opgaver, der er lukket af systemet.",
+    "Efter den 20. kan du ikke længere registrere, rette eller melde færdig i den periode. Ring til kontoret — de kan rette, og så kommer rettelsen med på næste løn.",
+    "«Min tid» følger lønperioden: «Oktober» er 20. september til 19. oktober.",
+  ] },
   { t: "Sådan finder du derhen", p: [
     "På hver opgave står adressen med det samme — du behøver ikke åbne opgaven for at se, hvor du skal hen.",
     "Er det en kommunal opgave, står borgerens navn øverst og adressen under. Firmanavnet nederst er den, der får regningen — ikke den du skal besøge.",
@@ -1737,6 +1745,14 @@ const HELP_EN = [
     "The question mark is this page.",
     "The circle with your initials is you: language, list or timeline, notifications, and sign out.",
     "Two more buttons can appear. A yellow warning sign means you have not registered time on a day that has passed — the number says how many. A calendar only shows if you are also a planner.",
+  ] },
+  { t: "If you forget to finish a job", p: [
+    "If the office has switched it on, the system closes a job you have not finished 2 hours after the planned end. You get a message one hour before.",
+    "The job is closed with the planned time. That is the time you are paid for, and the time the customer pays.",
+    "If you spent more time, correct it under «My time» (tap the car, Hours tab): tap «Correct time» on the job and enter the time and why. More time applies at once. Less time must be approved by the office.",
+    "You can correct it until the pay period closes — on the 20th at 23:59. You get a message 3 days and 1 day before if you have jobs closed by the system.",
+    "After the 20th you can no longer log, correct or finish jobs in that period. Call the office — they can correct it, and the correction is included in your next pay.",
+    "«My time» follows the pay period: «October» is 20 September to 19 October.",
   ] },
   { t: "Finding your way there", p: [
     "The address is shown on every job — you do not have to open the job to see where to go.",
@@ -6762,10 +6778,23 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
   const [km, setKm] = useState([]);
   const [henter, setHenter] = useState(true);
   const [fejl, setFejl] = useState("");
+  // Loenperioden (1.10.2026). Maaneden er den, perioden SLUTTER i: «oktober» er
+  // 20. sep – 19. okt ved lukkedag 20. Siden aabner i den aabne periode.
+  const [nyeste, setNyeste] = useState(nu.getFullYear() * 12 + nu.getMonth());
+  const [periode, setPeriode] = useState(null);
+  const [genhent, setGenhent] = useState(0);
+  const [retter, setRetter] = useState(null);      // { id, min, note, fejl, gemmer }
+  useEffect(() => {
+    const d = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, "0")}-${String(nu.getDate()).padStart(2, "0")}`;
+    supabaseClient.rpc("loen_periode_for", { p_dato: d }).then(({ data }) => {
+      if (!data?.slut) return;
+      const [y, m] = String(data.slut).split("-").map(Number);
+      setNyeste(y * 12 + (m - 1)); setAar(y); setMaaned(m);
+    });
+  }, [supabaseClient]);
 
-  // Vinduet: denne maaned og 11 tilbage. Aeldre maaneder er afregnet for laengst, og
+  // Vinduet: denne periode og 11 tilbage. Aeldre perioder er afregnet for laengst, og
   // en liste uden ende inviterer til at rode i noget, ingen kan lave om paa alligevel.
-  const nyeste = nu.getFullYear() * 12 + nu.getMonth();
   const valgt = aar * 12 + (maaned - 1);
   const kanFrem = valgt < nyeste;
   const kanTilbage = valgt > nyeste - 11;
@@ -6781,11 +6810,13 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
     let afbrudt = false;
     (async () => {
       setHenter(true); setFejl("");
-      const [t, k] = await Promise.all([
+      const [t, k, p] = await Promise.all([
         supabaseClient.rpc("mine_timer", { p_aar: aar, p_maaned: maaned, p_emp: visEmpId || null }),
         supabaseClient.rpc("mine_km",    { p_aar: aar, p_maaned: maaned, p_emp: visEmpId || null }),
+        supabaseClient.rpc("loen_periode_interval", { p_aar: aar, p_maaned: maaned }),
       ]);
       if (afbrudt) return;
+      setPeriode(Array.isArray(p.data) ? p.data[0] || null : p.data || null);
       // Fejlen maa ikke kastes vaek. En tom liste og "kunne ikke hente" ser ens ud for
       // brugeren, og her betyder forskellen "du har ingen timer" mod "vi ved det ikke"
       // — paa en side der handler om hendes loen.
@@ -6799,7 +6830,21 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
       setHenter(false);
     })();
     return () => { afbrudt = true; };
-  }, [aar, maaned, supabaseClient, visEmpId]);
+  }, [aar, maaned, supabaseClient, visEmpId, genhent]);
+
+  // Ret tiden paa en opgave, systemet har lukket (auto-slut). Mere tid gaelder straks;
+  // mindre tid venter paa kontoret. Databasen afviser, naar loenperioden er lukket.
+  async function gemRettelse() {
+    const min = Math.round(Number(String(retter.min).replace(",", ".")) * 60);
+    if (!(min >= 0) || !retter.note.trim()) return;
+    setRetter((x) => ({ ...x, gemmer: true, fejl: "" }));
+    const { error } = await supabaseClient.rpc("ret_systemlukket_tid",
+      { p_instance_id: retter.id, p_minutes: min, p_note: retter.note.trim() });
+    if (error) { setRetter((x) => ({ ...x, gemmer: false, fejl: error.message })); return; }
+    setRetter(null); setGenhent((g) => g + 1);
+  }
+  const periodeKort = (iso) => new Date(iso + "T12:00:00")
+    .toLocaleDateString(da ? "da-DK" : "en-GB", { day: "numeric", month: "short" });
 
   // Summerne. Godkendt regnes af de linjer der HAR flueben — ikke af alt.
   const sum = timer.reduce((a, r) => ({
@@ -6890,8 +6935,15 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
                    opacity: kanTilbage ? 1 : 0.25, display: "flex" }}>
           <ChevronLeft size={20} color="#475569" />
         </button>
-        <div style={{ fontSize: 14.5, fontWeight: 700 }}>
-          {(da ? MDR_DA : MDR_EN)[maaned - 1]} {aar}
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 14.5, fontWeight: 700 }}>
+            {(da ? MDR_DA : MDR_EN)[maaned - 1]} {aar}
+          </div>
+          {periode?.fra && (
+            <div style={{ fontSize: 11.5, color: "#64748B" }}>
+              {da ? "Lønperiode" : "Pay period"} {periodeKort(periode.fra)} – {periodeKort(periode.til)}
+            </div>
+          )}
         </div>
         <button onClick={() => skift(1)} disabled={!kanFrem}
           aria-label={da ? "Næste måned" : "Next month"}
@@ -6964,16 +7016,43 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
               <div style={{ borderTop: "1px solid #F1F5F9", marginTop: 6 }}>
                 {timer.map((r) => {
                   const ingen = (r.registreret || 0) === 0;
+                  const kanRette = !anden && r.systemlukket && !r.laast && !r.efterregulering;
                   return (
-                    <div key={r.opgave_id}
+                    <div key={r.opgave_id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                    <div
                       style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                               gap: 10, padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
+                               gap: 10, padding: "10px 0" }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13.5, color: "#111111" }}>{dagTekst(r.dato)}</div>
+                        <div style={{ fontSize: 13.5, color: r.efterregulering ? "#6D28D9" : "#111111" }}>
+                          {r.efterregulering ? (da ? "↩ Efterregulering · " : "↩ Adjustment · ") : ""}{dagTekst(r.dato)}
+                        </div>
                         <div style={{ fontSize: 11.5, color: "#94A3B8", whiteSpace: "nowrap",
                                       overflow: "hidden", textOverflow: "ellipsis" }}>
                           {r.hvor || r.titel}{r.weekend ? (da ? " · weekend" : " · weekend") : ""}
                         </div>
+                        {/* Auto-slut (1.10.2026) */}
+                        {r.systemlukket && (
+                          <div style={{ fontSize: 11.5, color: "#B45309", fontWeight: 700, marginTop: 2 }}>
+                            {da ? "🔒 Lukket af systemet med planlagt tid" : "🔒 Closed by the system with planned time"}
+                            {r.rettet ? (da ? " · rettet" : " · corrected") : ""}
+                          </div>
+                        )}
+                        {r.rettelse_afventer != null && (
+                          <div style={{ fontSize: 11.5, color: "#B91C1C", marginTop: 2 }}>
+                            {da ? `Rettet til ${timerTekst(r.rettelse_afventer, da)} t — venter på kontoret`
+                                : `Changed to ${timerTekst(r.rettelse_afventer, da)} h — awaiting office`}
+                          </div>
+                        )}
+                        {r.efterregulering && r.note && (
+                          <div style={{ fontSize: 11.5, color: "#6D28D9", marginTop: 2 }}>«{r.note}»</div>
+                        )}
+                        {kanRette && retter?.id !== r.opgave_id && (
+                          <button onClick={() => setRetter({ id: r.opgave_id, min: timerTekst(r.registreret, da), note: "", fejl: "", gemmer: false })}
+                            style={{ marginTop: 5, border: "1px solid #FDE68A", background: "#FFFBEB", color: "#92400E",
+                                     borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
+                            {da ? "Ret tid" : "Correct time"}
+                          </button>
+                        )}
                       </div>
                       <div style={{ textAlign: "right", flexShrink: 0 }}>
                         <div style={{ fontSize: 13.5, color: "#111111" }}>
@@ -6989,6 +7068,38 @@ function TidOgKmPage({ lang, supabaseClient, onClose, visEmpId, visEmpNavn }) {
                                               : (da ? "Afventer kontoret" : "Awaiting office")}
                         </div>
                       </div>
+                    </div>
+                    {retter?.id === r.opgave_id && (
+                      <div style={{ background: "#FFFBEB", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+                        <div style={{ fontSize: 12.5, color: "#92400E", lineHeight: 1.5, marginBottom: 8 }}>
+                          {da ? "Skriv den tid, du faktisk brugte, og hvorfor. Mere end planlagt gælder med det samme. Mindre end planlagt skal kontoret godkende. Kan rettes indtil lønperioden lukker."
+                              : "Enter the time you actually spent and why. More than planned applies at once. Less than planned must be approved by the office. Can be changed until the pay period closes."}
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                          <input value={retter.min} inputMode="decimal"
+                            onChange={(e) => setRetter((x) => ({ ...x, min: e.target.value }))}
+                            style={{ width: 80, padding: "8px 10px", borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 15, fontFamily: "inherit" }} />
+                          <span style={{ fontSize: 13, color: "#64748B" }}>{da ? "timer" : "hours"}</span>
+                        </div>
+                        <textarea value={retter.note} rows={2}
+                          placeholder={da ? "Hvorfor? (kræves)" : "Why? (required)"}
+                          onChange={(e) => setRetter((x) => ({ ...x, note: e.target.value }))}
+                          style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8,
+                                   border: "1px solid #E2E8F0", fontSize: 14, fontFamily: "inherit" }} />
+                        {retter.fejl && <div style={{ fontSize: 12.5, color: "#B91C1C", marginTop: 4 }}>{retter.fejl}</div>}
+                        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                          <button onClick={gemRettelse} disabled={retter.gemmer || !retter.note.trim()}
+                            style={{ flex: 1, border: "none", background: "var(--farve)", color: "#fff", borderRadius: 8,
+                                     padding: "9px 12px", fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                                     opacity: retter.gemmer || !retter.note.trim() ? 0.5 : 1 }}>
+                            {retter.gemmer ? (da ? "Gemmer…" : "Saving…") : (da ? "Gem rettelsen" : "Save")}
+                          </button>
+                          <button onClick={() => setRetter(null)}
+                            style={{ border: "1px solid #E2E8F0", background: "#fff", borderRadius: 8, padding: "9px 12px",
+                                     fontSize: 14, fontFamily: "inherit" }}>{da ? "Annuller" : "Cancel"}</button>
+                        </div>
+                      </div>
+                    )}
                     </div>
                   );
                 })}
