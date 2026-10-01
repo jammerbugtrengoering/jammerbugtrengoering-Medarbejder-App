@@ -1533,7 +1533,8 @@ const HELP_DA = [
     "Opgaven lukkes med den planlagte tid. Det er den tid, du får løn for, og den tid kunden betaler.",
     "Har du brugt mere tid, så ret det under «Min tid» (tryk på bilen, fanen Timer): tryk «Ret tid» på opgaven, skriv tiden og hvorfor. Mere tid gælder med det samme. Mindre tid skal kontoret godkende.",
     "Du kan rette indtil lønperioden lukker — den 20. kl. 23.59. Du får en besked 3 dage og 1 dag før, hvis du har opgaver, der er lukket af systemet.",
-    "Efter den 20. kan du ikke længere registrere, rette eller melde færdig i den periode. Ring til kontoret — de kan rette, og så kommer rettelsen med på næste løn.",
+    "Efter den 20. er opgaver, du har meldt færdige, låst. Ring til kontoret, hvis tiden skal rettes — så kommer rettelsen med på næste løn.",
+    "Har du glemt at registrere en opgave fra en lukket periode, kan du stadig gøre det. Appen beder dig skrive hvorfor, og det sendes til kontoret. Godkender de, kommer tiden med på næste løn.",
     "«Min tid» følger lønperioden: «Oktober» er 20. september til 19. oktober.",
   ] },
   { t: "Sådan finder du derhen", p: [
@@ -1751,7 +1752,8 @@ const HELP_EN = [
     "The job is closed with the planned time. That is the time you are paid for, and the time the customer pays.",
     "If you spent more time, correct it under «My time» (tap the car, Hours tab): tap «Correct time» on the job and enter the time and why. More time applies at once. Less time must be approved by the office.",
     "You can correct it until the pay period closes — on the 20th at 23:59. You get a message 3 days and 1 day before if you have jobs closed by the system.",
-    "After the 20th you can no longer log, correct or finish jobs in that period. Call the office — they can correct it, and the correction is included in your next pay.",
+    "After the 20th, jobs you have finished in that period are locked. Call the office if the time must be corrected — the correction is included in your next pay.",
+    "If you forgot to log a job from a closed period, you can still do it. The app asks you to write why, and it is sent to the office. If they approve, the time is included in your next pay.",
     "«My time» follows the pay period: «October» is 20 September to 19 October.",
   ] },
   { t: "Finding your way there", p: [
@@ -5332,6 +5334,28 @@ useEffect(() => {
     if (fraManglelisten) { setFraManglelisten(false); setVisMangler(true); }
   }
 
+  // Lønlukning (1.10.2026). Er lønperioden for opgaven lukket, og hun har IKKE meldt den
+  // færdig, må hun stadig registrere — men først med en begrundelse, som går til kontoret
+  // (fejlkode 55001). Er opgaven udført, er den låst (55000): kun kontoret kan rette.
+  async function medLoenluk(taskId, kald) {
+    let svar = await kald();
+    const e = svar?.error;
+    if (e?.code === "55001") {
+      const tekst = window.prompt(lang === "da"
+        ? "Lønperioden for opgaven er lukket.\n\nSkriv hvorfor den først registreres nu. Det sendes til kontoret, der skal godkende det, før tiden kommer med på lønnen."
+        : "The pay period for this job is closed.\n\nWrite why it is only being logged now. It is sent to the office, which must approve it before the time is paid.");
+      if (!tekst || !tekst.trim()) return svar;
+      const { error: bErr } = await supabase.rpc("begrund_efter_loenluk", { p_instance_id: taskId, p_begrundelse: tekst.trim() });
+      if (bErr) { window.alert(bErr.message); return svar; }
+      svar = await kald();
+    } else if (e?.code === "55000") {
+      window.alert(lang === "da"
+        ? "Lønperioden for opgaven er lukket, og opgaven er udført. Ring til kontoret, hvis tiden skal rettes."
+        : "The pay period for this job is closed and the job is done. Call the office if the time must be corrected.");
+    }
+    return svar;
+  }
+
   // Returnerer true/false. Afslutningsflowet er nødt til at kunne se om det gik godt:
   // før returnerede funktionen ingenting, og et lydløst afbrud — fx når en planlægger
   // kigger i en kollegas plan — endte i en kvittering på noget der aldrig blev gemt.
@@ -5349,10 +5373,10 @@ useEffect(() => {
     // en gentagelse — fordi svaret forsvandt undervejs — give 120 minutter i stedet for
     // 60, og det tal gaar direkte i loen og paa fakturaen. Med noeglen afvises
     // gentagelsen i databasen, og kaldet ser vellykket ud for appen.
-    const { data: newLog, error } = await supabase.rpc("append_time_log", {
+    const { data: newLog, error } = await medLoenluk(taskId, () => supabase.rpc("append_time_log", {
       p_instance_id: taskId, p_minutes: m, p_emp_id: employee.id, p_note: note,
       p_klient_id: klientId,
-    });
+    }));
     if (error) {
       console.error("append_time_log:", error.message);
       // Uden daekning laegges registreringen i koeen i stedet for at gaa tabt. Noeglen
@@ -5387,9 +5411,9 @@ useEffect(() => {
     // deres egen del. Databasefunktionen opdaterer atomart kun denne
     // medarbejders egen post og udleder selv om opgaven som helhed (status)
     // skal være "udført" — nemlig først når ALLE tilknyttede har afsluttet.
-    const { data, error } = await supabase.rpc("set_employee_task_status", {
+    const { data, error } = await medLoenluk(taskId, () => supabase.rpc("set_employee_task_status", {
       p_instance_id: taskId, p_emp_id: employee.id, p_done: done,
-    });
+    }));
     if (error) {
       console.error("setStatus:", error.message);
       // Afslutningen saettes pr. medarbejder til en fast vaerdi — sender koeen den
@@ -5593,7 +5617,7 @@ useEffect(() => {
       p_instance_id: taskId, p_minutes: m, p_note: note || null, p_klient_id: noegle,
       p_stop_ms: stopMs, p_afstand_m: afstand, p_noejagtighed_m: afstand === null ? null : noejagtighed,
     };
-    const { data, error } = await supabase.rpc("afslut_tid", args);
+    const { data, error } = await medLoenluk(taskId, () => supabase.rpc("afslut_tid", args));
     const fjernStart = () => setStartede((p) => { const n = { ...p }; delete n[taskId]; return n; });
     if (error) {
       if (error.code === "22023") {
