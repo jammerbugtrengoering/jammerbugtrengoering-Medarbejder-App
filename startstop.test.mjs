@@ -55,6 +55,11 @@ const ved = { a: { afstand: 20, noejagtighed: 15 } };
 const basis = { opgaver: [stor, lille], empId: "e1", regel: TIL, startede: {}, afstande: ved, nu: kl("08:50"), allerede: new Set() };
 er("én stor opgave ved doeren", autoStartKandidat(basis)?.id, "a");
 er("slaaet fra: intet", autoStartKandidat({ ...basis, regel: FRA }), null);
+// 2.10.2026: tiden er registreret (Afslut), men opgaven er ikke meldt faerdig endnu.
+er("lige afsluttet: ingen ny start", autoStartKandidat({ ...basis,
+  opgaver: basis.opgaver.map((o) => (o.id === "a" ? { ...o, time_log: [{ empId: basis.empId, minutes: 60 }] } : o)) })?.id ?? null, null);
+er("aflyst: ingen start", autoStartKandidat({ ...basis,
+  opgaver: basis.opgaver.map((o) => (o.id === "a" ? { ...o, status: "aflyst" } : o)) })?.id ?? null, null);
 er("hun har en tid koerende: intet", autoStartKandidat({ ...basis, startede: { x: {} } }), null);
 er("fortrudt i dag: startes ikke igen", autoStartKandidat({ ...basis, allerede: new Set(["a"]) }), null);
 er("afsluttet: intet", autoStartKandidat({ ...basis, opgaver: [{ ...stor, completed_by_employee: { e1: "x" } }] }), null);

@@ -63,6 +63,15 @@ export function erFaerdig(task, empId) {
   return !!((task?.completed_by_employee || {})[empId]);
 }
 
+// Har hun allerede registreret tid paa opgaven? (2.10.2026) Afslut skriver tiden FOER
+// opgaven meldes faerdig. I de millisekunder imellem saa den automatiske start en
+// opgave, der hverken var faerdig eller startet — og hun stod stadig ved doeren. Saa
+// startede tiden igen paa Alice Bloksgaard, lige efter Nadine havde afsluttet den.
+export function harRegistreret(task, empId) {
+  const log = task?.timeLog ?? task?.time_log ?? [];
+  return Array.isArray(log) && log.some((l) => l && l.empId === empId);
+}
+
 // Den ENE port. Siger nej til alt, hvis medarbejderen ikke har start/stop.
 export function brugerStartStop(regel, task, empId) {
   if (!regel || regel.startStop !== true || !task || !empId) return false;
@@ -116,6 +125,8 @@ export function autoStartKandidat({ opgaver, empId, regel, startede, afstande, n
   const mulige = (opgaver || []).filter((t) =>
     brugerStartStop(regel, t, empId)
     && !erFaerdig(t, empId)
+    && !harRegistreret(t, empId)
+    && t.status !== "aflyst"
     && !(allerede && allerede.has(t.id))
     && iTidsvindue(t, empId, nu)
     && kanAutoStarte(afstande?.[t.id]?.afstand, afstande?.[t.id]?.noejagtighed));

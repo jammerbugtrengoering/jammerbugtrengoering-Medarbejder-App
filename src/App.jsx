@@ -1620,6 +1620,7 @@ const HELP_DA = [
       "Brugte du længere tid end afsat, skal du skrive hvorfor. Det er ikke en løftet pegefinger — kontoret skal kunne forklare det til kunden.",
       "Har du fortrudt en afslutning og åbner opgaven igen — fx for at tilføje et billede — står der 0, og det er helt i orden. Din tid er registreret i forvejen, og du skal ikke taste mere for at komme videre." ] },
   { t: "Start og Afslut på store opgaver", p: [
+    "Ligger din tid inden for ± 5 minutter af den planlagte (kontoret kan ændre grænsen), registreres den planlagte tid. Er opgaven sat til 60 minutter, og du afslutter efter 56 eller 64, står der 60 — både på din løn og på kundens regning. Så skal du heller ikke skrive nogen begrundelse.",
       "Nogle medarbejdere har Start og Afslut på de store opgaver. Har du ikke, ser du ingenting af det her — så registrerer du tid som beskrevet ovenfor.",
       "Har du det, står der en grøn knap «▶ Start tiden» på store opgaver. Tryk på den, når du står hos kunden. Når du er færdig, trykker du «Afslut opgave» som altid.",
       "Har du Worklist åben, når du kommer frem, kan tiden starte af sig selv. Så kommer der en grøn linje øverst. Var det forkert, tryk «Fortryd start».",
@@ -1840,6 +1841,7 @@ const HELP_EN = [
       "If it took longer than planned, you need to write why. It is not a telling-off — the office has to be able to explain it to the customer.",
       "If you undid a completion and open the job again — for example to add a photo — it says 0, and that is fine. Your time is already registered, and you do not need to enter more to continue." ] },
   { t: "Start and Finish on large jobs", p: [
+    "If your time is within ± 5 minutes of the planned time (the office can change the limit), the planned time is logged. If the job is set to 60 minutes and you finish after 56 or 64, it says 60 — on your pay and on the customer's bill. You do not need to give a reason either.",
       "Some employees have Start and Finish on large jobs. If you do not, you will not see any of this — you log time as described above.",
       "If you do, a green «▶ Start time» button appears on large jobs. Tap it when you are at the customer. When you are done, tap «Complete job» as always.",
       "If Worklist is open when you arrive, the time can start by itself. A green line then appears at the top. If that was wrong, tap «Undo start».",
@@ -3263,7 +3265,12 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
   // En systemstart er et skoen, ikke en maaling (29.9.2026): retter hun den, skal hun
   // ikke forklare det. Databasen (afslut_tid) goer det samme.
   const rettet = !!startStop && !startStop?.startet?.system && kraeverBegrundelse(minutterIAlt, maalt);
-  const skalBegrundes = overskrider || rettet;
+  // Inden for tolerancen (start/stop) bliver tiden den planlagte — saa er der hverken
+  // en overskridelse eller en rettelse at forklare.
+  const tolerance = Number(startStop?.tolerance) || 0;
+  const iTolerance = !!startStop && tolerance > 0 && minEgenTid > 0 && alleredeLogget === 0
+    && minutterIAlt > 0 && Math.abs(minutterIAlt - minEgenTid) <= tolerance;
+  const skalBegrundes = !iTolerance && (overskrider || rettet);
 
   // Loftet paa 12 timer er det samme som i den gamle timevaelger. Nedad stopper vi
   // ved 0 — en registrering paa nul minutter afvises alligevel af naeste trin.
@@ -3600,6 +3607,14 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
                 </div>
               </div>
 
+              {iTolerance && minutterIAlt !== minEgenTid && (
+                <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: "10px 12px",
+                              marginBottom: 10, fontSize: 13, color: "#166534", lineHeight: 1.45 }}>
+                  {lang === "da"
+                    ? `Inden for ± ${tolerance} min af den planlagte tid — registreres som ${minEgenTid} min.`
+                    : `Within ± ${tolerance} min of the planned time — logged as ${minEgenTid} min.`}
+                </div>
+              )}
               {skalBegrundes && (
                 <div style={s.overrunBox}>
                   <div style={s.overrunTitle}>{rettet ? "⏱" : tr.overrunTitle}</div>
@@ -5673,6 +5688,9 @@ useEffect(() => {
     if (!task || !employee || !brugerStartStop(tidsregel, task, employee.id)) return null;
     return {
       startet: startede[task.id] || null,
+      // Tolerance (2.10.2026): inden for ± N min af den planlagte tid registreres den
+      // planlagte. Databasen (afslut_tid) goer det; skaermen siger det paa forhaand.
+      tolerance: Number(tidsregel?.tolerance) || 0,
       position,
       onStart: (maal) => startTid(task, maal),
       onFortryd: () => fortrydStart(task.id),
