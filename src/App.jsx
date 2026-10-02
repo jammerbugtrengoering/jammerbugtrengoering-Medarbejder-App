@@ -247,6 +247,19 @@ function laesPunktLager() {
   try { return JSON.parse(localStorage.getItem("wl_punkter") || "{}"); } catch { return {}; }
 }
 
+// Adresseopslag (2.10.2026). DAWA, som tidligere blev kaldt direkte herfra, er lukket
+// (410 Gone). Nu gaar opslaget gennem edge-funktionen adresse-opslag: Danmarks
+// adresseregister (GSearch), naar DATAFORSYNINGEN_TOKEN er sat, ellers OpenRouteService.
+// Svaret: { forslag: [{ tekst, adresse: { x, y, vejnavn, husnr, postnr } }], kilde }.
+// null = intet svar (ingen daekning, ikke logget ind, eller begge kilder nede).
+async function slaaAdresseOp(q, antal = 5) {
+  try {
+    const { data, error } = await supabase.functions.invoke("adresse-opslag", { body: { q, antal } });
+    if (error || !data || data.error) return null;
+    return { forslag: Array.isArray(data.forslag) ? data.forslag : [], kilde: data.kilde };
+  } catch { return null; }
+}
+
 async function adressePunkt(adresse) {
   const noegle = String(adresse || "").trim();
   if (!noegle) return null;
@@ -254,11 +267,10 @@ async function adressePunkt(adresse) {
   const lager = laesPunktLager();
   if (noegle in lager) { punktCache.set(noegle, lager[noegle]); return lager[noegle]; }
   try {
-    const res = await fetch("https://api.dataforsyningen.dk/adresser/autocomplete?per_side=1&q="
-      + encodeURIComponent(noegle));
-    if (!res.ok) return null;          // proeves igen naeste gang
-    const d = await res.json();
-    const fund = Array.isArray(d) && d[0] ? (d[0].adresse || d[0].data) : null;
+    const d = await slaaAdresseOp(noegle, 3);
+    if (!d) return null;               // proeves igen naeste gang
+    // Det bedste bud er det, der passer paa vej, husnummer og postnummer.
+    const fund = (d.forslag.map((f) => f.adresse).find((a) => stolPaaOpslag(noegle, a))) || null;
     // Et bud, der ikke er DEN adresse, er vaerre end intet bud: det ville spaerre
     // Start ved den rigtige doer. Saa gemmes null, og positionen er «ukendt».
     const punkt = fund && stolPaaOpslag(noegle, fund) && Number.isFinite(fund.x) && Number.isFinite(fund.y)
@@ -1722,7 +1734,7 @@ const HELP_DA = [
   { t: "Hvem kan se hvad", p: [
       "Kontoret kan se dine opgaver, din registrerede tid og din løn. Det skal de for at kunne planlægge og udbetale.",
       "Dine kolleger kan ikke se din løn, dine noter eller dine adgangskoder. Det er ikke bare skjult på skærmen — databasen afviser det.",
-      "Uden for huset: databasen ligger hos Supabase i Stockholm. Mails sendes gennem Brevo i Frankrig. Beregningen af afstande sker hos et tysk ruteberegningsfirma og hos statens adresseregister, som får adressen men ikke dit navn.",
+      "Uden for huset: databasen ligger hos Supabase i Stockholm. Mails sendes gennem Brevo i Frankrig. Beregningen af afstande og adresseforslag sker hos statens adresseregister og — når det ikke svarer — hos et tysk ruteberegningsfirma. De får adressen, men ikke dit navn.",
       "Beskeder på telefonen går gennem Apple og Google. Indholdet er krypteret undervejs — de kan ikke læse, hvad der står.",
       "Lønfilen sendes ikke automatisk nogen steder. Kontoret henter den som en fil og lægger den selv op i Danløn.",
     ] },
@@ -2307,7 +2319,7 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
 // og koeretider. Samme fejl som i planlaegningsappen, bare ad den anden vej — og ad
 // den vej har hun travlt, fordi hun staar hos kunden.
 //
-// Registret er dataforsyningen.dk, samme kilde som geokodningen i travel-distance.
+// Opslaget gaar gennem edge-funktionen adresse-opslag (se slaaAdresseOp).
 // Fri indtastning er stadig tilladt: flere adresser i drift har etage og doer skrevet
 // ind, og en spaerring ville bare faa hende til at lade feltet staa tomt.
 function AdresseFelt({ vaerdi, onChange, disabled, placeholder, felt }) {
@@ -2329,12 +2341,12 @@ function AdresseFelt({ vaerdi, onChange, disabled, placeholder, felt }) {
     // sidder formentlig paa mobildata.
     ur.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          "https://api.dataforsyningen.dk/adresser/autocomplete?per_side=5&q=" + encodeURIComponent(q));
-        const data = res.ok ? await res.json() : [];
-        const liste = Array.isArray(data) ? data : [];
-        setForslag(liste);
-        setKendt(liste.some((f) => ens(f.tekst, q)));
+        const d = await slaaAdresseOp(q, 5);
+        if (!d) { setForslag([]); setKendt(null); return; }
+        setForslag(d.forslag);
+        // Samme vej, husnummer og postnummer tæller — «V. Hjermitslev» i midten skal
+        // ikke gøre adressen ukendt.
+        setKendt(d.forslag.some((f) => ens(f.tekst, q) || stolPaaOpslag(q, f.adresse)));
       } catch {
         // Ingen daekning eller registret nede. Saa siger vi ingenting frem for at
         // paastaa at adressen er forkert.
