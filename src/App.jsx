@@ -1631,6 +1631,7 @@ const HELP_DA = [
       "Er tiden stadig ikke startet 10 minutter efter, starter systemet den for dig fra det planlagte tidspunkt. Der står «startet af systemet» ved tiden. Passer det ikke, tryk «Fortryd start» og tryk selv Start. Kontoret kan se, at starten er fortrudt.",
       "Systemet starter aldrig tiden, mens du stadig mangler at melde en tidligere opgave færdig samme dag.",
       "Kontoret kan planlægge ugen om for at spare kørsel. Får du en ny opgave, eller bliver en taget fra dig, får du besked, og din dag i appen opdaterer sig selv.",
+      "Aflyser kontoret en opgave, får du en besked, og opgaven forsvinder fra din dag. Den skal du ikke registrere tid på.",
       "Er tiden startet af systemet, skal du ikke skrive en forklaring, hvis du retter tiden ved Afslut.",
       "Glemte du at trykke Start, kan du stadig afslutte. Så skriver du tiden som før." ] },
   { t: "Produkter til kunden", p: [
