@@ -129,5 +129,7 @@ med kommandoen:
 
 Den samtale, hvor meget af systemet blev bygget, lukkede 6.10.2026. Det, der kun stod
 dér — beslutninger, hvad der er lært om ydelse, åbne punkter — er samlet i
-`Planning-App/overdragelse/STATUS-2026-09-30.md`. Læs den, før du begynder på noget
+`Planning-App/overdragelse/STATUS-2026-09-30.md` og tillægget
+`Planning-App/overdragelse/STATUS-2026-10-03.md` (1.–3.10: adresseopslag efter DAWA,
+henvendelser fra pjecen, pjece/magnet, næste opgave: kampagneappen). Læs dem, før du begynder på noget
 større.
