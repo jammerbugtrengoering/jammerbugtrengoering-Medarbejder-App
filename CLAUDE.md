@@ -120,8 +120,13 @@ tilbage.
 Den kører selv `oxlint`, `tjek-tdz.mjs`, `ugespring.test.mjs` og `tidsfelt.test.mjs`. Går
 en af dem i stykker, bygger den ikke — det er med vilje.
 
-Claude kan ikke nå GitHub. **Claude retter og committer, brugeren pusher.** Slut svaret af
-med kommandoen:
+**Claude committer og pusher selv** (Jonns beslutning 3.10.2026), men først når
+build og tests er grønne, og hele outputtet er læst. Push går i drift med det samme.
+Først `git pull --no-rebase origin main`, aldrig `--force`. Commit-beskeder uden æøå.
+
+Kører Claude et sted uden adgang til GitHub (fx lokalt, hvor adgangskoden ligger i
+brugerens nøglering), gælder den gamle deling: Claude committer, brugeren pusher, og
+svaret sluttes af med kommandoen:
 
     cd ~/planapp/jammerbugtrengoering-Medarbejder-App && git push origin main
 
