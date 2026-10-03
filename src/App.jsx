@@ -2487,13 +2487,20 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
         supabaseClient.from("tilbud").select("*").eq("instance_id", task.id).maybeSingle(),
         supabaseClient.from("checklist_templates").select("id, name").order("name"),
         supabaseClient.from("checklist_template_items").select("checklist_template_id"),
-        supabaseClient.from("pricing").select("contract_type, hourly_rate"),
+        // Timepriserne har gyldighedsdato fra 3.10.2026 (timepris_satser). Tilbuddet
+        // foreslaar den sats, der gaelder i dag: nyeste sats pr. type med gyldig_fra
+        // til og med i dag. pricing laeses ikke laengere og opdateres ikke.
+        supabaseClient.from("timepris_satser").select("contract_type, hourly_rate, gyldig_fra")
+          .lte("gyldig_fra", new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))
+          .order("gyldig_fra", { ascending: false }),
       ]);
       if (afbrudt) return;
       setLister((cl || []).map((c) => ({
         ...c, antal: (cli || []).filter((i) => i.checklist_template_id === c.id).length,
       })));
-      const satser = Object.fromEntries((pr || []).map((p) => [p.contract_type, Number(p.hourly_rate)]));
+      // Listen er nyeste foerst, saa den foerste raekke pr. type er dagens sats.
+      const satser = {};
+      for (const p of pr || []) if (!(p.contract_type in satser)) satser[p.contract_type] = Number(p.hourly_rate);
       setPriser(satser);
       setTilbud(t || null);
       if (t) {

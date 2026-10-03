@@ -103,6 +103,20 @@ tilbage.
 
 ---
 
+## Fælles læring — læs før, skriv efter
+
+Jonn og Charlotte arbejder begge i de her repositories med hver sin Claude. Det eneste,
+de to Claude-samtaler deler, er **filerne her**. Det, der kun står i en samtale, er væk
+for den anden. Derfor (Jonns beslutning 3.10.2026):
+
+- **Før du begynder:** `git pull`, og læs den nyeste `STATUS-*.md` i
+  `Planning-App/overdragelse/` — den anden kan have lært noget siden sidst.
+- **Når en regel, en beslutning eller en arbejdsgang ændres, eller I har lært noget
+  af en fejl:** skriv det ind i samme commit som ændringen — reglen her i `CLAUDE.md`,
+  og hvad der er sket og besluttet i dagens `STATUS-*.md`. Ligesom hjælpen i appen
+  skal følge med funktionaliteten, skal instruktionsfilerne følge med arbejdsgangen.
+- Skriv **hvorfor** og gerne hvilken fejl, der lå bag — ikke bare reglen.
+
 ## Faste ting
 
 - **Hjælpen skal opdateres, når funktionalitet ændres** — både `HELP_DA` og `HELP_EN`.
@@ -135,6 +149,6 @@ svaret sluttes af med kommandoen:
 Den samtale, hvor meget af systemet blev bygget, lukkede 6.10.2026. Det, der kun stod
 dér — beslutninger, hvad der er lært om ydelse, åbne punkter — er samlet i
 `Planning-App/overdragelse/STATUS-2026-09-30.md` og tillægget
-`Planning-App/overdragelse/STATUS-2026-10-03.md` (1.–3.10: adresseopslag efter DAWA,
+`Planning-App/overdragelse/STATUS-2026-10-03.md` (1.–3.10: adresseopslag efter DAWA, timepriser med gyldighedsdato, fælles læring,
 henvendelser fra pjecen, pjece/magnet, næste opgave: kampagneappen). Læs dem, før du begynder på noget
 større.
