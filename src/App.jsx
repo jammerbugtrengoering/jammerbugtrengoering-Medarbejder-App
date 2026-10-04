@@ -396,7 +396,9 @@ const T = {
     newPasswordTitle: "Nulstil adgangskode",
     newPasswordLabel: "Ny adgangskode",
     repeatPasswordLabel: "Gentag adgangskode",
-    passwordTooShort: "Adgangskoden skal være mindst 6 tegn",
+    passwordTooShort: "Adgangskoden skal være mindst 8 tegn og have både bogstaver og tal",
+    passwordRule: "Mindst 8 tegn, både bogstaver og tal.",
+    passwordLeaked: "Den adgangskode er kendt fra et datalæk og kan ikke bruges. Vælg en anden.",
     passwordMismatch: "Adgangskoderne er ikke ens",
     saveNewPassword: "Gem ny adgangskode",
     savingPassword: "Gemmer…",
@@ -597,7 +599,9 @@ const T = {
     newPasswordTitle: "Reset password",
     newPasswordLabel: "New password",
     repeatPasswordLabel: "Repeat password",
-    passwordTooShort: "Password must be at least 6 characters",
+    passwordTooShort: "Password must be at least 8 characters and contain both letters and numbers",
+    passwordRule: "At least 8 characters, both letters and numbers.",
+    passwordLeaked: "That password is known from a data leak and cannot be used. Choose another one.",
     passwordMismatch: "Passwords do not match",
     saveNewPassword: "Save new password",
     savingPassword: "Saving…",
@@ -1560,7 +1564,7 @@ const HELP_DA = [
     "Under hvert punkt står, hvad der er valgt lige nu — du behøver ikke åbne noget for at se det.",
     "Her vælger du, om dagen skal vises som tidslinje eller liste, hvilket sprog appen taler, og om du vil have beskeder på telefonen.",
     "Appen taler dansk og engelsk. Første gang følger den din telefon: er telefonen på dansk, får du dansk — ellers engelsk. Vælger du selv, følger valget dig, også hvis du skifter telefon.",
-    "Du kan også bede om et link til at skifte adgangskode. Det bliver sendt til din mail.",
+    "Du kan også bede om et link til at skifte adgangskode. Det bliver sendt til din mail. En ny adgangskode skal være mindst 8 tegn og have både bogstaver og tal, og den må ikke være en, der er kendt fra et datalæk.",
     "Log ud står nederst for sig selv. Du behøver ikke logge ud, når du er færdig for dagen — appen husker dig.",
   ] },
   { t: "Liste eller tidslinje", p: [
@@ -1781,7 +1785,7 @@ const HELP_EN = [
     "Under each item you can see what is currently selected — you do not have to open anything to check.",
     "Here you choose whether the day is shown as a timeline or a list, which language the app speaks, and whether you want notifications on your phone.",
     "The app speaks Danish and English. The first time it follows your phone: if your phone is in Danish you get Danish, otherwise English. If you choose yourself, the choice follows you, also on a new phone.",
-    "You can also request a link to change your password. It is sent to your email.",
+    "You can also request a link to change your password. It is sent to your email. A new password must be at least 8 characters with both letters and numbers, and it must not be one known from a data leak.",
     "Sign out is at the bottom on its own. You do not need to sign out at the end of the day — the app remembers you.",
   ] },
   { t: "List or timeline", p: [
@@ -2259,12 +2263,17 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
   const [done, setDone] = useState(false);
 
   async function save() {
-    if (pw1.length < 6) { setError(t.passwordTooShort); return; }
+    // Samme krav som Supabase (Jonn 4.10.2026): mindst 8 tegn, baade bogstaver og
+    // tal. Tjekkes her foerst, saa hun faar en dansk forklaring i stedet for den
+    // generelle fejlbesked.
+    if (pw1.length < 8 || !/[A-Za-zÆØÅæøå]/.test(pw1) || !/[0-9]/.test(pw1)) { setError(t.passwordTooShort); return; }
     if (pw1 !== pw2) { setError(t.passwordMismatch); return; }
     setLoading(true); setError("");
     const { error: err } = await supabase.auth.updateUser({ password: pw1 });
     setLoading(false);
-    if (err) setError(t.passwordUpdateError);
+    // Supabase afviser ogsaa adgangskoder, der er kendt fra datalaek (slaaet til
+    // 4.10.2026). Det skal siges ligeud — ellers proever hun bare den samme igen.
+    if (err) setError(err.code === "weak_password" ? t.passwordLeaked : t.passwordUpdateError);
     else setDone(true);
   }
 
@@ -2290,6 +2299,7 @@ function SetNewPasswordScreen({ lang, setLang, onDone }) {
             <input type="password" style={s.loginInput} value={pw1}
               onChange={(e) => setPw1(e.target.value)}
               placeholder="••••••••" autoFocus />
+            <div style={{ fontSize: 14, color: "#64748B", margin: "-4px 0 12px" }}>{t.passwordRule}</div>
             <div style={s.loginLabel}>{t.repeatPasswordLabel}</div>
             <input type="password" style={s.loginInput} value={pw2}
               onChange={(e) => setPw2(e.target.value)}
