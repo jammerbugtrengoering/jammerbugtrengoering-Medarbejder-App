@@ -1688,6 +1688,7 @@ const HELP_DA = [
       "Tryk på kalender-ikonet øverst for at booke et kundemøde. Kunden behøver ikke findes i Dinero endnu.",
       "Mødet lægges i din uge, så kontoret kan se at du er ude, og tiden tæller i din kapacitet.",
       "Åbn mødet når du er derude. Du får tilbudsskærmen i stedet for den almindelige opgave: referat, billeder, pris og hvilke ydelser der er med.",
+      "Øverst på tilbudsskærmen ligger en opgaveliste for før, under og efter mødet. Tryk på et punkt for at sætte flueben. Kontoret ser de samme flueben, og du kan tilføje eller fjerne punkter.",
       "Referatet er lavet til at blive dikteret. Tryk på mikrofonen på tastaturet og tal — ret det bagefter.",
       "Du kan lægge op til 10 billeder på. De er interne, medmindre du på tilbuddet vælger at vise dem til kunden.",
       "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage." ] },
@@ -1903,6 +1904,7 @@ const HELP_EN = [
       "Tap the calendar icon at the top to book a customer meeting. The customer does not have to exist in Dinero yet.",
       "The meeting goes into your week, so the office can see you are out, and the time counts in your capacity.",
       "Open the meeting once you are there. You get the quote screen instead of the ordinary job: notes, photos, price and which services are included.",
+      "At the top of the quote screen is a task list for before, during and after the meeting. Tap an item to tick it. The office sees the same ticks, and you can add or remove items.",
       "The notes field is made for dictation. Tap the microphone on the keyboard and speak — edit it afterwards.",
       "You can add up to 10 photos. They are internal unless you choose to show them to the customer on the quote.",
       "\"Send to customer\" creates the PDF and mails a link she can accept from. If she accepts, the agreement is created as a draft — you set the start date and weekdays yourself." ] },
@@ -2468,9 +2470,74 @@ function InstallerBjaelke({ lang }) {
 // i planlaegningsappen bagefter, hvor halvdelen af det hun saa er glemt.
 const TILBUD_MAKS_FOTOS = 10;
 
+const TILBUD_FASER = [["foer", "Før mødet"], ["under", "Under mødet"], ["efter", "Efter mødet"]];
+
+// Listen ændres ét punkt ad gangen gennem funktioner i databasen (tilbud_opgave_*), aldrig ved at gemme hele
+// listen: planlæggeren kan sidde med samme tilbud, og en liste hentet for ti minutter siden ville ellers
+// overskrive hendes flueben. Svaret er altid den nye, samlede liste. Tryk er mindst 44 px højt (handsker).
+function TilbudOpgaveliste({ supabaseClient, tilbudId, opgaver, setOpgaver, laast }) {
+  const [ny, setNy] = useState({ foer: "", under: "", efter: "" });
+  const [fejl, setFejl] = useState("");
+
+  async function kald(navn, args) {
+    setFejl("");
+    const { data, error } = await supabaseClient.rpc(navn, args);
+    if (error) { setFejl(error.message); return; }
+    setOpgaver(data || []);
+  }
+
+  const klar = opgaver.filter((o) => o.done).length;
+  return (
+    <div>
+      <div style={s.tilbudAfsnit}>Opgaveliste — {klar} af {opgaver.length}</div>
+      {TILBUD_FASER.map(([fase, navn]) => (
+        <div key={fase} style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>{navn}</div>
+          {opgaver.filter((o) => o.fase === fase).map((o) => (
+            <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 6, minHeight: 44 }}>
+              <button type="button" disabled={laast} aria-pressed={!!o.done}
+                onClick={() => kald("tilbud_opgave_flueben", { p_tilbud_id: tilbudId, p_opgave_id: o.id, p_done: !o.done })}
+                style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, minHeight: 44,
+                         background: "none", border: "none", padding: 0, textAlign: "left", font: "inherit", cursor: "pointer" }}>
+                <span style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 6, display: "flex",
+                               alignItems: "center", justifyContent: "center",
+                               border: o.done ? "none" : "2px solid #94A3B8",
+                               background: o.done ? "#16A34A" : "#fff", color: "#fff" }}>
+                  {o.done && <Check size={16} />}
+                </span>
+                <span style={{ fontSize: 14.5, color: o.done ? "#94A3B8" : "#1E293B",
+                               textDecoration: o.done ? "line-through" : "none" }}>{o.tekst}</span>
+              </button>
+              {!laast && (
+                <button type="button" aria-label="Fjern punktet"
+                  onClick={() => kald("tilbud_opgave_fjern", { p_tilbud_id: tilbudId, p_opgave_id: o.id })}
+                  style={{ width: 36, height: 44, flexShrink: 0, background: "none", border: "none", color: "#94A3B8" }}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          ))}
+          {!laast && (
+            <input style={{ ...s.notatInput, marginTop: 4 }} placeholder="Tilføj et punkt…" enterKeyHint="done"
+              value={ny[fase]} onChange={(e) => setNy({ ...ny, [fase]: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || !ny[fase].trim()) return;
+                e.preventDefault();
+                kald("tilbud_opgave_tilfoej", { p_tilbud_id: tilbudId, p_fase: fase, p_tekst: ny[fase] });
+                setNy({ ...ny, [fase]: "" });
+              }} />
+          )}
+        </div>
+      ))}
+      {fejl && <div style={{ color: "#B91C1C", fontSize: 12.5, marginTop: 6 }}>{fejl}</div>}
+    </div>
+  );
+}
+
 function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
   const synlig = useSynligHoejde();
   const [tilbud, setTilbud] = useState(null);
+  const [opgaver, setOpgaver] = useState([]);
   const [henter, setHenter] = useState(true);
   const [lister, setLister] = useState([]);
   const [priser, setPriser] = useState({});
@@ -2513,6 +2580,7 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
       for (const p of pr || []) if (!(p.contract_type in satser)) satser[p.contract_type] = Number(p.hourly_rate);
       setPriser(satser);
       setTilbud(t || null);
+      setOpgaver(t?.opgaveliste || []);
       if (t) {
         // Vi VED hvad prisen er, saa snart kontrakttypen er kendt. Stod feltet tomt,
         // skulle hun huske satsen udenad mens kunden sad og kiggede.
@@ -2722,6 +2790,11 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
                           padding: 11, fontSize: 13, color: "#166534", marginBottom: 14, lineHeight: 1.5 }}>
               Kunden har accepteret. Tilbuddet kan ikke længere rettes.
             </div>
+          )}
+
+          {opgaver.length > 0 && (
+            <TilbudOpgaveliste supabaseClient={supabaseClient} tilbudId={tilbud.id} opgaver={opgaver}
+              setOpgaver={setOpgaver} laast={tilbud.status !== "kladde" && tilbud.status !== "sendt"} />
           )}
 
           <div style={s.tilbudAfsnit}>Kunden</div>
