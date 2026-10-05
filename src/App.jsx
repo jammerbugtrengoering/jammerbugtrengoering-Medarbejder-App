@@ -1731,6 +1731,7 @@ const HELP_DA = [
       "Om din løn: din timeløn og tidligere satser, bonus og kilometersats, om du har weekendtillæg og SH-betaling, og dit medarbejdernummer i Danløn.",
       "Fravær registreres som fravær. Der står aldrig hvorfor du var væk.",
       "Slår du beskeder til, gemmes en teknisk adresse på din telefon, så beskeden kan finde frem.",
+      "Lader du en kunde skrive under på et tilbud, eller godkender du et tilbud for kunden, gemmes det, at det var dig, og hvornår — sammen med kundens underskrift. Det er for at kunne dokumentere, hvem der var til stede.",
     ] },
   { t: "Det appen ikke gemmer", p: [
       "Appen følger dig ikke. Der er ingen GPS og ingen positionsmåling — hverken i arbejdstiden eller udenfor. Kørslen regnes ud fra adresserne på dine opgaver, ikke fra hvor telefonen har været.",
@@ -1946,6 +1947,7 @@ const HELP_EN = [
       "About your pay: your hourly rate and previous rates, bonus and mileage rate, whether you have the weekend supplement and holiday pay, and your employee number in Danløn.",
       "Absence is recorded as absence. It never says why you were away.",
       "If you turn notifications on, a technical address for your phone is stored so the message can reach you.",
+      "If you let a customer sign a quote, or approve a quote for the customer, it is stored that it was you and when — together with the customer's signature. This is so we can document who was present.",
     ] },
   { t: "What the app does not store", p: [
       "The app does not track you. There is no GPS and no location tracking — neither during working hours nor outside them. Mileage is calculated from the addresses of your jobs, not from where your phone has been.",
