@@ -1692,6 +1692,7 @@ const HELP_DA = [
       "Referatet er lavet til at blive dikteret. Tryk på mikrofonen på tastaturet og tal — ret det bagefter.",
       "Du kan lægge op til 10 billeder på. De er interne, medmindre du på tilbuddet vælger at vise dem til kunden.",
       "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage.",
+      "Skal kunden godkende med det samme, så tryk «Underskriv med kunden» og giv telefonen til kunden. Kunden skriver sit navn og skriver under med fingeren. Tilbuddet bliver godkendt, underskriften sættes ind i PDF'en, og kunden får den på mail, hvis der er en adresse.",
       "Har kunden ikke en mail, så tryk «Godkend for kunden». Skriv hvem der har sagt ja og hvordan (telefon, på stedet, brev). Det registreres med dit navn, og aftalen dannes som kladde." ] },
   { t: "Dine timer — de tre tal", p: [
       "Tryk på bil-ikonet øverst. Under fanen Timer kan du se, hvad der bliver rapporteret til løn.",
@@ -1909,6 +1910,7 @@ const HELP_EN = [
       "The notes field is made for dictation. Tap the microphone on the keyboard and speak — edit it afterwards.",
       "You can add up to 10 photos. They are internal unless you choose to show them to the customer on the quote.",
       "\"Send to customer\" creates the PDF and mails a link she can accept from. If she accepts, the agreement is created as a draft — you set the start date and weekdays yourself.",
+      "If the customer should approve right away, tap \"Sign with customer\" and hand over the phone. The customer enters their name and signs with a finger. The quote is approved, the signature is placed in the PDF, and the customer gets it by email if there is an address.",
       "If the customer has no email, tap \"Approve for customer\". Enter who said yes and how (phone, on site, letter). It is recorded under your name, and the agreement is created as a draft." ] },
   { t: "Your hours — the three figures", p: [
       "Tap the car icon at the top. The Hours tab shows what is reported to payroll.",
@@ -2536,11 +2538,88 @@ function TilbudOpgaveliste({ supabaseClient, tilbudId, opgaver, setOpgaver, laas
   );
 }
 
+// Underskriftsfelt (5.10.2026): kunden skriver med fingeren. touch-action: none er det, der forhindrer, at siden ruller,
+// mens man tegner. Lærredet skaleres med skærmens pixeltæthed, ellers bliver stregen sløret på en iPhone.
+// Feltet har ingen egen knap: forælderen henter billedet gennem padRef (tom() og tilBlob()).
+function Underskriftsfelt({ padRef, hoejde = 170 }) {
+  const laerred = useRef(null);
+  const tegner = useRef(false);
+  const harTegnet = useRef(false);
+  const [tom, setTom] = useState(true);
+
+  useEffect(() => {
+    const c = laerred.current;
+    if (!c) return;
+    const r = window.devicePixelRatio || 1;
+    const b = c.getBoundingClientRect();
+    c.width = Math.round(b.width * r);
+    c.height = Math.round(b.height * r);
+    const g = c.getContext("2d");
+    g.scale(r, r);
+    g.lineWidth = 2.6; g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = "#111";
+    padRef.current = {
+      tom: () => !harTegnet.current,
+      tilBlob: () => new Promise((svar) => c.toBlob(svar, "image/png")),
+    };
+  }, [padRef]);
+
+  const punkt = (e) => {
+    const b = laerred.current.getBoundingClientRect();
+    return [e.clientX - b.left, e.clientY - b.top];
+  };
+  function ned(e) {
+    e.preventDefault();
+    laerred.current.setPointerCapture?.(e.pointerId);
+    const g = laerred.current.getContext("2d");
+    const [x, y] = punkt(e);
+    tegner.current = true;
+    g.beginPath(); g.moveTo(x, y);
+    // En enkelt prik skal også tælle som tegnet.
+    g.lineTo(x + 0.01, y + 0.01); g.stroke();
+  }
+  function bevaeg(e) {
+    if (!tegner.current) return;
+    e.preventDefault();
+    const g = laerred.current.getContext("2d");
+    const [x, y] = punkt(e);
+    g.lineTo(x, y); g.stroke();
+    if (!harTegnet.current) { harTegnet.current = true; setTom(false); }
+  }
+  function op() { tegner.current = false; }
+  function ryd() {
+    const c = laerred.current;
+    c.getContext("2d").clearRect(0, 0, c.width, c.height);
+    harTegnet.current = false; setTom(true);
+  }
+
+  return (
+    <div>
+      <div style={{ position: "relative", background: "#fff", border: "2px solid #94A3B8", borderRadius: 10, height: hoejde }}>
+        <canvas ref={laerred} aria-label="Felt til underskrift"
+          style={{ width: "100%", height: "100%", touchAction: "none", display: "block", borderRadius: 8 }}
+          onPointerDown={ned} onPointerMove={bevaeg} onPointerUp={op} onPointerCancel={op} onPointerLeave={op} />
+        {tom && <div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94A3B8",
+                              fontSize: 14, pointerEvents: "none" }}>Skriv under her</div>}
+        <div style={{ position: "absolute", left: 12, right: 12, bottom: 26, borderBottom: "1px solid #CBD5E1", pointerEvents: "none" }} />
+      </div>
+      <button type="button" onClick={ryd}
+        style={{ background: "none", border: "none", color: "#4F46E5", fontSize: 13.5, padding: "8px 0", minHeight: 44 }}>
+        Ryd og start forfra
+      </button>
+    </div>
+  );
+}
+
 function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
   const synlig = useSynligHoejde();
   const [tilbud, setTilbud] = useState(null);
   const [opgaver, setOpgaver] = useState([]);
   // Godkendelse på kundens vegne (kun planlæggere): borgere uden mail kan ikke trykke «Accepter» i et link.
+  // Underskrift på telefonen (5.10.2026).
+  const [uAaben, setUAaben] = useState(false);
+  const [uNavn, setUNavn] = useState("");
+  const [uUrl, setUUrl] = useState("");
+  const padRef = useRef(null);
   const [gAaben, setGAaben] = useState(false);
   const [gNavn, setGNavn] = useState("");
   const [gMaade, setGMaade] = useState("telefon");
@@ -2719,6 +2798,52 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
       saet("fotos", alle);
       await supabaseClient.from("tilbud").update({ fotos: alle }).eq("id", tilbud.id);
     }
+  }
+
+  // Rækkefølgen er vigtig: PDF'en dannes først (fingeraftryk), så gemmes underskriften og tilbuddet låses, og først
+  // DEREFTER lægges underskriften ind i en ny udgave af PDF'en og mailes til kunden. Mislykkes sidste trin, er
+  // underskriften stadig gemt, og kontoret kan danne den underskrevne PDF igen.
+  async function underskriv() {
+    setFejl(""); setBesked("");
+    const navn = (uNavn || f.kontaktperson || f.kunde_navn || "").trim();
+    if (!navn) { setFejl("Skriv kundens navn."); return; }
+    if (!padRef.current || padRef.current.tom()) { setFejl("Kunden skal skrive under i feltet."); return; }
+    if (!window.confirm(
+      `Kunden godkender tilbuddet for ${(f.kunde_navn || "kunden").trim()} med sin underskrift. `
+      + `Der oprettes en aftale i kladde, og tilbuddet kan derefter ikke rettes.\n\nVil du fortsætte?`)) return;
+    setGemmer(true);
+    if (!(await gem())) { setGemmer(false); return; }
+    const { data: pdfSvar, error: pdfFejl } = await supabaseClient.functions
+      .invoke("tilbud-pdf", { body: { tilbudId: tilbud.id } });
+    if (pdfFejl || pdfSvar?.error) { setGemmer(false); setFejl(pdfSvar?.error || pdfFejl.message); return; }
+
+    const blob = await padRef.current.tilBlob();
+    const sti = `${tilbud.id}/signatur-${Date.now()}.png`;
+    const { error: upFejl } = await supabaseClient.storage.from("tilbud")
+      .upload(sti, blob, { contentType: "image/png", upsert: false });
+    if (upFejl) { setGemmer(false); setFejl("Underskriften kunne ikke gemmes: " + upFejl.message); return; }
+
+    const { data, error } = await supabaseClient.rpc("godkend_tilbud_med_underskrift", {
+      p_tilbud_id: tilbud.id, p_kundens_navn: navn, p_signatur_sti: sti, p_note: null,
+    });
+    if (error) { setGemmer(false); setFejl(error.message); return; }
+    setTilbud((x) => ({ ...x, status: "accepteret", service_template_id: data?.aftaleId || x.service_template_id }));
+    setUAaben(false);
+
+    const { data: us, error: usFejl } = await supabaseClient.functions
+      .invoke("tilbud-underskriv", { body: { tilbudId: tilbud.id } });
+    setGemmer(false);
+    if (usFejl || us?.error) {
+      setBesked("Underskriften er gemt, og tilbuddet er godkendt. Den underskrevne PDF kunne ikke dannes lige nu — kontoret kan danne den bagefter.");
+      return;
+    }
+    const { data: sign } = await supabaseClient.storage.from("tilbud").createSignedUrl(us.sti, 900);
+    if (sign?.signedUrl) setUUrl(sign.signedUrl);
+    setBesked(us.mail === "sendt"
+      ? `Tak! Tilbuddet er underskrevet, og kunden har fået det på mail (${(f.kunde_email || "").trim()}).`
+      : us.mail === "fejlede"
+        ? "Tilbuddet er underskrevet, men mailen til kunden kunne ikke sendes. Vis PDF'en for kunden, og send den fra kontoret."
+        : "Tilbuddet er underskrevet. Kunden har ingen mail, så vis PDF'en på telefonen — eller print den fra kontoret.");
   }
 
   // Databasen afviser, hvis den, der kalder, ikke er planlægger, eller hvis der ingen PDF er. PDF'en dannes forfra først,
@@ -2965,6 +3090,42 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
             Der skal ikke registreres tid på et kundemøde. Fluebenet er kun så kontoret
             kan se at du har været der.
           </div>
+
+          {!laast && (tilbud.status === "kladde" || tilbud.status === "sendt") && (
+            <div style={{ marginTop: 16 }}>
+              {!uAaben ? (
+                <button style={{ ...s.doneLarge, width: "100%", background: "var(--farve)", color: "#fff", borderColor: "var(--farve)", fontWeight: 700 }}
+                  disabled={gemmer}
+                  onClick={() => { setUAaben(true); if (!uNavn) setUNavn(f.kontaktperson || f.kunde_navn || ""); }}>
+                  Underskriv med kunden
+                </button>
+              ) : (
+                <div style={{ background: "#F8FAFC", border: "1.5px solid #CBD5E1", borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14.5 }}>Kundens underskrift</div>
+                  <div style={s.tilbudHint}>
+                    Giv telefonen til kunden. Kunden godkender tilbuddet ved at skrive under, og får det underskrevne tilbud på mail,
+                    hvis der er en adresse.
+                  </div>
+                  <input style={{ ...felt, marginTop: 10, marginBottom: 10 }} value={uNavn} onChange={(e) => setUNavn(e.target.value)}
+                    placeholder="Kundens navn" />
+                  <Underskriftsfelt padRef={padRef} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button style={{ ...s.sekundaerStor, flex: 1 }} disabled={gemmer} onClick={() => setUAaben(false)}>Annuller</button>
+                    <button style={{ ...s.doneLarge, flex: 1, background: "var(--farve)", color: "#fff", borderColor: "var(--farve)", fontWeight: 700 }}
+                      disabled={gemmer} onClick={underskriv}>
+                      {gemmer ? "Gemmer…" : "Godkend"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {uUrl && (
+            <a href={uUrl} target="_blank" rel="noreferrer"
+              style={{ display: "block", marginTop: 12, color: "#4F46E5", fontWeight: 700, fontSize: 15, minHeight: 44, lineHeight: "44px" }}>
+              Åbn det underskrevne tilbud (PDF)
+            </a>
+          )}
 
           {employee.is_admin && !laast && (tilbud.status === "kladde" || tilbud.status === "sendt") && (
             <div style={{ marginTop: 16 }}>
