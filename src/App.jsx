@@ -1691,7 +1691,8 @@ const HELP_DA = [
       "Øverst på tilbudsskærmen ligger en opgaveliste for før, under og efter mødet. Tryk på et punkt for at sætte flueben. Kontoret ser de samme flueben, og du kan tilføje eller fjerne punkter.",
       "Referatet er lavet til at blive dikteret. Tryk på mikrofonen på tastaturet og tal — ret det bagefter.",
       "Du kan lægge op til 10 billeder på. De er interne, medmindre du på tilbuddet vælger at vise dem til kunden.",
-      "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage." ] },
+      "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage.",
+      "Har kunden ikke en mail, så tryk «Godkend for kunden». Skriv hvem der har sagt ja og hvordan (telefon, på stedet, brev). Det registreres med dit navn, og aftalen dannes som kladde." ] },
   { t: "Dine timer — de tre tal", p: [
       "Tryk på bil-ikonet øverst. Under fanen Timer kan du se, hvad der bliver rapporteret til løn.",
       "Der står tre tal, og de er ikke det samme. «Planlagt» er den tid, kontoret afsatte til opgaven. «Registreret» er den tid, du selv har trykket. «Til løn» er det, kontoret har godkendt.",
@@ -1907,7 +1908,8 @@ const HELP_EN = [
       "At the top of the quote screen is a task list for before, during and after the meeting. Tap an item to tick it. The office sees the same ticks, and you can add or remove items.",
       "The notes field is made for dictation. Tap the microphone on the keyboard and speak — edit it afterwards.",
       "You can add up to 10 photos. They are internal unless you choose to show them to the customer on the quote.",
-      "\"Send to customer\" creates the PDF and mails a link she can accept from. If she accepts, the agreement is created as a draft — you set the start date and weekdays yourself." ] },
+      "\"Send to customer\" creates the PDF and mails a link she can accept from. If she accepts, the agreement is created as a draft — you set the start date and weekdays yourself.",
+      "If the customer has no email, tap \"Approve for customer\". Enter who said yes and how (phone, on site, letter). It is recorded under your name, and the agreement is created as a draft." ] },
   { t: "Your hours — the three figures", p: [
       "Tap the car icon at the top. The Hours tab shows what is reported to payroll.",
       "There are three figures, and they are not the same thing. \"Planned\" is the time the office set aside for the job. \"Logged\" is the time you registered yourself. \"To payroll\" is what the office has approved.",
@@ -2538,6 +2540,11 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
   const synlig = useSynligHoejde();
   const [tilbud, setTilbud] = useState(null);
   const [opgaver, setOpgaver] = useState([]);
+  // Godkendelse på kundens vegne (kun planlæggere): borgere uden mail kan ikke trykke «Accepter» i et link.
+  const [gAaben, setGAaben] = useState(false);
+  const [gNavn, setGNavn] = useState("");
+  const [gMaade, setGMaade] = useState("telefon");
+  const [gNote, setGNote] = useState("");
   const [henter, setHenter] = useState(true);
   const [lister, setLister] = useState([]);
   const [priser, setPriser] = useState({});
@@ -2562,7 +2569,8 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
     (async () => {
       const [{ data: t }, { data: cl }, { data: cli }, { data: pr }] = await Promise.all([
         supabaseClient.from("tilbud").select("*").eq("instance_id", task.id).maybeSingle(),
-        supabaseClient.from("checklist_templates").select("id, name").order("name"),
+        // De tre tilbudslister (tilbud_fase) er ikke til at vælge på tilbuddet; de ligger i opgavelisten øverst.
+        supabaseClient.from("checklist_templates").select("id, name").is("tilbud_fase", null).order("name"),
         supabaseClient.from("checklist_template_items").select("checklist_template_id"),
         // Timepriserne har gyldighedsdato fra 3.10.2026 (timepris_satser). Tilbuddet
         // foreslaar den sats, der gaelder i dag: nyeste sats pr. type med gyldig_fra
@@ -2711,6 +2719,31 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
       saet("fotos", alle);
       await supabaseClient.from("tilbud").update({ fotos: alle }).eq("id", tilbud.id);
     }
+  }
+
+  // Databasen afviser, hvis den, der kalder, ikke er planlægger, eller hvis der ingen PDF er. PDF'en dannes forfra først,
+  // så det er netop det, der står i systemet, der er godkendt.
+  async function godkendForKunden() {
+    setFejl(""); setBesked("");
+    const navn = (gNavn || f.kontaktperson || f.kunde_navn || "").trim();
+    if (!navn) { setFejl("Skriv navnet på den, der har sagt ja."); return; }
+    const maade = { telefon: "på telefon", paa_stedet: "på stedet", brev: "pr. brev", andet: "på anden måde" }[gMaade];
+    if (!window.confirm(
+      `Godkend tilbuddet for ${(f.kunde_navn || "kunden").trim()}?\n\nDer dannes en ny PDF, og den noteres som godkendt af ${navn} (${maade}), registreret af dig. `
+      + `Der oprettes en aftale i kladde, og tilbuddet kan derefter ikke rettes.`)) return;
+    setGemmer(true);
+    if (!(await gem())) { setGemmer(false); return; }
+    const { data: pdfSvar, error: pdfFejl } = await supabaseClient.functions
+      .invoke("tilbud-pdf", { body: { tilbudId: tilbud.id } });
+    if (pdfFejl || pdfSvar?.error) { setGemmer(false); setFejl(pdfSvar?.error || pdfFejl.message); return; }
+    const { data, error } = await supabaseClient.rpc("godkend_tilbud_for_kunden", {
+      p_tilbud_id: tilbud.id, p_kundens_navn: navn, p_maade: gMaade, p_note: gNote.trim() || null,
+    });
+    setGemmer(false);
+    if (error) { setFejl(error.message); return; }
+    setTilbud((x) => ({ ...x, status: "accepteret", service_template_id: data?.aftaleId || x.service_template_id }));
+    setGAaben(false);
+    setBesked("Tilbuddet er godkendt for kunden. Kontoret sætter ugedage og startdato på aftalen.");
   }
 
   async function dannOgSend() {
@@ -2932,6 +2965,40 @@ function TilbudSkaerm({ task, employee, supabaseClient, onSetStatus, onLuk }) {
             Der skal ikke registreres tid på et kundemøde. Fluebenet er kun så kontoret
             kan se at du har været der.
           </div>
+
+          {employee.is_admin && !laast && (tilbud.status === "kladde" || tilbud.status === "sendt") && (
+            <div style={{ marginTop: 16 }}>
+              {!gAaben ? (
+                <button style={s.sekundaerStor} disabled={gemmer}
+                  onClick={() => { setGAaben(true); if (!gNavn) setGNavn(f.kontaktperson || f.kunde_navn || ""); }}>
+                  Godkend for kunden
+                </button>
+              ) : (
+                <div style={{ background: "#FFFBEB", border: "1.5px solid #FDE68A", borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14.5, color: "#92400E" }}>Godkend på kundens vegne</div>
+                  <div style={{ ...s.tilbudHint, color: "#78350F" }}>
+                    Til kunder uden mail. Kunden har sagt ja, og du registrerer det. Det står på tilbuddet, hvem der har godkendt, og hvordan.
+                  </div>
+                  <input style={{ ...felt, marginTop: 10 }} value={gNavn} onChange={(e) => setGNavn(e.target.value)} placeholder="Hvem har sagt ja?" />
+                  <select style={felt} value={gMaade} onChange={(e) => setGMaade(e.target.value)}>
+                    <option value="telefon">På telefon</option>
+                    <option value="paa_stedet">På stedet, ved mødet</option>
+                    <option value="brev">Pr. brev</option>
+                    <option value="andet">På anden måde</option>
+                  </select>
+                  <textarea style={{ ...felt, minHeight: 60 }} value={gNote} onChange={(e) => setGNote(e.target.value)}
+                    placeholder="Note (valgfri)" />
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    <button style={{ ...s.sekundaerStor, flex: 1 }} disabled={gemmer} onClick={() => setGAaben(false)}>Annuller</button>
+                    <button style={{ ...s.doneLarge, flex: 1, background: "var(--farve)", color: "#fff", borderColor: "var(--farve)", fontWeight: 700 }}
+                      disabled={gemmer} onClick={godkendForKunden}>
+                      {gemmer ? "Godkender…" : "Godkend tilbuddet"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {fejl && <div style={{ ...s.notatFejl, marginTop: 12 }}>{fejl}</div>}
           {besked && <div style={{ color: "#166534", fontSize: 13.5, marginTop: 12, lineHeight: 1.5 }}>{besked}</div>}
