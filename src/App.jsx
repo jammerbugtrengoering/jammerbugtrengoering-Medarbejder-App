@@ -1578,6 +1578,7 @@ const HELP_DA = [
     "Under hvert punkt står, hvad der er valgt lige nu — du behøver ikke åbne noget for at se det.",
     "Her vælger du, om dagen skal vises som tidslinje eller liste, hvilket sprog appen taler, og om du vil have beskeder på telefonen.",
     "Appen taler dansk og engelsk. Første gang følger den din telefon: er telefonen på dansk, får du dansk — ellers engelsk. Vælger du selv, følger valget dig, også hvis du skifter telefon.",
+    "Under «Personalemappen» åbner du en anden app med dine dokumenter fra kontoret, ferie og fri, din MUS, dine ønsker til kurser og håndbogen. Du bruger det samme login som her.",
     "Du kan også bede om et link til at skifte adgangskode. Det bliver sendt til din mail. En ny adgangskode skal være mindst 8 tegn og have både bogstaver og tal, og den må ikke være en, der er kendt fra et datalæk.",
     "Log ud står nederst for sig selv. Du behøver ikke logge ud, når du er færdig for dagen — appen husker dig.",
   ] },
@@ -1805,6 +1806,7 @@ const HELP_EN = [
     "Under each item you can see what is currently selected — you do not have to open anything to check.",
     "Here you choose whether the day is shown as a timeline or a list, which language the app speaks, and whether you want notifications on your phone.",
     "The app speaks Danish and English. The first time it follows your phone: if your phone is in Danish you get Danish, otherwise English. If you choose yourself, the choice follows you, also on a new phone.",
+    "Under \"Staff folder\" you open another app with your documents from the office, leave requests, your performance review, your wishes for courses and the handbook. You use the same login as here.",
     "You can also request a link to change your password. It is sent to your email. A new password must be at least 8 characters with both letters and numbers, and it must not be one known from a data leak.",
     "Sign out is at the bottom on its own. You do not need to sign out at the end of the day — the app remembers you.",
   ] },
@@ -4790,6 +4792,8 @@ function erIOS() {
 // «Dine oplysninger» (6.10.2026): medarbejderen retter selv sit telefonnummer og sin nødkontakt. Kun de fire felter, og kun sine egne:
 // databasefunktionen opdater_mine_kontaktoplysninger rører ikke ansættelse eller MUS-datoer, som kun kontoret kan se. Skrifttyperne er
 // 16 px, ellers zoomer iPhone ind på feltet, og siden skal rulles tilbage.
+// Adressen til medarbejderens Personalemappe-app (eget Netlify-site, samme Supabase-login).
+const PERSONALEMAPPEN_URL = import.meta.env.VITE_PERSONALEMAPPEN_URL || "https://jammerbugtrengoering-personalemappen.netlify.app/";
 function KontaktSide({ da, onTilbage }) {
   const [henter, setHenter] = useState(true);
   const [gemmer, setGemmer] = useState(false);
@@ -4981,6 +4985,14 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
               </span>
               <ChevronRight size={19} color="#CBD5E1" style={{ flexShrink: 0 }} />
             </button>
+            {/* Personalemappen (6.10.2026): dokumenter, ferie, MUS og håndbog ligger i en egen app med samme login. Den åbnes i en ny fane. */}
+            <a href={PERSONALEMAPPEN_URL} target="_blank" rel="noreferrer" style={{ ...raekke, marginTop: -8, marginBottom: 18, textDecoration: "none", display: "flex" }}>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ ...titel, display: "block" }}>{da ? "Personalemappen" : "Staff folder"}</span>
+                <span style={{ ...svar, display: "block" }}>{da ? "Dokumenter, ferie, MUS og håndbog" : "Documents, leave, reviews and handbook"}</span>
+              </span>
+              <ChevronRight size={19} color="#CBD5E1" style={{ flexShrink: 0 }} />
+            </a>
 
             <div style={overskrift}>{da ? "Beskeder" : "Notifications"}</div>
             <div style={{ marginBottom: 18 }}>
