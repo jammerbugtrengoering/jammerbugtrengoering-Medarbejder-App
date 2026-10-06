@@ -2769,8 +2769,9 @@ function MusSkaerm({ task, supabaseClient, onLuk }) {
                 </>
               ) : (
                 <div style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.55 }}>
-                  Din leder skriver referatet under samtalen. Når det er sendt, godkender du det i
-                  Personalemappen.
+                  {m.rolle === "hr"
+                    ? "Referatet skrives af lederen i Worklist, eller af HR i planlægningsappen under medarbejderens kort."
+                    : "Din leder skriver referatet under samtalen. Når det er sendt, godkender du det i Personalemappen."}
                 </div>
               )}
 
