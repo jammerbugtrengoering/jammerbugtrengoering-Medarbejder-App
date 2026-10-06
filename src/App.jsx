@@ -1736,7 +1736,7 @@ const HELP_DA = [
     ] },
   { t: "Det appen ikke gemmer", p: [
       "Appen følger dig ikke. Der er ingen GPS og ingen positionsmåling — hverken i arbejdstiden eller udenfor. Kørslen regnes ud fra adresserne på dine opgaver, ikke fra hvor telefonen har været.",
-      "Dit CPR-nummer ligger ikke i systemet. Lønfilen bruger dit Danløn-nummer.",
+      "Dit CPR-nummer ligger ikke i selve systemet. Lønfilen bruger dit Danløn-nummer. Kontoret kan have lagt dokumenter om din ansættelse — fx din kontrakt — i et dokumentarkiv, som kun administratorer kan åbne. En kontrakt kan indeholde dit CPR-nummer.",
       "Der ligger ingen bankoplysninger og intet kontonummer.",
       "Der ligger ingen helbredsoplysninger, diagnoser eller sygdomsårsager.",
     ] },
@@ -1953,7 +1953,7 @@ const HELP_EN = [
     ] },
   { t: "What the app does not store", p: [
       "The app does not track you. There is no GPS and no location tracking — neither during working hours nor outside them. Mileage is calculated from the addresses of your jobs, not from where your phone has been.",
-      "Your civil registration number is not stored anywhere in the system. The payroll file uses your Danløn number.",
+      "Your civil registration number is not stored in the system itself. The payroll file uses your Danløn number. The office may have placed documents about your employment — for example your contract — in a document archive that only administrators can open. A contract may contain your civil registration number.",
       "There are no bank details and no account number.",
       "There is no health information, no diagnoses and no reasons for sickness.",
     ] },
