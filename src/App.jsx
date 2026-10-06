@@ -1710,6 +1710,12 @@ const HELP_DA = [
       "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage.",
       "Skal kunden godkende med det samme, så tryk «Underskriv med kunden» og giv telefonen til kunden. Kunden skriver sit navn og skriver under med fingeren. Tilbuddet bliver godkendt, underskriften sættes ind i PDF'en, og kunden får den på mail, hvis der er en adresse.",
       "Har kunden ikke en mail, så tryk «Godkend for kunden». Skriv hvem der har sagt ja og hvordan (telefon, på stedet, brev). Det registreres med dit navn, og aftalen dannes som kladde." ] },
+  { t: "MUS-samtale", p: [
+      "En MUS-samtale ligger i din opgaveliste som «MUS: navn». Åbn den under samtalen.",
+      "Er du leder, skriver du referatet her. Det er lavet til at blive dikteret: tryk på mikrofonen på tastaturet og tal. Har medarbejderen delt sin forberedelse, ser du den øverst.",
+      "«Gem kladde» gemmer, uden at medarbejderen ser noget. «Send til medarbejderen» markerer samtalen som holdt og sender referatet til godkendelse i Personalemappen.",
+      "Medarbejderen godkender referatet eller skriver en bemærkning. Har hun bemærkninger, står de øverst — ret referatet og send det igen. Et godkendt referat kan ikke rettes.",
+      "Er du medarbejderen, ser du kun status her. Referatet godkender du i Personalemappen." ] },
   { t: "Dine timer — de tre tal", p: [
       "Tryk på bil-ikonet øverst. Under fanen Timer kan du se, hvad der bliver rapporteret til løn.",
       "Der står tre tal, og de er ikke det samme. «Planlagt» er den tid, kontoret afsatte til opgaven. «Registreret» er den tid, du selv har trykket. «Til løn» er det, kontoret har godkendt.",
@@ -1932,6 +1938,12 @@ const HELP_EN = [
       "\"Send to customer\" creates the PDF and mails a link she can accept from. If she accepts, the agreement is created as a draft — you set the start date and weekdays yourself.",
       "If the customer should approve right away, tap \"Sign with customer\" and hand over the phone. The customer enters their name and signs with a finger. The quote is approved, the signature is placed in the PDF, and the customer gets it by email if there is an address.",
       "If the customer has no email, tap \"Approve for customer\". Enter who said yes and how (phone, on site, letter). It is recorded under your name, and the agreement is created as a draft." ] },
+  { t: "Appraisal interview (MUS)", p: [
+      "An appraisal interview is in your task list as \"MUS: name\". Open it during the meeting.",
+      "If you are the manager, you write the minutes here. They are made for dictation: tap the microphone on the keyboard and speak. If the employee has shared her preparation, you see it at the top.",
+      "\"Save draft\" saves without the employee seeing anything. \"Send to employee\" marks the meeting as held and sends the minutes for approval in Personalemappen.",
+      "The employee approves the minutes or writes a comment. Comments appear at the top — edit the minutes and send them again. Approved minutes cannot be edited.",
+      "If you are the employee, you only see the status here. You approve the minutes in Personalemappen." ] },
   { t: "Your hours — the three figures", p: [
       "Tap the car icon at the top. The Hours tab shows what is reported to payroll.",
       "There are three figures, and they are not the same thing. \"Planned\" is the time the office set aside for the job. \"Logged\" is the time you registered yourself. \"To payroll\" is what the office has approved.",
@@ -2628,6 +2640,158 @@ function Underskriftsfelt({ padRef, hoejde = 170 }) {
         style={{ background: "none", border: "none", color: "#4F46E5", fontSize: 13.5, padding: "8px 0", minHeight: 44 }}>
         Ryd og start forfra
       </button>
+    </div>
+  );
+}
+
+// MUS-samtale (aktivitet med titlen «MUS: navn»). Lederen skriver referatet her og sender det
+// til medarbejderen, som godkender det i Personalemappen. Medarbejderens egen forberedelse
+// vises kun, hvis hun selv har delt den (forberedelse_delt) — det afgoer databasen, ikke appen.
+function MusSkaerm({ task, supabaseClient, onLuk }) {
+  const synlig = useSynligHoejde();
+  const [m, setM] = useState(null);
+  const [henter, setHenter] = useState(true);
+  const [tekst, setTekst] = useState("");
+  const [gemmer, setGemmer] = useState(false);
+  const [fejl, setFejl] = useState("");
+  const [besked, setBesked] = useState("");
+
+  async function hent() {
+    const { data, error } = await supabaseClient.rpc("mus_for_opgave", { p_instance_id: task.id });
+    if (error) setFejl(error.message);
+    const raekke = Array.isArray(data) ? data[0] : data;
+    setM(raekke || null);
+    setTekst(raekke?.referat || "");
+    setHenter(false);
+  }
+  useEffect(() => { hent(); }, [task.id]);
+
+  const erLeder = m?.rolle === "leder";
+  const godkendt = m?.referat_status === "godkendt";
+  const sendt = m?.referat_status === "sendt";
+
+  // Et sendt referat kan rettes, men saa er det ikke laengere sendt — databasen goer det
+  // til kladde, og hun skal sende det igen. Et godkendt referat er laast.
+  async function gem(send) {
+    setFejl(""); setBesked(""); setGemmer(true);
+    const { error } = await supabaseClient.rpc("gem_mus_referat",
+      { p_id: m.id, p_referat: tekst, p_send: send });
+    setGemmer(false);
+    if (error) { setFejl(error.message); return; }
+    setBesked(send ? "Referatet er sendt til medarbejderen." : "Kladden er gemt.");
+    hent();
+  }
+
+  async function markerHoldt() {
+    setFejl(""); setGemmer(true);
+    const { error } = await supabaseClient.rpc("mus_holdt", { p_id: m.id });
+    setGemmer(false);
+    if (error) { setFejl(error.message); return; }
+    hent();
+  }
+
+  function luk() {
+    if (erLeder && !godkendt && tekst !== (m?.referat || "")) {
+      if (!window.confirm("Du har ændringer der ikke er gemt. Vil du forlade samtalen alligevel?")) return;
+    }
+    onLuk();
+  }
+
+  const felt = { ...s.notatInput, marginTop: 6 };
+  const statusTekst = godkendt ? "Medarbejderen har godkendt referatet."
+    : m?.referat_status === "bemaerkning" ? "Medarbejderen har bemærkninger — ret referatet og send det igen."
+    : sendt ? "Sendt til medarbejderen. Venter på godkendelse."
+    : m?.referat_status === "kladde" ? "Kladde — ikke sendt endnu." : "";
+
+  return (
+    <div style={s.overlay} onClick={(e) => e.stopPropagation()}>
+      <div style={{ ...s.sheet, height: synlig.hoejde, maxHeight: synlig.hoejde,
+                    marginTop: synlig.top, alignSelf: "flex-start" }}>
+        <div style={s.afslutTop}>
+          <button style={s.afslutTilbage} onClick={luk}>
+            <ChevronLeft size={16} /> Tilbage
+          </button>
+          <span style={{ opacity: 0.8 }}>{task.title}</span>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px 20px" }}>
+          {henter && <div style={{ color: "#64748B", fontSize: 14 }}>Henter…</div>}
+          {!henter && !m && (
+            <div style={{ color: "#64748B", fontSize: 14, lineHeight: 1.5 }}>
+              Der hører ingen MUS-samtale til denne aktivitet, eller du er ikke med i den.
+            </div>
+          )}
+          {m && (
+            <>
+              <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, marginBottom: 12 }}>
+                {m.employee_navn}{m.leder_navn ? ` og ${m.leder_navn}` : ""}
+                {m.dato ? ` · ${m.dato}` : ""}{m.tid ? ` kl. ${String(m.tid).slice(0, 5)}` : ""}
+              </div>
+
+              {statusTekst && (
+                <div style={{ background: godkendt ? "#F0FDF4" : "#EEF2FF",
+                              border: `1px solid ${godkendt ? "#BBF7D0" : "#C7D2FE"}`, borderRadius: 9,
+                              padding: 11, fontSize: 13, lineHeight: 1.5, marginBottom: 14,
+                              color: godkendt ? "#166534" : "#3730A3" }}>
+                  {statusTekst}
+                </div>
+              )}
+
+              {m.referat_status === "bemaerkning" && m.medarbejder_bemaerkning && (
+                <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 9,
+                              padding: 11, fontSize: 13, color: "#92400E", lineHeight: 1.5, marginBottom: 14 }}>
+                  <b>Medarbejderens bemærkning:</b><br />{m.medarbejder_bemaerkning}
+                </div>
+              )}
+
+              {erLeder && m.forberedelse_delt && m.forberedelse && (
+                <>
+                  <div style={s.tilbudAfsnit}>Medarbejderens forberedelse</div>
+                  <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 9,
+                                padding: 11, fontSize: 13, lineHeight: 1.55, color: "#334155" }}>
+                    {Object.entries(m.forberedelse).filter(([, v]) => v).map(([k, v]) => (
+                      <div key={k} style={{ marginBottom: 6 }}>{String(v)}</div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {erLeder ? (
+                <>
+                  <div style={s.tilbudAfsnit}>Referat</div>
+                  <textarea style={{ ...felt, minHeight: 200, resize: "vertical", lineHeight: 1.5 }}
+                    value={tekst} disabled={godkendt}
+                    onChange={(e) => setTekst(e.target.value)}
+                    placeholder="Hvad I talte om, hvad I aftalte, og hvad der skal ske bagefter…" />
+                  <div style={s.tilbudHint}>
+                    Tryk på mikrofonen på tastaturet og tal. Når du sender referatet, ser medarbejderen
+                    det i Personalemappen og kan godkende det eller skrive en bemærkning.
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.55 }}>
+                  Din leder skriver referatet under samtalen. Når det er sendt, godkender du det i
+                  Personalemappen.
+                </div>
+              )}
+
+              {fejl && <div style={{ color: "#B91C1C", fontSize: 13, marginTop: 10 }}>{fejl}</div>}
+              {besked && <div style={{ color: "#166534", fontSize: 13, marginTop: 10 }}>{besked}</div>}
+            </>
+          )}
+        </div>
+        {m && erLeder && !godkendt && (
+          <div style={{ padding: "10px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex",
+                        gap: 8, borderTop: "1px solid #E2E8F0" }}>
+            <button style={{ ...s.sekundaerStor, flex: 1 }} disabled={gemmer} onClick={() => gem(false)}>
+              Gem kladde
+            </button>
+            <button style={{ ...s.primaerStor, flex: 1 }} disabled={gemmer || !tekst.trim()}
+              onClick={() => gem(true)}>
+              {sendt ? "Send igen" : "Send til medarbejderen"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -6660,7 +6824,16 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
       {/* Et kundemoede er en aktivitet med et tilbud paa. Den skal aabne tilbuddet og
           ikke den almindelige opgaveskaerm — der er ingen tjekliste at hakke af, og
           det hun skal, er at skrive ned hvad kunden sagde. */}
-      {openTask && openTask.type === "aktivitet" && (
+      {openTask && openTask.type === "aktivitet" && (openTask.title || "").startsWith("MUS: ") && (
+        <MusSkaerm
+          key={openTask.id}
+          task={instances.find((t) => t.id === openTask.id) || openTask}
+          supabaseClient={supabase}
+          onLuk={lukOpgave}
+        />
+      )}
+
+      {openTask && openTask.type === "aktivitet" && !(openTask.title || "").startsWith("MUS: ") && (
         <TilbudSkaerm
           key={openTask.id}
           task={instances.find((t) => t.id === openTask.id) || openTask}
