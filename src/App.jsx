@@ -437,6 +437,13 @@ const T = {
     access: "Adgang",
     watchVideo: "Se instruktionsvideo",
     tasks: "Tasks",
+    nextVisitHint: "Aftal datoen med kunden nu, og skriv den her, før du registrerer tiden. Så kommer opgaven i planen. Er den ikke aftalt, så lad punktet stå — kontoret kontakter kunden.",
+    nextVisitDate: "Dato",
+    nextVisitTime: "Klokkeslæt (valgfrit)",
+    nextVisitSave: "Gem aftalt besøg",
+    nextVisitSaving: "Gemmer…",
+    nextVisitDone: "Næste besøg er aftalt",
+    nextVisitErr: "Kunne ikke gemmes",
     timeTracking: "Tidsregistrering",
     registered: "registreret",
     planned: "planlagt",
@@ -640,6 +647,13 @@ const T = {
     access: "Access",
     watchVideo: "Watch instruction video",
     tasks: "Tasks",
+    nextVisitHint: "Agree the date with the customer now and enter it here before you log your time. The job then goes into the plan. If it is not agreed, leave the item — the office will contact the customer.",
+    nextVisitDate: "Date",
+    nextVisitTime: "Time (optional)",
+    nextVisitSave: "Save agreed visit",
+    nextVisitSaving: "Saving…",
+    nextVisitDone: "Next visit agreed",
+    nextVisitErr: "Could not be saved",
     timeTracking: "Time tracking",
     registered: "registered",
     planned: "planned",
@@ -1614,6 +1628,7 @@ const HELP_DA = [
       "«Vis vej» åbner Google Maps.",
       "Under «Adgang» trykker du for at se nøgleboks og kode — se afsnittet nedenfor.",
       "Under «Tasks» sætter du flueben, når du har gjort en ting. Tælleren viser hvor langt du er.",
+      "Hos nogle kunder aftaler du selv næste besøg. Så står punktet «Aftal næste besøg med kunden» på listen. Aftal datoen med kunden, skriv den under punktet, og tryk «Gem aftalt besøg», før du registrerer tiden. Så kommer næste opgave i planen. Er der ikke aftalt noget, så lad punktet stå — så kontakter kontoret kunden.",
       "Der skal ikke registreres noget her. Det kommer bagefter." ] },
   { t: "Nøglebokskoder og adgang", p: [
       "Koderne er skjulte, indtil du selv trykker «Vis adgangsoplysninger». Det er ikke fordi vi ikke stoler på dig — det er fordi koderne hører til kundernes hjem, og vi skal kunne dokumentere hvem der har set dem.",
@@ -1840,6 +1855,7 @@ const HELP_EN = [
       "\"Show the way\" opens Google Maps.",
       "Under \"Access\" you tap to see the key box and code — see the section below.",
       "Under \"Tasks\" you tick off each thing as you finish it.",
+      "For some customers you agree the next visit yourself. The item \"Aftal næste besøg med kunden\" is then on the list. Agree the date with the customer, enter it under the item and tap \"Save agreed visit\" before you log your time. The next job then goes into the plan. If nothing is agreed, leave the item — the office will contact the customer.",
       "Nothing needs to be registered here. That comes afterwards." ] },
   { t: "Key box codes and access", p: [
       "Codes are hidden until you tap \"Show access details\" yourself. It is not that we do not trust you — the codes belong to the customers' homes, and we have to be able to document who has seen them.",
@@ -4366,6 +4382,9 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
               </div>
               <div style={s.checklistWrap}>
                 {t.checklist.map((item) => (
+                  item.text === NAESTE_BESOEG_TEKST ? (
+                    <NaesteBesoegPunkt key={item.id} task={t} item={item} tr={tr} onGemt={() => onToggleChecklist(t.id, item.id)} />
+                  ) : (
                   <div key={item.id} style={s.checklistItem}>
                     <button style={s.checklistBtn} onClick={() => onToggleChecklist(t.id, item.id)}>
                       <span style={item.done ? s.cbChecked : s.cbUnchecked}>
@@ -4384,6 +4403,7 @@ function TaskModal({ task, employee, lang, onClose, fraListe, onLogMinutes, onSe
                       </a>
                     )}
                   </div>
+                  )
                 ))}
               </div>
             </div>
@@ -4553,6 +4573,59 @@ function useTranslatedTitle(title, lang) {
     translateText(title, lang).then(setTranslated);
   }, [title, lang]);
   return translated;
+}
+
+// «Aftal næste besøg» (6.10.2026): punktet på tjeklisten hos aftaler, hvor næste besøg aftales ved besøget. Det er et almindeligt punkt
+// i tjeklisten, men teksten kendes (den står også i planlægningsappen og i databasen), og så får det en dato at udfylde. Et tryk på
+// selve punktet krydser det ikke af — det sker først, når datoen er gemt, ellers ville «aftalt» stå, uden at nogen opgave findes.
+// Står punktet uden flueben, ved kontoret, at kunden skal kontaktes (klokken, hver uge).
+const NAESTE_BESOEG_TEKST = "Aftal næste besøg med kunden";
+function NaesteBesoegPunkt({ task, item, tr, onGemt }) {
+  const [dato, setDato] = useState("");
+  const [tid, setTid] = useState("");
+  const [gemmer, setGemmer] = useState(false);
+  const [fejl, setFejl] = useState("");
+  async function gem() {
+    if (!dato || gemmer) return;
+    setGemmer(true); setFejl("");
+    const { error } = await supabase.rpc("opret_naeste_besoeg", { p_instance_id: task.id, p_dato: dato, p_tid: tid || null });
+    setGemmer(false);
+    if (error) { setFejl(tr.nextVisitErr + ": " + error.message); return; }
+    onGemt();
+  }
+  return (
+    <div style={{ ...s.checklistItem, padding: "10px 0" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <span style={item.done ? s.cbChecked : s.cbUnchecked}>{item.done && <Check size={12} color="#fff" strokeWidth={3} />}</span>
+        <div style={s.checklistContent}>
+          <span style={{ ...s.checklistText, color: item.done ? "#166534" : "#111111", fontWeight: 700 }}>
+            {item.done ? tr.nextVisitDone : item.text}
+          </span>
+          {!item.done && (
+            <>
+              <div style={s.checklistDesc}>{tr.nextVisitHint}</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                <label style={{ fontSize: 12.5, color: "#64748B" }}>{tr.nextVisitDate}<br />
+                  <input type="date" value={dato} onChange={(e) => setDato(e.target.value)}
+                    style={{ fontSize: 16, padding: "8px 10px", borderRadius: 10, border: "1px solid #CBD5E1", fontFamily: "inherit" }} />
+                </label>
+                <label style={{ fontSize: 12.5, color: "#64748B" }}>{tr.nextVisitTime}<br />
+                  <input type="time" value={tid} onChange={(e) => setTid(e.target.value)}
+                    style={{ fontSize: 16, padding: "8px 10px", borderRadius: 10, border: "1px solid #CBD5E1", fontFamily: "inherit" }} />
+                </label>
+              </div>
+              <button type="button" disabled={!dato || gemmer} onClick={gem}
+                style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "none", fontWeight: 700, fontSize: 15,
+                         background: dato ? "#D6247A" : "#E2E8F0", color: dato ? "#fff" : "#94A3B8", cursor: dato ? "pointer" : "default" }}>
+                {gemmer ? tr.nextVisitSaving : tr.nextVisitSave}
+              </button>
+              {fejl && <div style={s.notatFejl}>{fejl}</div>}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function TaskCard({ seg, employee, lang, onClick }) {
