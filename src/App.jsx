@@ -1730,7 +1730,7 @@ const HELP_DA = [
       "Hver gang du åbner adgangsoplysningerne på en opgave — nøglekoden, kundens kontaktperson og telefonnummer — gemmes det, hvornår du gjorde det, og på hvilken opgave. Det er for at kunne svare kunden, hvis de spørger, hvem der har haft deres kode.",
       "Om din løn: din timeløn og tidligere satser, bonus og kilometersats, om du har weekendtillæg og SH-betaling, og dit medarbejdernummer i Danløn.",
       "Fravær registreres som fravær. Der står aldrig hvorfor du var væk.",
-      "Kontoret kan have noteret dit telefonnummer, din private e-mail, hvordan og hvornår du er ansat, datoerne for dine MUS-samtaler (aldrig indholdet) og en nødkontakt — navn, forhold og telefonnummer på en anden person, som du har oplyst. Kun kontorets administratorer kan se det.",
+      "Kontoret kan have noteret dit telefonnummer, din private e-mail, hvordan og hvornår du er ansat, datoerne for dine MUS-samtaler (aldrig indholdet) og en nødkontakt — navn, forhold og telefonnummer på en anden person, som du har oplyst. Kun kontorets administratorer kan se det. Telefonnummeret og nødkontakten kan du selv rette under Indstillinger → Dine oplysninger.",
       "Slår du beskeder til, gemmes en teknisk adresse på din telefon, så beskeden kan finde frem.",
       "Lader du en kunde skrive under på et tilbud, eller godkender du et tilbud for kunden, gemmes det, at det var dig, og hvornår — sammen med kundens underskrift. Det er for at kunne dokumentere, hvem der var til stede.",
     ] },
@@ -1947,7 +1947,7 @@ const HELP_EN = [
       "Every time you open the access details on a job — the key code, the customer's contact person and phone number — the time and the job are stored. This is so we can answer a customer who asks who has had their code.",
       "About your pay: your hourly rate and previous rates, bonus and mileage rate, whether you have the weekend supplement and holiday pay, and your employee number in Danløn.",
       "Absence is recorded as absence. It never says why you were away.",
-      "The office may have noted your phone number, private email, how and when you were employed, the dates of your performance reviews (never their content) and an emergency contact — the name, relationship and phone number of another person, as you have provided them. Only the office administrators can see this.",
+      "The office may have noted your phone number, private email, how and when you were employed, the dates of your performance reviews (never their content) and an emergency contact — the name, relationship and phone number of another person, as you have provided them. Only the office administrators can see this. You can edit your phone number and emergency contact yourself under Settings → Your details.",
       "If you turn notifications on, a technical address for your phone is stored so the message can reach you.",
       "If you let a customer sign a quote, or approve a quote for the customer, it is stored that it was you and when — together with the customer's signature. This is so we can document who was present.",
     ] },
@@ -4714,10 +4714,88 @@ function erIOS() {
 //     praecis det der goer en skaerm rodet.
 //   - Log ud staar alene nederst med roed kant. Det er den eneste handling med en
 //     konsekvens, og den skal ikke ligge mellem sprog og adgangskode.
+// «Dine oplysninger» (6.10.2026): medarbejderen retter selv sit telefonnummer og sin nødkontakt. Kun de fire felter, og kun sine egne:
+// databasefunktionen opdater_mine_kontaktoplysninger rører ikke ansættelse eller MUS-datoer, som kun kontoret kan se. Skrifttyperne er
+// 16 px, ellers zoomer iPhone ind på feltet, og siden skal rulles tilbage.
+function KontaktSide({ da, onTilbage }) {
+  const [henter, setHenter] = useState(true);
+  const [gemmer, setGemmer] = useState(false);
+  const [f, setF] = useState({ telefon: "", nodNavn: "", nodRelation: "", nodTelefon: "" });
+  const [fejl, setFejl] = useState("");
+  const [gemt, setGemt] = useState(false);
+
+  useEffect(() => {
+    let afbrudt = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("hent_mine_kontaktoplysninger");
+      if (afbrudt) return;
+      if (error) setFejl(error.message);
+      const r = Array.isArray(data) ? data[0] : data;
+      if (r) setF({ telefon: r.telefon || "", nodNavn: r.nodkontakt_navn || "", nodRelation: r.nodkontakt_relation || "", nodTelefon: r.nodkontakt_telefon || "" });
+      setHenter(false);
+    })();
+    return () => { afbrudt = true; };
+  }, []);
+
+  const saet = (n, v) => { setF((p) => ({ ...p, [n]: v })); setGemt(false); };
+  async function gem() {
+    setGemmer(true); setFejl(""); setGemt(false);
+    const { error } = await supabase.rpc("opdater_mine_kontaktoplysninger", {
+      p_telefon: f.telefon, p_nod_navn: f.nodNavn, p_nod_relation: f.nodRelation, p_nod_telefon: f.nodTelefon,
+    });
+    setGemmer(false);
+    if (error) { setFejl(error.message); return; }
+    setGemt(true);
+  }
+
+  const felt = { width: "100%", boxSizing: "border-box", fontSize: 16, minHeight: 48, padding: "10px 12px", borderRadius: 10,
+                 border: "1px solid #CBD5E1", background: "#fff", marginTop: 6, marginBottom: 14 };
+  const etiket = { fontSize: 13.5, fontWeight: 700, color: "#334155" };
+
+  return (
+    <div style={{ padding: "14px 16px calc(24px + env(safe-area-inset-bottom))" }}>
+      <button onClick={onTilbage}
+        style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14, border: "1px solid #E2E8F0", background: "#fff",
+                 color: "#111111", borderRadius: 12, padding: "12px 16px", minHeight: 48, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+        <ChevronLeft size={19} color="currentColor" style={{ color: "var(--farve)" }} /> {da ? "Tilbage" : "Back"}
+      </button>
+      <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{da ? "Dine oplysninger" : "Your details"}</div>
+      <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.5, marginBottom: 16 }}>
+        {da ? "Kun kontoret kan se dem. Nødkontakten ringer vi kun til, hvis der sker dig noget."
+            : "Only the office can see them. We only call your emergency contact if something happens to you."}
+      </div>
+      {henter ? (
+        <div style={{ color: "#94A3B8", padding: 20 }}>{da ? "Henter…" : "Loading…"}</div>
+      ) : (
+        <>
+          <label style={etiket}>{da ? "Dit telefonnummer" : "Your phone number"}</label>
+          <input style={felt} type="tel" inputMode="tel" autoComplete="tel" value={f.telefon} onChange={(e) => saet("telefon", e.target.value)} />
+
+          <div style={{ fontSize: 14.5, fontWeight: 700, margin: "6px 0 10px" }}>{da ? "Nødkontakt" : "Emergency contact"}</div>
+          <label style={etiket}>{da ? "Navn" : "Name"}</label>
+          <input style={felt} value={f.nodNavn} onChange={(e) => saet("nodNavn", e.target.value)} />
+          <label style={etiket}>{da ? "Forhold til dig (fx ægtefælle)" : "Relationship (e.g. partner)"}</label>
+          <input style={felt} value={f.nodRelation} onChange={(e) => saet("nodRelation", e.target.value)} />
+          <label style={etiket}>{da ? "Telefonnummer" : "Phone number"}</label>
+          <input style={felt} type="tel" inputMode="tel" value={f.nodTelefon} onChange={(e) => saet("nodTelefon", e.target.value)} />
+
+          {fejl && <div style={{ color: "#B91C1C", fontSize: 13.5, marginBottom: 10 }}>{fejl}</div>}
+          {gemt && <div style={{ color: "#166534", fontSize: 14, marginBottom: 10 }}>✓ {da ? "Gemt" : "Saved"}</div>}
+          <button onClick={gem} disabled={gemmer}
+            style={{ width: "100%", padding: "14px 0", borderRadius: 12, minHeight: 52, border: "none", background: "var(--farve)",
+                     color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: gemmer ? 0.6 : 1 }}>
+            {gemmer ? (da ? "Gemmer…" : "Saving…") : (da ? "Gem" : "Save")}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsVisning,
                          onSignOut, onPasswordReset, resetSent, resetLoading, onLuk }) {
   const da = lang === "da";
-  const [underside, setUnderside] = useState(null);   // null | "sprog" | "dag"
+  const [underside, setUnderside] = useState(null);   // null | "sprog" | "dag" | "kontakt"
 
   const initialer = avatarTegn(employee.name, employee.id);
 
@@ -4790,6 +4868,8 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
         {underside === "sprog" ? (
           <Valgside navn={da ? "Sprog" : "Language"} valgt={lang} vaelg={setLang}
             punkter={[["da", "Dansk", null], ["en", "English", null]]} />
+        ) : underside === "kontakt" ? (
+          <KontaktSide da={da} onTilbage={() => setUnderside(null)} />
         ) : underside === "dag" ? (
           <Valgside navn={da ? "Vis dagen som" : "Show the day as"} valgt={dagsVisning} vaelg={setDagsVisning}
             punkter={[
@@ -4816,6 +4896,15 @@ function Indstillinger({ employee, session, lang, setLang, dagsVisning, setDagsV
               <span style={{ minWidth: 0 }}>
                 <span style={{ ...titel, display: "block" }}>{da ? "Sprog" : "Language"}</span>
                 <span style={{ ...svar, display: "block" }}>{da ? "Dansk" : "English"}</span>
+              </span>
+              <ChevronRight size={19} color="#CBD5E1" style={{ flexShrink: 0 }} />
+            </button>
+
+            <div style={overskrift}>{da ? "Dig" : "You"}</div>
+            <button style={{ ...raekke, marginBottom: 18 }} onClick={() => setUnderside("kontakt")}>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ ...titel, display: "block" }}>{da ? "Dine oplysninger" : "Your details"}</span>
+                <span style={{ ...svar, display: "block" }}>{da ? "Telefon og nødkontakt" : "Phone and emergency contact"}</span>
               </span>
               <ChevronRight size={19} color="#CBD5E1" style={{ flexShrink: 0 }} />
             </button>
