@@ -1679,7 +1679,7 @@ const HELP_DA = [
       "Tryk på en opgave i listen, så åbner den, og du kan registrere og afslutte med det samme. Den forsvinder fra listen, og tallet tæller ned.",
       "Du kommer altid tilbage til listen bagefter — også hvis du fortryder og hellere vil tage en anden først. Så kan du arbejde dig ned gennem den uden at lede efter udråbstegnet hver gang.",
       "Er der intet udråbstegn, mangler du ingenting. Det er den samme opgørelse, som påmindelsesmailen kl. 18 bruger — de kan ikke komme til at sige hver sit.",
-      "Til kontoret: vælger du en kollega under «Se plan for», viser udråbstegnet hendes tal og hendes liste, så I kan hjælpe hende over telefonen. Det er kun visning — I kan ikke registrere for hende.",
+      "Til kontoret: vælger du en kollega under «Se plan for», viser udråbstegnet kollegaens tal og kollegaens liste, så I kan hjælpe over telefonen. Det er kun visning — I kan ikke registrere for kollegaen.",
       "Husk: når måneden lukker, kan timer og kørsel fra den måned ikke længere komme med på lønnen." ] },
   { t: "Nexus-borgere", p: [
       "Er opgaven hos en Nexus-borger, står det øverst på opgaven, og der er en knap til at åbne KMD Nexus.",
@@ -1707,14 +1707,14 @@ const HELP_DA = [
       "Øverst på tilbudsskærmen ligger en opgaveliste for før, under og efter mødet. Tryk på et punkt for at sætte flueben. Kontoret ser de samme flueben, og du kan tilføje eller fjerne punkter.",
       "Referatet er lavet til at blive dikteret. Tryk på mikrofonen på tastaturet og tal — ret det bagefter.",
       "Du kan lægge op til 10 billeder på. De er interne, medmindre du på tilbuddet vælger at vise dem til kunden.",
-      "«Send til kunden» danner PDF'en og mailer et link hun kan acceptere fra. Accepterer hun, dannes aftalen som kladde — du sætter selv startdato og ugedage.",
+      "«Send til kunden» danner PDF'en og mailer et link kunden kan acceptere fra. Accepterer kunden, dannes aftalen som kladde — du sætter selv startdato og ugedage.",
       "Skal kunden godkende med det samme, så tryk «Underskriv med kunden» og giv telefonen til kunden. Kunden skriver sit navn og skriver under med fingeren. Tilbuddet bliver godkendt, underskriften sættes ind i PDF'en, og kunden får den på mail, hvis der er en adresse.",
       "Har kunden ikke en mail, så tryk «Godkend for kunden». Skriv hvem der har sagt ja og hvordan (telefon, på stedet, brev). Det registreres med dit navn, og aftalen dannes som kladde." ] },
   { t: "MUS-samtale", p: [
       "En MUS-samtale ligger i din opgaveliste som «MUS: navn». Åbn den under samtalen.",
       "Er du leder, skriver du referatet her. Det er lavet til at blive dikteret: tryk på mikrofonen på tastaturet og tal. Har medarbejderen delt sin forberedelse, ser du den øverst.",
       "«Gem kladde» gemmer, uden at medarbejderen ser noget. «Send til medarbejderen» markerer samtalen som holdt og sender referatet til godkendelse i Personalemappen.",
-      "Medarbejderen godkender referatet eller skriver en bemærkning. Har hun bemærkninger, står de øverst — ret referatet og send det igen. Et godkendt referat kan ikke rettes.",
+      "Medarbejderen godkender referatet eller skriver en bemærkning. Har medarbejderen bemærkninger, står de øverst — ret referatet og send det igen. Et godkendt referat kan ikke rettes.",
       "Er du medarbejderen, ser du kun status her. Referatet godkender du i Personalemappen." ] },
   { t: "Dine timer — de tre tal", p: [
       "Tryk på bil-ikonet øverst. Under fanen Timer kan du se, hvad der bliver rapporteret til løn.",
@@ -1726,7 +1726,7 @@ const HELP_DA = [
       "Passer et tal ikke med det, du husker, så tag fat i kontoret med datoen og opgaven. Så kan I kigge på det samme.",
       "Er I flere på en opgave, kan kontoret have fordelt timerne ulige. Den tid der foreslås, når du afslutter, er DIN andel — ikke hele opgavens.",
       "Er du med på en opgave for at lære, står det på opgaven. Registrér din tid som altid — den tæller på din løn præcis som alt andet. Det er kun kundens faktura, den ikke går på.",
-      "Er du planlægger og har valgt en kollega under «Se plan for», viser siden hendes tal og ikke dine. Hendes navn står i overskriften, og der er en orange bjælke øverst.",
+      "Er du planlægger og har valgt en kollega under «Se plan for», viser siden kollegaens tal og ikke dine. Kollegaens navn står i overskriften, og der er en orange bjælke øverst.",
     ] },
   { t: "Din kørsel", p: [
       "Under fanen Kørsel — samme sted som timerne — ser du din beregnede kørsel.",
@@ -7401,7 +7401,7 @@ function ManglerPage({ lang, tr, raekker, henter, fejl, visEmpId, visEmpNavn, on
       {anden && (
         <div style={{ background: "#FFF7ED", borderLeft: "4px solid #C2410C", color: "#9A3412",
                       padding: "9px 14px", fontSize: 12.5, lineHeight: 1.45, flexShrink: 0 }}>
-          {da ? "Du ser en kollegas liste. Kun visning — du kan ikke registrere for hende."
+          {da ? "Du ser en kollegas liste. Kun visning — du kan ikke registrere for kollegaen."
               : "You are viewing a colleague's list. View only — you cannot register on her behalf."}
         </div>
       )}
