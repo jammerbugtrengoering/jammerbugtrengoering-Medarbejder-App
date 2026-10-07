@@ -90,6 +90,11 @@ Fejlen, der lå bag: HR-administratorer fik rollen leder og kunne sende deres eg
 
 **Tekster:** skriv aldrig «hun»/«han»/«hende» i noget, brugeren ser — brug «du», «medarbejderen», «kunden», «kollegaen» (Jonns beslutning 7.10.2026). Gælder også `HELP_DA`; hold `HELP_DA` og `HELP_EN` lige lange.
 
+## Nexus og Ældrelov: fast tid (7.10.2026)
+
+Opgaver med kontrakttype `nexus`/`aeldrelov` registreres altid til den aftalte tid. `AfslutOpgave` springer tidstrinnet over (`fastTid`), og kun «Er der noget kontoret skal vide?» er tilbage til mere tid.
+Databasen tvinger det samme (`fast_tid_min` i `afslut_tid`/`append_time_log`) — så rør aldrig reglen kun i appen. Er aftalt tid 0, vises trinnet som før. Detaljer i planlægningsappens CLAUDE.md.
+
 ## Når I er flere om det samme repository
 
 **Sæt de her én gang på hver maskine:**

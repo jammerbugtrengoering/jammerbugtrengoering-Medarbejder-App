@@ -507,6 +507,7 @@ const T = {
     finishZeroOk: "Skal du ikke tilføje mere tid, lader du bare 0 stå og trykker Videre.",
     finishSaveFailed: "Kunne ikke gemme. Tjek at du har forbindelse, og prøv igen.",
     finishNoteQ: "Er der noget kontoret skal vide?",
+    finishFixedTime: (min) => `Tiden registreres som den aftalte: ${min}. Er der brugt mere tid, så skriv det her til kontoret.`,
     finishNoteHint: "Var der ekstra beskidt, eller noget i stykker? Tag et billede.",
     finishNothingHappened: "Spring over — der skete ikke noget",
     finishDone: "Opgaven er afsluttet",
@@ -717,6 +718,7 @@ const T = {
     finishZeroOk: "If you are not adding more time, just leave it at 0 and tap Next.",
     finishSaveFailed: "Could not save. Check your connection and try again.",
     finishNoteQ: "Anything the office should know?",
+    finishFixedTime: (min) => `The time is logged as the agreed time: ${min}. If you used more time, write it here for the office.`,
     finishNoteHint: "Was it extra dirty, or was something broken? Take a photo.",
     finishNothingHappened: "Skip — nothing happened",
     finishDone: "The job is complete",
@@ -1653,6 +1655,7 @@ const HELP_DA = [
       "Har du fortrudt en afslutning og åbner opgaven igen — fx for at tilføje et billede — står der 0, og det er helt i orden. Din tid er registreret i forvejen, og du skal ikke taste mere for at komme videre." ] },
   { t: "Start og Afslut på store opgaver", p: [
     "Ligger din tid inden for ± 5 minutter af den planlagte (kontoret kan ændre grænsen), registreres den planlagte tid. Er opgaven sat til 60 minutter, og du afslutter efter 56 eller 64, står der 60 — både på din løn og på kundens regning. Så skal du heller ikke skrive nogen begrundelse.",
+    "Nexus- og Ældrelov-opgaver registreres altid til den aftalte tid. Du får derfor ikke spørgsmålet om tid — tiden står som aftalt. Er der brugt mere tid, så skriv det i beskeden til kontoret, når du afslutter.",
       "Nogle medarbejdere har Start og Afslut på de store opgaver. Har du ikke, ser du ingenting af det her — så registrerer du tid som beskrevet ovenfor.",
       "Har du det, står der en grøn knap «▶ Start tiden» på store opgaver. Tryk på den, når du står hos kunden. Når du er færdig, trykker du «Afslut opgave» som altid.",
       "Har du Worklist åben, når du kommer frem, kan tiden starte af sig selv. Så kommer der en grøn linje øverst. Var det forkert, tryk «Fortryd start».",
@@ -1887,6 +1890,7 @@ const HELP_EN = [
       "If you undid a completion and open the job again — for example to add a photo — it says 0, and that is fine. Your time is already registered, and you do not need to enter more to continue." ] },
   { t: "Start and Finish on large jobs", p: [
     "If your time is within ± 5 minutes of the planned time (the office can change the limit), the planned time is logged. If the job is set to 60 minutes and you finish after 56 or 64, it says 60 — on your pay and on the customer's bill. You do not need to give a reason either.",
+    "Nexus and Elder-law (Ældrelov) jobs are always logged as the agreed time. You are not asked about time — it is set as agreed. If you used more time, write it in the message to the office when you finish.",
       "Some employees have Start and Finish on large jobs. If you do not, you will not see any of this — you log time as described above.",
       "If you do, a green «▶ Start time» button appears on large jobs. Tap it when you are at the customer. When you are done, tap «Complete job» as always.",
       "If Worklist is open when you arrive, the time can start by itself. A green line then appears at the top. If that was wrong, tap «Undo start».",
@@ -3653,6 +3657,7 @@ function MeldProblem({ task, employee, lang, tr, supabaseClient, onAfbryd, onSen
 function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLogMinutes, onSetStatus, onAfbryd, onFaerdig, startStop = null }) {
   const synlig = useSynligHoejde();
   const erNexus = task.contractType === "nexus";
+  const erAeldrelov = task.contractType === "aeldrelov";
 
   // Produkter udleveres paa KONTORET af planlaeggeren. Medarbejderen vaelger altsaa
   // ikke laengere varer her — hun BEKRAEFTER at kunden har faaet det hun fik med.
@@ -3681,12 +3686,21 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
     return () => { afbrudt = true; };
   }, [task.id, task.dinero_contact_guid, employee.id, supabaseClient]);
 
+  const fordeling = task.tidFordeling || task.tid_fordeling || {};
+  const minEgenTid = Number(fordeling[employee.id]) > 0
+    ? Math.round(Number(fordeling[employee.id]))
+    : (task.duration || 0);
+  // Nexus og Ældrelov registreres ALTID til den aftalte tid (7.10.2026, Jonn): tidstrinnet springes over, og
+  // mere tid skrives som besked til kontoret. Databasen (fast_tid_min) tvinger det samme, så en gammel
+  // fane ikke kan sende en anden tid. Er der ingen aftalt tid (0), er tiden ikke fast, og trinnet vises.
+  const fastTid = (erNexus || erAeldrelov) && minEgenTid > 0;
+
   // Trinnene bygges op efter opgaven, saa taellingen "3 af 4" passer til det man
   // faktisk faar at se. En erhvervsopgave spoerges ikke om Nexus, og har hun ingen
   // varer med til kunden, er der ingen grund til at spoerge om produkter.
   const spoergOmProdukter = (udleveringer?.length || 0) > 0;
   const trin = [
-    "tid",
+    ...(fastTid ? [] : ["tid"]),
     ...(spoergOmProdukter ? ["produkter"] : []),
     ...(erNexus ? ["nexus"] : []),
     "besked",
@@ -3709,10 +3723,6 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
   // hun faa gennemsnittet foreslaaet og se ud til at overskride med det samme.
   //
   // Er der ikke fordelt, er andelen opgavens varighed, praecis som foer.
-  const fordeling = task.tidFordeling || task.tid_fordeling || {};
-  const minEgenTid = Number(fordeling[employee.id]) > 0
-    ? Math.round(Number(fordeling[employee.id]))
-    : (task.duration || 0);
   // Alt planlagt arbejde paa opgaven: summen af andelene, hvis der er fordelt.
   const planlagt = Object.keys(fordeling).length > 0
     ? (task.assignees || []).reduce((sum, id) => sum
@@ -3742,9 +3752,12 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
   const [stopMs] = useState(() => Date.now());
   const startMs = startStop?.startet?.startMs ?? null;
   const [maalt, setMaalt] = useState(() => maaltMin(startMs, stopMs));
-  const [samletMin, setSamletMin] = useState(() => (maalt !== null
-    ? maalt
-    : Math.max(0, Math.round(minEgenTid - migLoggede))));
+  // Fast tid: den aftalte tid, men kun én gang — har hun allerede en registrering, tilføjes intet (databasen gør det samme).
+  const [samletMin, setSamletMin] = useState(() => (fastTid
+    ? (migLoggede > 0 ? 0 : minEgenTid)
+    : maalt !== null
+      ? maalt
+      : Math.max(0, Math.round(minEgenTid - migLoggede))));
   const timer = Math.floor(samletMin / 60);
   const minutter = samletMin % 60;
   const [begrundelse, setBegrundelse] = useState("");
@@ -3776,12 +3789,12 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
   // Er der ingen planlagt varighed, findes der ingen overskridelse at begrunde.
   // Og tilfoejer hun ingen tid, er der heller ikke noget nyt at forklare — den tid
   // der allerede staar, er begrundet dengang den blev registreret.
-  const overskrider = planlagt > 0 && afvigelse > 0 && minutterIAlt > 0;
+  const overskrider = !fastTid && planlagt > 0 && afvigelse > 0 && minutterIAlt > 0;
   // Rettet fra det maalte med mere end to minutter? Saa skal hun skrive hvorfor —
   // i begge retninger. Én begrundelse daekker baade rettelsen og overskridelsen.
   // En systemstart er et skoen, ikke en maaling (29.9.2026): retter hun den, skal hun
   // ikke forklare det. Databasen (afslut_tid) goer det samme.
-  const rettet = !!startStop && !startStop?.startet?.system && kraeverBegrundelse(minutterIAlt, maalt);
+  const rettet = !fastTid && !!startStop && !startStop?.startet?.system && kraeverBegrundelse(minutterIAlt, maalt);
   // Inden for tolerancen (start/stop) bliver tiden den planlagte — saa er der hverken
   // en overskridelse eller en rettelse at forklare.
   const tolerance = Number(startStop?.tolerance) || 0;
@@ -4207,6 +4220,7 @@ function AfslutOpgave({ task, employee, lang, tr, supabaseClient, fraListe, onLo
             <>
               <div style={s.trinSpoergsmaal}>{tr.finishNoteQ}</div>
               <div style={s.trinHjaelp}>{tr.finishNoteHint}</div>
+              {fastTid && <div style={{ ...s.trinHjaelp, fontWeight: 700, marginTop: 8 }}>{tr.finishFixedTime(fmtMin(minEgenTid))}</div>}
               <textarea rows={3} value={beskedTekst} onChange={(e) => setBeskedTekst(e.target.value)}
                 placeholder={tr.notesPlaceholder} style={{ ...s.notatInput, marginTop: 12 }} />
               <div style={{ marginTop: 8 }}>
