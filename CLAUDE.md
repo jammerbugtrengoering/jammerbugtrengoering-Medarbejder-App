@@ -82,6 +82,14 @@ kopieres herind igen, ellers er det den gamle, medarbejderne øver sig på.
 
 ---
 
+## MUS-samtale (6.10.2026)
+
+Aktiviteter med titlen **`MUS: navn`** åbner `MusSkaerm`, ikke tilbudsskærmen (ruten ligger ved `openTask.type === "aktivitet"`). Alt går gennem `mus_for_opgave`, `gem_mus_referat`, `mus_holdt`.
+Rollen kommer fra databasen: **kun lederen** ser «Gem kladde» / «Send til medarbejderen». Medarbejderen og HR ser kun status. Referatet godkendes i Personalemappen-appen. Ændres titlen i planlægningsappen (`addActivity`), skal ruten her med.
+Fejlen, der lå bag: HR-administratorer fik rollen leder og kunne sende deres eget referat.
+
+**Tekster:** skriv aldrig «hun»/«han»/«hende» i noget, brugeren ser — brug «du», «medarbejderen», «kunden», «kollegaen» (Jonns beslutning 7.10.2026). Gælder også `HELP_DA`; hold `HELP_DA` og `HELP_EN` lige lange.
+
 ## Når I er flere om det samme repository
 
 **Sæt de her én gang på hver maskine:**
