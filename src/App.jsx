@@ -6754,8 +6754,10 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
 
         <BeskedBanner lang={lang} employee={employee} />
 
+        {/* Ser kontoret en kollegas plan, skal flueben, farve og tid være kollegaens og ikke kontorets egne (8.10.2026: en afsluttet opgave stod gul).
+            Kun visning: kortene registrerer ikke noget. */}
         {dagsVisning === "tid" && schedule.length > 0 && (
-          <Tidslinje schedule={schedule} employee={employee} lang={lang}
+          <Tidslinje schedule={schedule} employee={viewedEmployee || employee} lang={lang}
             erIDag={day === todayWorkdayKey()} onVaelg={setOpenTask} />
         )}
 
@@ -6783,7 +6785,7 @@ if (recoveryToken) return React.createElement("div", { style: { display:"flex",a
 
           const t = seg.task;
           return (
-            <TaskCard key={t.id} seg={seg} employee={employee} lang={lang} onClick={() => setOpenTask(t)} />
+            <TaskCard key={t.id} seg={seg} employee={viewedEmployee || employee} lang={lang} onClick={() => setOpenTask(t)} />
           );
         })}
       </div>
