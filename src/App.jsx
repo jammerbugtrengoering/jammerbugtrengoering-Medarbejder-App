@@ -5577,6 +5577,7 @@ export default function MedarbejderApp() {
   const senderRef = useRef(false);
   // Sand naar den naeste genhentning skal ske uden at bytte skaermen ud.
   const stilleGenhentRef = useRef(false);
+  const sidsteHentRef = useRef(0);
   // Taelles op naar koeen er toemt, saa dagen hentes forfra fra databasen.
   const [genhent, setGenhent] = useState(0);
   const [henterAdgang, setHenterAdgang] = useState(false);
@@ -5761,7 +5762,20 @@ useEffect(() => {
     const ur = setInterval(() => { if (navigator.onLine) sendKoe(); }, 60 * 1000);
     // Naar appen kommer frem igen efter at have ligget i baggrunden — det er dét der
     // sker naar hun tager telefonen op af lommen ude hos naeste kunde.
-    function paaSynlig() { if (document.visibilityState === "visible" && navigator.onLine) sendKoe(); }
+    // Planen ændres på kontoret, mens telefonen ligger i lommen (9.10.2026: en opgave lagt på
+    // fredag dukkede ikke op, før appen blev lukket helt ned). Der er hverken realtime eller
+    // polling, så planen hentes forfra, når appen kommer frem og er over et minut gammel —
+    // stille, så et åbent skærmbillede ikke forsvinder. Aldrig mens der ligger noget i køen:
+    // så hentes den af sendKoe, når den er tømt, og de lokale tal må ikke overskrives.
+    async function opfrisk() {
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      if (Date.now() - sidsteHentRef.current < 60 * 1000) return;
+      if ((await koeAlle()).length > 0) return;
+      stilleGenhentRef.current = true;
+      setGenhent((n) => n + 1);
+    }
+    function paaSynlig() { if (document.visibilityState === "visible" && navigator.onLine) { sendKoe(); opfrisk(); } }
+    const opfriskUr = setInterval(opfrisk, 5 * 60 * 1000);
     document.addEventListener("visibilitychange", paaSynlig);
     sendKoe();
     return () => {
@@ -5769,6 +5783,7 @@ useEffect(() => {
       window.removeEventListener("online", paaNet);
       document.removeEventListener("visibilitychange", paaSynlig);
       clearInterval(ur);
+      clearInterval(opfriskUr);
     };
   }, [session?.user?.id]);
 
@@ -5950,6 +5965,7 @@ useEffect(() => {
           travelSettings: rejse,
         });
       }
+      sidsteHentRef.current = Date.now();
       setDataLoading(false);
     }
     load();
