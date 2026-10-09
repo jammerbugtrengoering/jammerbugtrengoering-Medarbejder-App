@@ -7347,7 +7347,7 @@ function ShopPage({ employee, lang, supabaseClient, onClose }) {
             <button
               style={{ ...s.doneLarge,background:saved?"#ECFDF5":orderCount>0?"var(--farve)":"#fff",color:saved?"#16A34A":orderCount>0?"#fff":"#475569",borderColor:saved?"#22C55E":orderCount>0?"var(--farve)":"#E2E8F0",fontWeight:700 }}
               onClick={submitOrder} disabled={saving||orderCount===0}>
-              {saved?("\u2713 "+(lang==="da"?"Bestilling sendt":"Order sent")):saving?"...":(orderCount>0?(lang==="da"?"Bestil ":"Order ")+orderCount+" "+(lang==="da"?"produkter":"products"):(lang==="da"?"Vaelg produkter":"Select products"))}
+              {saved?("\u2713 "+(lang==="da"?"Bestilling sendt":"Order sent")):saving?"...":(orderCount>0?(lang==="da"?"Bestil ":"Order ")+orderCount+" "+(lang==="da"?"produkter":"products"):(lang==="da"?"Vælg produkter":"Select products"))}
             </button>
           </div>
         )}
