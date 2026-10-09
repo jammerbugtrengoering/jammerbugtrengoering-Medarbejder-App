@@ -5854,7 +5854,8 @@ useEffect(() => {
       // Databasen har i forvejen sidste ord: en almindelig medarbejder kan slet
       // ikke laese andres opgaver, uanset hvad brugerfladen viser.
       if (empData.is_admin && isDesktopBrowser()) {
-        const { data: emps } = await supabase.from("employees").select("id,name,color").order("name");
+        // Fratrådte vises ikke (9.10.2026): Michelle Pedersen, fratrådt 7.9., stod stadig i «Se plan for» og kunne vælges. De har ingen plan at hjælpe med.
+        const { data: emps } = await supabase.from("employees").select("id,name,color").is("fratraadt_dato", null).order("name");
         setAllEmployees(emps || []);
       } else {
         setAllEmployees([]);
